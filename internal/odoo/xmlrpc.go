@@ -31,6 +31,25 @@ func (x *XMLRPCClient) Close() {
 	x.client.Close()
 }
 
+// ListProjects returns all projects from Odoo.
+func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
+	criteria := goOdoo.NewCriteria()
+	projects, err := x.client.FindProjectProjects(criteria, goOdoo.NewOptions())
+	if err != nil {
+		return nil, fmt.Errorf("fetching projects: %w", err)
+	}
+
+	result := make([]ProjectInfo, 0, len(*projects))
+	for _, p := range *projects {
+		result = append(result, ProjectInfo{
+			ID:     p.Id.Get(),
+			Name:   p.Name.Get(),
+			Active: p.Active.Get(),
+		})
+	}
+	return result, nil
+}
+
 // WhoAmI returns the identity of the currently authenticated user.
 func (x *XMLRPCClient) WhoAmI() (*UserInfo, error) {
 	criteria := goOdoo.NewCriteria().Add("login", "=", x.login)

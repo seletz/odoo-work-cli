@@ -7,12 +7,18 @@ import (
 
 // mockClient implements Client for testing.
 type mockClient struct {
-	info *UserInfo
-	err  error
+	info     *UserInfo
+	err      error
+	projects []ProjectInfo
+	projErr  error
 }
 
 func (m *mockClient) WhoAmI() (*UserInfo, error) {
 	return m.info, m.err
+}
+
+func (m *mockClient) ListProjects() ([]ProjectInfo, error) {
+	return m.projects, m.projErr
 }
 
 func TestWhoAmI_Success(t *testing.T) {

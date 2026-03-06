@@ -1,5 +1,5 @@
 # Binaries
-odoo-work-cli
+/odoo-work-cli
 *.exe
 *.dll
 *.so
