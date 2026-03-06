@@ -4,11 +4,13 @@ CLI tool for managing Odoo 17 timesheets, written in Go.
 
 ## Design Doc
 
--  `~/develop/notes/00 Persönlich/00.03 Projekte/odoo-work-cli/odoo-work-cli.md`
+- `~/develop/notes/00 Persönlich/00.03 Projekte/odoo-work-cli/odoo-work-cli.md`
+
+**IMPORTANT:** Always use TDD, red/green phase
 
 ## Progress Tracking and ODOO API Notes
 
--  `~/develop/notes/00 Persönlich/00.03 Projekte/odoo-work-cli/odoo-work-cli progress.md`
+- `~/develop/notes/00 Persönlich/00.03 Projekte/odoo-work-cli/odoo-work-cli progress.md`
 
 ## Project Structure
 
@@ -30,7 +32,6 @@ internal/display/             # Output formatting (placeholder, M4)
 - `github.com/spf13/cobra` — CLI framework
 - `github.com/skilld-labs/go-odoo` — Odoo XML-RPC client (generated model types)
 - `github.com/BurntSushi/toml` — TOML config parsing
-
 
 ## Odoo API Notes
 
@@ -65,4 +66,3 @@ mise run fmt          # gofmt
 - Go RST-style docstrings
 - No personal data, credentials, or company-specific URLs in committed code
 - golangci-lint v2 with `version: "2"` in `.golangci.yml`, `default: standard` linters
-
