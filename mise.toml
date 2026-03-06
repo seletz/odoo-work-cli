@@ -1,3 +1,5 @@
+env_file = '.env'
+
 [tools]
 go = "latest"
 op = "latest"
@@ -21,4 +23,4 @@ run = "gofmt -w ."
 
 [tasks.inject-env]
 description = "Inject secrets from 1Password into .env"
-run = "op inject -i .env.1p -o .env"
+run = "op inject -f -i .env.1p -o .env"
