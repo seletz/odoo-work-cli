@@ -1,0 +1,24 @@
+[tools]
+go = "latest"
+op = "latest"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
+
+[tasks.build]
+description = "Build the CLI binary"
+run = "go build -o odoo-work-cli ./cmd/odoo-work-cli"
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "golangci-lint run ./..."
+
+[tasks.fmt]
+description = "Format Go code"
+run = "gofmt -w ."
+
+[tasks.inject-env]
+description = "Inject secrets from 1Password into .env"
+run = "op inject -i .env.1p -o .env"
