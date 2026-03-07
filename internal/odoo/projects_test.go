@@ -15,30 +15,50 @@ func TestListProjects(t *testing.T) {
 		checkFn  func(t *testing.T, projects []ProjectInfo)
 	}{
 		{
-			name: "success returns projects",
+			name: "success returns projects with all fields",
 			client: &mockClient{
 				projects: []ProjectInfo{
-					{ID: 1, Name: "Project Alpha", Active: true},
-					{ID: 2, Name: "Project Beta", Active: false},
+					{
+						ID: 1, Name: "Project Alpha", Active: true,
+						Customer: "ACME Corp", Company: "nexiles",
+						Stage: "In Progress", ProductOwner: "Jane Doe",
+						ProjectManager: "John Smith",
+					},
+					{
+						ID: 2, Name: "Project Beta", Active: false,
+						Customer: "Globex", Company: "digitalgedacht",
+						Stage: "Done", ProductOwner: "Bob",
+						ProjectManager: "Alice",
+					},
 				},
 			},
 			wantLen: 2,
 			checkFn: func(t *testing.T, projects []ProjectInfo) {
 				t.Helper()
-				if projects[0].ID != 1 {
-					t.Errorf("projects[0].ID = %d, want 1", projects[0].ID)
+				p := projects[0]
+				if p.ID != 1 {
+					t.Errorf("ID = %d, want 1", p.ID)
 				}
-				if projects[0].Name != "Project Alpha" {
-					t.Errorf("projects[0].Name = %q, want %q", projects[0].Name, "Project Alpha")
+				if p.Name != "Project Alpha" {
+					t.Errorf("Name = %q, want %q", p.Name, "Project Alpha")
 				}
-				if !projects[0].Active {
-					t.Error("projects[0].Active = false, want true")
+				if !p.Active {
+					t.Error("Active = false, want true")
 				}
-				if projects[1].ID != 2 {
-					t.Errorf("projects[1].ID = %d, want 2", projects[1].ID)
+				if p.Customer != "ACME Corp" {
+					t.Errorf("Customer = %q, want %q", p.Customer, "ACME Corp")
 				}
-				if projects[1].Active {
-					t.Error("projects[1].Active = true, want false")
+				if p.Company != "nexiles" {
+					t.Errorf("Company = %q, want %q", p.Company, "nexiles")
+				}
+				if p.Stage != "In Progress" {
+					t.Errorf("Stage = %q, want %q", p.Stage, "In Progress")
+				}
+				if p.ProductOwner != "Jane Doe" {
+					t.Errorf("ProductOwner = %q, want %q", p.ProductOwner, "Jane Doe")
+				}
+				if p.ProjectManager != "John Smith" {
+					t.Errorf("ProjectManager = %q, want %q", p.ProjectManager, "John Smith")
 				}
 			},
 		},

@@ -11,9 +11,14 @@ type UserInfo struct {
 
 // ProjectInfo holds summary information for an Odoo project.
 type ProjectInfo struct {
-	ID     int64
-	Name   string
-	Active bool
+	ID             int64
+	Name           string
+	Active         bool
+	Customer       string
+	Company        string
+	Stage          string
+	ProductOwner   string
+	ProjectManager string
 }
 
 // TaskInfo holds summary information for an Odoo task.

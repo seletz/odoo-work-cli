@@ -53,10 +53,13 @@ var projectsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%-8s %-40s %s\n", "ID", "Name", "Active")
-		fmt.Printf("%-8s %-40s %s\n", "--------", "----------------------------------------", "------")
+		fmt.Printf("%-6s %-30s %-20s %-15s %-15s %-20s %-20s %s\n",
+			"ID", "Name", "Customer", "Company", "Stage", "Product Owner", "Project Manager", "Active")
+		fmt.Printf("%-6s %-30s %-20s %-15s %-15s %-20s %-20s %s\n",
+			"------", "------------------------------", "--------------------", "---------------", "---------------", "--------------------", "--------------------", "------")
 		for _, p := range projects {
-			fmt.Printf("%-8d %-40s %v\n", p.ID, p.Name, p.Active)
+			fmt.Printf("%-6d %-30s %-20s %-15s %-15s %-20s %-20s %v\n",
+				p.ID, p.Name, p.Customer, p.Company, p.Stage, p.ProductOwner, p.ProjectManager, p.Active)
 		}
 		return nil
 	},

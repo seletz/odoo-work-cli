@@ -32,10 +32,26 @@ func (x *XMLRPCClient) Close() {
 	x.client.Close()
 }
 
+// projectRecord is a custom struct for deserializing project.project via SearchRead.
+// It includes the custom field x_studio_productowner that is not in the generated go-odoo types.
+type projectRecord struct {
+	Id                   *goOdoo.Int     `xmlrpc:"id,omitempty"`
+	Name                 *goOdoo.String  `xmlrpc:"name,omitempty"`
+	Active               *goOdoo.Bool    `xmlrpc:"active,omitempty"`
+	PartnerId            *goOdoo.Many2One `xmlrpc:"partner_id,omitempty"`
+	CompanyId            *goOdoo.Many2One `xmlrpc:"company_id,omitempty"`
+	StageId              *goOdoo.Many2One `xmlrpc:"stage_id,omitempty"`
+	UserId               *goOdoo.Many2One `xmlrpc:"user_id,omitempty"`
+	XStudioProductowner  *goOdoo.Many2One `xmlrpc:"x_studio_productowner,omitempty"`
+}
+
+type projectRecords []projectRecord
+
 // ListProjects returns all projects from Odoo.
 func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 	criteria := goOdoo.NewCriteria()
-	projects, err := x.client.FindProjectProjects(criteria, goOdoo.NewOptions())
+	var records projectRecords
+	err := x.client.SearchRead("project.project", criteria, goOdoo.NewOptions(), &records)
 	if IsNotFound(err) {
 		return []ProjectInfo{}, nil
 	}
@@ -43,13 +59,29 @@ func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 		return nil, fmt.Errorf("fetching projects: %w", err)
 	}
 
-	result := make([]ProjectInfo, 0, len(*projects))
-	for _, p := range *projects {
-		result = append(result, ProjectInfo{
+	result := make([]ProjectInfo, 0, len(records))
+	for _, p := range records {
+		info := ProjectInfo{
 			ID:     p.Id.Get(),
 			Name:   p.Name.Get(),
 			Active: p.Active.Get(),
-		})
+		}
+		if p.PartnerId != nil {
+			info.Customer = p.PartnerId.Name
+		}
+		if p.CompanyId != nil {
+			info.Company = p.CompanyId.Name
+		}
+		if p.StageId != nil {
+			info.Stage = p.StageId.Name
+		}
+		if p.UserId != nil {
+			info.ProjectManager = p.UserId.Name
+		}
+		if p.XStudioProductowner != nil {
+			info.ProductOwner = p.XStudioProductowner.Name
+		}
+		result = append(result, info)
 	}
 	return result, nil
 }
