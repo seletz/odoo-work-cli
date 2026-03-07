@@ -15,7 +15,7 @@ func TestListTimesheets(t *testing.T) {
 		checkFn func(t *testing.T, entries []TimesheetEntry)
 	}{
 		{
-			name: "success returns entries",
+			name: "success returns only current user entries",
 			client: &mockClient{
 				timesheets: []TimesheetEntry{
 					{ID: 100, Date: "2026-03-02", Project: "Alpha", Task: "Task A", Name: "Dev work", Hours: 4.0, Employee: "Test User"},
@@ -36,6 +36,12 @@ func TestListTimesheets(t *testing.T) {
 				}
 				if entries[0].Project != "Alpha" {
 					t.Errorf("entries[0].Project = %q, want %q", entries[0].Project, "Alpha")
+				}
+				// All entries should belong to the same user.
+				for i, e := range entries {
+					if e.Employee != "Test User" {
+						t.Errorf("entries[%d].Employee = %q, want %q", i, e.Employee, "Test User")
+					}
 				}
 			},
 		},

@@ -85,7 +85,8 @@ func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
 func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error) {
 	criteria := goOdoo.NewCriteria().
 		Add("date", ">=", dateFrom).
-		Add("date", "<=", dateTo)
+		Add("date", "<=", dateTo).
+		Add("user_id.login", "=", x.login)
 	lines, err := x.client.FindAccountAnalyticLines(criteria, goOdoo.NewOptions())
 	if err != nil {
 		return nil, fmt.Errorf("fetching timesheets: %w", err)
