@@ -18,6 +18,7 @@ type uiState int
 const (
 	stateLoading uiState = iota
 	stateGrid
+	stateDetail
 	stateError
 )
 
@@ -131,12 +132,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 
+		case key.Matches(msg, m.keys.Back):
+			if m.state == stateDetail {
+				m.state = stateGrid
+				return m, nil
+			}
+
 		case key.Matches(msg, m.keys.Left):
+			if m.state == stateDetail {
+				m.state = stateGrid
+			}
 			m.monday = MondayTime{m.monday.AddDate(0, 0, -7)}
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 
 		case key.Matches(msg, m.keys.Right):
+			if m.state == stateDetail {
+				m.state = stateGrid
+			}
 			m.monday = MondayTime{m.monday.AddDate(0, 0, 7)}
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
@@ -144,6 +157,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.state == stateGrid {
 			switch {
+			case key.Matches(msg, m.keys.Enter):
+				if m.cursor[0] < len(m.grid.Rows) {
+					m.state = stateDetail
+				}
+				return m, nil
 			case key.Matches(msg, m.keys.Up):
 				if m.cursor[0] > 0 {
 					m.cursor[0]--
@@ -180,7 +198,7 @@ func (m Model) View() tea.View {
 	case stateError:
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
-	case stateGrid:
+	case stateGrid, stateDetail:
 		sunday := m.monday.AddDate(0, 0, 6)
 		loadingIndicator := ""
 		if m.loading {
@@ -193,8 +211,14 @@ func (m Model) View() tea.View {
 			sunday.Format("Mon 02 Jan 2006"),
 			loadingIndicator)
 		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols)
+
 		helpView := m.help.View(m.keys)
 		s = "\n" + title + grid + "\n  " + helpView + "\n"
+
+		if m.state == stateDetail && m.cursor[0] < len(m.grid.Rows) {
+			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.width)
+			s = RenderDetailOverlay(s, detail, m.width, m.height)
+		}
 	}
 
 	// Pad to full terminal height so alt screen doesn't show artifacts.

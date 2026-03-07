@@ -11,8 +11,9 @@ import (
 
 // GridRow represents a single project/task row in the weekly grid.
 type GridRow struct {
-	Label string
-	Hours [7]float64 // Mon=0 .. Sun=6
+	Label   string
+	Hours   [7]float64                // Mon=0 .. Sun=6
+	Entries [7][]odoo.TimesheetEntry  // individual entries per day
 }
 
 // WeekGrid holds the aggregated weekly timesheet data.
@@ -51,6 +52,7 @@ func BuildWeekGrid(entries []odoo.TimesheetEntry, monday time.Time) WeekGrid {
 			g.Rows = append(g.Rows, GridRow{Label: label})
 		}
 		g.Rows[idx].Hours[dayOffset] += e.Hours
+		g.Rows[idx].Entries[dayOffset] = append(g.Rows[idx].Entries[dayOffset], e)
 	}
 
 	sort.Slice(g.Rows, func(i, j int) bool {

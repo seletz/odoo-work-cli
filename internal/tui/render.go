@@ -3,7 +3,10 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"charm.land/bubbles/v2/table"
+	"charm.land/lipgloss/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
 )
 
@@ -128,4 +131,140 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	b.WriteString("\n")
 
 	return b.String()
+}
+
+// RenderDetail renders a detail panel for a specific cell showing individual entries.
+// Uses the bubbles table widget for the entries listing. The returned string is the
+// inner content (no border); use RenderDetailOverlay to composite it as a centered
+// overlay box on top of a background.
+func RenderDetail(row GridRow, col int, monday time.Time, width int) string {
+	// Inner content width is reduced by border (2) + padding (4).
+	innerWidth := width - 8
+	if innerWidth < 40 {
+		innerWidth = 40
+	}
+
+	var b strings.Builder
+
+	day := monday.AddDate(0, 0, col)
+	header := fmt.Sprintf("%s — %s", row.Label, day.Format("Mon 02 Jan 2006"))
+	b.WriteString(detailHeaderStyle.Render(header))
+	b.WriteString("\n")
+
+	entries := row.Entries[col]
+	if len(entries) == 0 {
+		b.WriteString("\nNo entries")
+		return b.String()
+	}
+
+	// Build table using bubbles table widget.
+	idWidth := 10
+	hoursWidth := 6
+	statusWidth := 10
+	descWidth := innerWidth - idWidth - hoursWidth - statusWidth - 8 // padding between cols
+	if descWidth < 10 {
+		descWidth = 10
+	}
+
+	cols := []table.Column{
+		{Title: "ID", Width: idWidth},
+		{Title: "Hours", Width: hoursWidth},
+		{Title: "Status", Width: statusWidth},
+		{Title: "Description", Width: descWidth},
+	}
+
+	rows := make([]table.Row, 0, len(entries))
+	for _, e := range entries {
+		rows = append(rows, table.Row{
+			fmt.Sprintf("%d", e.ID),
+			FormatHours(e.Hours),
+			e.ValidatedStatus,
+			e.Name,
+		})
+	}
+
+	t := table.New(
+		table.WithColumns(cols),
+		table.WithRows(rows),
+		table.WithHeight(len(entries)+1),
+		table.WithWidth(innerWidth),
+		table.WithStyles(detailTableStyles()),
+	)
+
+	b.WriteString("\n")
+	b.WriteString(t.View())
+	b.WriteString("\n\n")
+	total := fmt.Sprintf("Total: %s (%d entries)", FormatHours(row.Hours[col]), len(entries))
+	b.WriteString(detailHeaderStyle.Render(total))
+
+	return b.String()
+}
+
+// detailTableStyles returns table styles for the detail overlay.
+func detailTableStyles() table.Styles {
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		Bold(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Padding(0, 1)
+	s.Cell = s.Cell.Padding(0, 1)
+	s.Selected = lipgloss.NewStyle() // no selection highlighting
+	return s
+}
+
+// RenderDetailOverlay composites a bordered detail box centered on top of bg.
+func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int) string {
+	box := detailBoxStyle.Render(detail)
+
+	boxLines := strings.Split(box, "\n")
+	bgLines := strings.Split(bg, "\n")
+
+	// Pad bg to full height.
+	for len(bgLines) < bgHeight {
+		bgLines = append(bgLines, "")
+	}
+
+	boxH := len(boxLines)
+	boxW := lipglossWidth(boxLines)
+
+	// Center vertically and horizontally.
+	startRow := (bgHeight - boxH) / 2
+	if startRow < 0 {
+		startRow = 0
+	}
+	startCol := (bgWidth - boxW) / 2
+	if startCol < 0 {
+		startCol = 0
+	}
+
+	for i, bline := range boxLines {
+		row := startRow + i
+		if row >= len(bgLines) {
+			break
+		}
+		bgRunes := []rune(bgLines[row])
+		// Pad bg line if needed.
+		for len(bgRunes) < startCol+len([]rune(bline)) {
+			bgRunes = append(bgRunes, ' ')
+		}
+		// Overwrite bg runes with box content.
+		copy(bgRunes[startCol:], []rune(bline))
+		bgLines[row] = string(bgRunes)
+	}
+
+	return strings.Join(bgLines, "\n")
+}
+
+// lipglossWidth returns the visual width of the widest line.
+func lipglossWidth(lines []string) int {
+	max := 0
+	for _, l := range lines {
+		w := len([]rune(l))
+		if w > max {
+			max = w
+		}
+	}
+	return max
 }

@@ -113,6 +113,44 @@ func TestBuildWeekGrid_WeekendEntries(t *testing.T) {
 	}
 }
 
+func TestBuildWeekGrid_PreservesEntries(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{ID: 100, Date: "2026-03-03", Project: "Acme", Task: "Dev", Hours: 1.0, Name: "auth endpoint", ValidatedStatus: "draft"},
+		{ID: 101, Date: "2026-03-03", Project: "Acme", Task: "Dev", Hours: 2.0, Name: "code review", ValidatedStatus: "validated"},
+		{ID: 102, Date: "2026-03-04", Project: "Acme", Task: "Dev", Hours: 3.0, Name: "bugfix", ValidatedStatus: "draft"},
+	}
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+
+	if len(g.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(g.Rows))
+	}
+	row := g.Rows[0]
+
+	// Tuesday (index 1) should have 2 entries.
+	if len(row.Entries[1]) != 2 {
+		t.Fatalf("expected 2 entries on Tue, got %d", len(row.Entries[1]))
+	}
+	if row.Entries[1][0].ID != 100 {
+		t.Errorf("expected first entry ID 100, got %d", row.Entries[1][0].ID)
+	}
+	if row.Entries[1][1].ID != 101 {
+		t.Errorf("expected second entry ID 101, got %d", row.Entries[1][1].ID)
+	}
+
+	// Wednesday (index 2) should have 1 entry.
+	if len(row.Entries[2]) != 1 {
+		t.Fatalf("expected 1 entry on Wed, got %d", len(row.Entries[2]))
+	}
+	if row.Entries[2][0].Name != "bugfix" {
+		t.Errorf("expected entry name 'bugfix', got %q", row.Entries[2][0].Name)
+	}
+
+	// Monday (index 0) should have no entries.
+	if len(row.Entries[0]) != 0 {
+		t.Errorf("expected 0 entries on Mon, got %d", len(row.Entries[0]))
+	}
+}
+
 func TestFormatHours(t *testing.T) {
 	tests := []struct {
 		input float64

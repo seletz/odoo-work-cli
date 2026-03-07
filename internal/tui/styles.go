@@ -15,6 +15,12 @@ var (
 	hoursLow     = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
 	hoursNormal  = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
 	hoursHigh    = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
+
+	detailHeaderStyle = lipgloss.NewStyle().Bold(true)
+	detailBoxStyle    = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("4")). // blue
+				Padding(1, 2)
 )
 
 // hoursStyle returns the appropriate style based on daily total hours.

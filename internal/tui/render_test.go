@@ -47,6 +47,82 @@ func TestRenderGrid_EmptyGrid(t *testing.T) {
 	}
 }
 
+func TestRenderDetail_ShowsEntries(t *testing.T) {
+	row := GridRow{
+		Label: "Acme Corp / Backend Dev",
+	}
+	row.Entries[0] = []odoo.TimesheetEntry{
+		{ID: 31097, Hours: 2.0, ValidatedStatus: "draft", Name: "Implemented user auth endpoint"},
+		{ID: 31098, Hours: 1.5, ValidatedStatus: "validated", Name: "Code review PR #42"},
+	}
+	row.Hours[0] = 3.5
+
+	mon := monday(2026, 3, 2)
+	out := RenderDetail(row, 0, mon, 80)
+
+	checks := []struct {
+		substr string
+		desc   string
+	}{
+		{"Acme Corp / Backend Dev", "project/task label"},
+		{"Mon 02 Mar", "day name and date"},
+		{"31097", "entry ID 31097"},
+		{"31098", "entry ID 31098"},
+		{"2:00", "formatted hours 2:00"},
+		{"1:30", "formatted hours 1:30"},
+		{"draft", "status 'draft'"},
+		{"validated", "status 'validated'"},
+		{"Implemented user auth endpoint", "entry description"},
+		{"3:30", "total hours"},
+		{"2 entries", "entry count"},
+	}
+	for _, c := range checks {
+		if !strings.Contains(out, c.substr) {
+			t.Errorf("output should contain %s (%q)", c.desc, c.substr)
+		}
+	}
+}
+
+func TestRenderDetail_EmptyCell(t *testing.T) {
+	row := GridRow{Label: "Acme / Dev"}
+	mon := monday(2026, 3, 2)
+	out := RenderDetail(row, 0, mon, 80)
+
+	if !strings.Contains(out, "No entries") {
+		t.Error("output should indicate no entries")
+	}
+}
+
+func TestRenderDetailOverlay_CentersBox(t *testing.T) {
+	// Create a simple background.
+	bgLines := make([]string, 20)
+	for i := range bgLines {
+		bgLines[i] = strings.Repeat(".", 60)
+	}
+	bg := strings.Join(bgLines, "\n")
+
+	row := GridRow{Label: "Test"}
+	row.Entries[0] = []odoo.TimesheetEntry{
+		{ID: 1, Hours: 1.0, ValidatedStatus: "draft", Name: "test entry"},
+	}
+	row.Hours[0] = 1.0
+
+	detail := RenderDetail(row, 0, monday(2026, 3, 2), 60)
+	result := RenderDetailOverlay(bg, detail, 60, 20)
+
+	// The overlay should contain the box border characters.
+	if !strings.Contains(result, "╭") {
+		t.Error("overlay should contain rounded border top-left")
+	}
+	if !strings.Contains(result, "╯") {
+		t.Error("overlay should contain rounded border bottom-right")
+	}
+	// Background dots should still be visible outside the box.
+	if !strings.Contains(result, "...") {
+		t.Error("background should still be visible outside overlay")
+	}
+}
+
 func TestRenderGrid_CorrectLineCount(t *testing.T) {
 	entries := []odoo.TimesheetEntry{
 		{Date: "2026-03-02", Project: "A", Task: "T1", Hours: 1.0},
