@@ -18,8 +18,8 @@ func TestListTimesheets(t *testing.T) {
 			name: "success returns only current user entries",
 			client: &mockClient{
 				timesheets: []TimesheetEntry{
-					{ID: 100, Date: "2026-03-02", Project: "Alpha", Task: "Task A", Name: "Dev work", Hours: 4.0, Employee: "Test User"},
-					{ID: 101, Date: "2026-03-02", Project: "Beta", Task: "Task B", Name: "Review", Hours: 2.5, Employee: "Test User"},
+					{ID: 100, Date: "2026-03-02", Project: "Alpha", Task: "Task A", Name: "Dev work", Hours: 4.0, Employee: "Test User", ValidatedStatus: "draft"},
+					{ID: 101, Date: "2026-03-02", Project: "Beta", Task: "Task B", Name: "Review", Hours: 2.5, Employee: "Test User", ValidatedStatus: "validated"},
 				},
 			},
 			wantLen: 2,
@@ -36,6 +36,12 @@ func TestListTimesheets(t *testing.T) {
 				}
 				if entries[0].Project != "Alpha" {
 					t.Errorf("entries[0].Project = %q, want %q", entries[0].Project, "Alpha")
+				}
+				if entries[0].ValidatedStatus != "draft" {
+					t.Errorf("entries[0].ValidatedStatus = %q, want %q", entries[0].ValidatedStatus, "draft")
+				}
+				if entries[1].ValidatedStatus != "validated" {
+					t.Errorf("entries[1].ValidatedStatus = %q, want %q", entries[1].ValidatedStatus, "validated")
 				}
 				// All entries should belong to the same user.
 				for i, e := range entries {

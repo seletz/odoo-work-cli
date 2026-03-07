@@ -32,13 +32,14 @@ type TaskInfo struct {
 
 // TimesheetEntry holds a single timesheet line from Odoo.
 type TimesheetEntry struct {
-	ID       int64
-	Date     string
-	Project  string
-	Task     string
-	Name     string
-	Hours    float64
-	Employee string
+	ID              int64
+	Date            string
+	Project         string
+	Task            string
+	Name            string
+	Hours           float64
+	Employee        string
+	ValidatedStatus string
 }
 
 // FieldInfo holds metadata about a single model field.

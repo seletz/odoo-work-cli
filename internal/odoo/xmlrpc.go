@@ -233,7 +233,11 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 		Add("date", "<=", dateTo).
 		Add("user_id.login", "=", x.login)
 	x.applyCriteriaFilters(criteria, "timesheet")
-	lines, err := x.client.FindAccountAnalyticLines(criteria, goOdoo.NewOptions())
+
+	fields := []string{"id", "date", "project_id", "task_id", "name", "unit_amount", "employee_id", "validated_status"}
+	opts := goOdoo.NewOptions().FetchFields(fields...)
+
+	records, err := x.searchReadRaw("account.analytic.line", criteria, opts)
 	if IsNotFound(err) {
 		return []TimesheetEntry{}, nil
 	}
@@ -241,24 +245,29 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 		return nil, fmt.Errorf("fetching timesheets: %w", err)
 	}
 
-	result := make([]TimesheetEntry, 0, len(*lines))
-	for _, l := range *lines {
+	result := make([]TimesheetEntry, 0, len(records))
+	for _, r := range records {
 		entry := TimesheetEntry{
-			ID:    l.Id.Get(),
-			Name:  l.Name.Get(),
-			Hours: l.UnitAmount.Get(),
+			Project:  extractMany2OneName(r["project_id"]),
+			Task:     extractMany2OneName(r["task_id"]),
+			Employee: extractMany2OneName(r["employee_id"]),
 		}
-		if l.Date != nil {
-			entry.Date = l.Date.Get().Format("2006-01-02")
+		if id, ok := r["id"].(int64); ok {
+			entry.ID = id
+		} else if id, ok := r["id"].(float64); ok {
+			entry.ID = int64(id)
 		}
-		if l.ProjectId != nil {
-			entry.Project = l.ProjectId.Name
+		if name, ok := r["name"].(string); ok {
+			entry.Name = name
 		}
-		if l.TaskId != nil {
-			entry.Task = l.TaskId.Name
+		if date, ok := r["date"].(string); ok {
+			entry.Date = date
 		}
-		if l.EmployeeId != nil {
-			entry.Employee = l.EmployeeId.Name
+		if hours, ok := r["unit_amount"].(float64); ok {
+			entry.Hours = hours
+		}
+		if status, ok := r["validated_status"].(string); ok {
+			entry.ValidatedStatus = status
 		}
 		result = append(result, entry)
 	}

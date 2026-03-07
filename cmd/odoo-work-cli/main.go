@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/BurntSushi/toml"
@@ -38,8 +39,14 @@ func init() {
 	rootCmd.AddCommand(whoamiCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(tuiCmd)
+	rootCmd.AddCommand(entriesCmd)
 
 	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
+	entriesCmd.Flags().StringVar(&entriesWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
+	entriesCmd.Flags().StringVar(&entriesDate, "date", "", "specific date (YYYY-MM-DD), overrides --week")
+	entriesCmd.Flags().StringVar(&entriesProject, "project", "", "filter by project name (substring, case-insensitive)")
+	entriesCmd.Flags().StringVar(&entriesTask, "task", "", "filter by task name (substring, case-insensitive)")
+	entriesCmd.Flags().StringVar(&entriesStatus, "status", "", "filter by validation status (e.g. draft, validated)")
 	tuiCmd.Flags().StringVar(&tuiWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 	configCmd.Flags().BoolVar(&configMerged, "merged", false, "print merged TOML config (password redacted)")
 }
@@ -197,6 +204,103 @@ var timesheetsCmd = &cobra.Command{
 			total += e.Hours
 		}
 		fmt.Printf("\nTotal: %.2f hours\n", total)
+		return nil
+	},
+}
+
+// parseDateRange returns a single-day date range for the given YYYY-MM-DD string.
+func parseDateRange(date string) (string, string, error) {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid date %q: expected YYYY-MM-DD", date)
+	}
+	s := d.Format("2006-01-02")
+	return s, s, nil
+}
+
+// filterEntries returns entries matching the project, task, and status filters.
+// Project and task use case-insensitive substring match. Status uses exact match.
+// Empty filter matches all.
+func filterEntries(entries []odoo.TimesheetEntry, project, task, status string) []odoo.TimesheetEntry {
+	if project == "" && task == "" && status == "" {
+		return entries
+	}
+	projectLower := strings.ToLower(project)
+	taskLower := strings.ToLower(task)
+	var result []odoo.TimesheetEntry
+	for _, e := range entries {
+		if project != "" && !strings.Contains(strings.ToLower(e.Project), projectLower) {
+			continue
+		}
+		if task != "" && !strings.Contains(strings.ToLower(e.Task), taskLower) {
+			continue
+		}
+		if status != "" && e.ValidatedStatus != status {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result
+}
+
+var (
+	entriesWeek    string
+	entriesDate    string
+	entriesProject string
+	entriesTask    string
+	entriesStatus  string
+)
+
+var entriesCmd = &cobra.Command{
+	Use:   "entries",
+	Short: "List individual timesheet entries with full detail",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		var dateFrom, dateTo string
+		if entriesDate != "" {
+			dateFrom, dateTo, err = parseDateRange(entriesDate)
+		} else {
+			dateFrom, dateTo, err = weekDateRange(entriesWeek)
+		}
+		if err != nil {
+			return err
+		}
+
+		entries, err := client.ListTimesheets(dateFrom, dateTo)
+		if err != nil {
+			return err
+		}
+
+		entries = filterEntries(entries, entriesProject, entriesTask, entriesStatus)
+
+		if entriesDate != "" {
+			fmt.Printf("Date: %s\n\n", dateFrom)
+		} else {
+			fmt.Printf("Week: %s to %s\n\n", dateFrom, dateTo)
+		}
+
+		fmt.Printf("%-8s %-12s %-25s %-25s %-6s %-10s %s\n",
+			"ID", "Date", "Project", "Task", "Hours", "Status", "Description")
+		fmt.Printf("%-8s %-12s %-25s %-25s %-6s %-10s %s\n",
+			"--------", "------------", "-------------------------", "-------------------------", "------", "----------", "------------------------------")
+
+		var total float64
+		for _, e := range entries {
+			fmt.Printf("%-8d %-12s %-25s %-25s %-6s %-10s %s\n",
+				e.ID, e.Date, e.Project, e.Task, tui.FormatHours(e.Hours), e.ValidatedStatus, e.Name)
+			total += e.Hours
+		}
+
+		fmt.Printf("\nTotal: %s (%d entries)\n", tui.FormatHours(total), len(entries))
 		return nil
 	},
 }
