@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
 
@@ -13,7 +14,7 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 		{Date: "2026-03-03", Project: "Beta", Task: "QA", Hours: 2.5},
 	}
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits())
 
 	if !strings.Contains(out, "Acme / Dev") {
 		t.Error("output should contain 'Acme / Dev'")
@@ -31,7 +32,7 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 
 func TestRenderGrid_EmptyGrid(t *testing.T) {
 	g := BuildWeekGrid(nil, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits())
 
 	if !strings.Contains(out, "Project / Task") {
 		t.Error("output should contain header")
@@ -53,7 +54,7 @@ func TestRenderGrid_CorrectLineCount(t *testing.T) {
 		{Date: "2026-03-02", Project: "C", Task: "T3", Hours: 3.0},
 	}
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits())
 
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	// header + sep + 3 data rows + sep + totals = 7

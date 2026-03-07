@@ -3,12 +3,14 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/seletz/odoo-work-cli/internal/config"
 )
 
 var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
 // RenderGrid renders the weekly grid as a styled string.
-func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int) string {
+func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits) string {
 	colWidth := 7
 	minLabelWidth := 10
 
@@ -57,7 +59,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int) string {
 			} else if d >= 5 {
 				cell = weekendStyle.Render(cell)
 			} else if row.Hours[d] > 0 {
-				cell = hoursStyle(grid.DayTotals[d]).Render(cell)
+				cell = hoursStyle(grid.DayTotals[d], limits).Render(cell)
 			}
 			line += cell
 		}
@@ -77,7 +79,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int) string {
 		totalsLine += cell
 	}
 	weekCell := fmt.Sprintf("%*s", colWidth, FormatHours(grid.WeekTotal))
-	totalsLine += weekTotalStyle(grid.WeekTotal).Bold(true).Render(weekCell)
+	totalsLine += weekTotalStyle(grid.WeekTotal, limits).Bold(true).Render(weekCell)
 	b.WriteString(totalsLine)
 	b.WriteString("\n")
 

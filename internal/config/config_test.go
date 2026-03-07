@@ -487,6 +487,82 @@ func TestMerge_FiltersAccumulate(t *testing.T) {
 	}
 }
 
+func TestLoadFromTOML_HoursLimits(t *testing.T) {
+	content := `
+url = "https://odoo.example.com"
+
+[hours]
+daily_low = 7.0
+daily_high = 10.0
+weekly_low = 30.0
+weekly_high = 45.0
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Hours.DailyLow != 7.0 {
+		t.Errorf("DailyLow = %f, want 7.0", cfg.Hours.DailyLow)
+	}
+	if cfg.Hours.DailyHigh != 10.0 {
+		t.Errorf("DailyHigh = %f, want 10.0", cfg.Hours.DailyHigh)
+	}
+	if cfg.Hours.WeeklyLow != 30.0 {
+		t.Errorf("WeeklyLow = %f, want 30.0", cfg.Hours.WeeklyLow)
+	}
+	if cfg.Hours.WeeklyHigh != 45.0 {
+		t.Errorf("WeeklyHigh = %f, want 45.0", cfg.Hours.WeeklyHigh)
+	}
+}
+
+func TestLoadFromTOML_HoursLimitsDefaults(t *testing.T) {
+	content := `url = "https://odoo.example.com"`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	d := DefaultHoursLimits()
+	if cfg.Hours.DailyLow != d.DailyLow {
+		t.Errorf("DailyLow = %f, want default %f", cfg.Hours.DailyLow, d.DailyLow)
+	}
+	if cfg.Hours.WeeklyHigh != d.WeeklyHigh {
+		t.Errorf("WeeklyHigh = %f, want default %f", cfg.Hours.WeeklyHigh, d.WeeklyHigh)
+	}
+}
+
+func TestMerge_HoursLimits(t *testing.T) {
+	base := &Config{Hours: DefaultHoursLimits()}
+	overlay := &Config{Hours: HoursLimits{DailyHigh: 10.0, WeeklyLow: 30.0}}
+
+	base.Merge(overlay)
+
+	if base.Hours.DailyHigh != 10.0 {
+		t.Errorf("DailyHigh = %f, want 10.0", base.Hours.DailyHigh)
+	}
+	if base.Hours.WeeklyLow != 30.0 {
+		t.Errorf("WeeklyLow = %f, want 30.0", base.Hours.WeeklyLow)
+	}
+	// Unset overlay fields keep base defaults.
+	if base.Hours.DailyLow != 6.0 {
+		t.Errorf("DailyLow = %f, want 6.0 (base default)", base.Hours.DailyLow)
+	}
+	if base.Hours.WeeklyHigh != 40.0 {
+		t.Errorf("WeeklyHigh = %f, want 40.0 (base default)", base.Hours.WeeklyHigh)
+	}
+}
+
 func TestMerge_FiltersSameFieldOverride(t *testing.T) {
 	base := &Config{
 		Models: map[string]ModelConfig{

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
 
@@ -26,7 +27,7 @@ func (c *mockClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, erro
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
 	client := &mockClient{entries: entries, err: err}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	return NewModel(client, mon)
+	return NewModel(client, mon, config.DefaultHoursLimits())
 }
 
 func TestModel_LoadedTransitionsToGrid(t *testing.T) {

@@ -1,3 +1,9 @@
+[hours]
+daily_low = 6.0
+daily_high = 9.0
+weekly_low = 35.0
+weekly_high = 40.0
+
 [models.project]
 extra_fields = [
   { name = "product_owner", field = "x_studio_productowner", type = "many2one" },

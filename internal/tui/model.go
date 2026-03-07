@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
 
@@ -36,6 +37,7 @@ type Model struct {
 	spinner spinner.Model
 	help    help.Model
 	keys    KeyMap
+	limits  config.HoursLimits
 	err     error
 	width   int
 	height  int
@@ -47,13 +49,14 @@ type MondayTime struct {
 }
 
 // NewModel creates a new TUI model with the given client and starting Monday.
-func NewModel(client odoo.Client, monday MondayTime) Model {
+func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	return Model{
 		state:   stateLoading,
 		client:  client,
 		monday:  monday,
+		limits:  limits,
 		spinner: s,
 		help:    help.New(),
 		keys:    DefaultKeyMap(),
@@ -173,7 +176,7 @@ func (m Model) View() tea.View {
 		title := fmt.Sprintf("  Week: %s — %s\n\n",
 			m.monday.Format("Mon 02 Jan 2006"),
 			sunday.Format("Mon 02 Jan 2006"))
-		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4)
+		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits)
 		helpView := m.help.View(m.keys)
 		s = "\n" + title + grid + "\n  " + helpView + "\n"
 	}

@@ -35,6 +35,24 @@ type ModelConfig struct {
 	Filters     []Filter     `toml:"filters"`
 }
 
+// HoursLimits holds threshold values for hour coloring in the TUI.
+type HoursLimits struct {
+	DailyLow  float64 `toml:"daily_low"`  // below this: yellow (default 6)
+	DailyHigh float64 `toml:"daily_high"` // above this: red (default 9)
+	WeeklyLow float64 `toml:"weekly_low"` // below this: yellow (default 35)
+	WeeklyHigh float64 `toml:"weekly_high"` // above this: red (default 40)
+}
+
+// DefaultHoursLimits returns the default work hour thresholds.
+func DefaultHoursLimits() HoursLimits {
+	return HoursLimits{
+		DailyLow:   6,
+		DailyHigh:  9,
+		WeeklyLow:  35,
+		WeeklyHigh: 40,
+	}
+}
+
 // Config holds the application configuration.
 type Config struct {
 	URL      string                 `toml:"url"`
@@ -42,6 +60,7 @@ type Config struct {
 	Username string                 `toml:"username"`
 	Password string                 `toml:"-"`
 	Models   map[string]ModelConfig `toml:"models"`
+	Hours    HoursLimits            `toml:"hours"`
 }
 
 func (c *Config) OdooURL() string      { return c.URL }
@@ -58,6 +77,24 @@ func LoadFromEnv() *Config {
 		Database: os.Getenv("ODOO_DATABASE"),
 		Username: os.Getenv("ODOO_USERNAME"),
 		Password: os.Getenv("ODOO_PASSWORD"),
+		Hours:    DefaultHoursLimits(),
+	}
+}
+
+// ApplyHoursDefaults fills in zero-valued hour limits with defaults.
+func (c *Config) ApplyHoursDefaults() {
+	d := DefaultHoursLimits()
+	if c.Hours.DailyLow == 0 {
+		c.Hours.DailyLow = d.DailyLow
+	}
+	if c.Hours.DailyHigh == 0 {
+		c.Hours.DailyHigh = d.DailyHigh
+	}
+	if c.Hours.WeeklyLow == 0 {
+		c.Hours.WeeklyLow = d.WeeklyLow
+	}
+	if c.Hours.WeeklyHigh == 0 {
+		c.Hours.WeeklyHigh = d.WeeklyHigh
 	}
 }
 
@@ -95,6 +132,7 @@ func LoadFromTOML(path string) (*Config, error) {
 	if meta.IsDefined("password") {
 		return nil, fmt.Errorf("config file %s contains a password field; passwords must be set via ODOO_PASSWORD env var, not in config files", path)
 	}
+	cfg.ApplyHoursDefaults()
 	return cfg, nil
 }
 
@@ -113,6 +151,18 @@ func (c *Config) Merge(other *Config) {
 	}
 	if other.Password != "" {
 		c.Password = other.Password
+	}
+	if other.Hours.DailyLow != 0 {
+		c.Hours.DailyLow = other.Hours.DailyLow
+	}
+	if other.Hours.DailyHigh != 0 {
+		c.Hours.DailyHigh = other.Hours.DailyHigh
+	}
+	if other.Hours.WeeklyLow != 0 {
+		c.Hours.WeeklyLow = other.Hours.WeeklyLow
+	}
+	if other.Hours.WeeklyHigh != 0 {
+		c.Hours.WeeklyHigh = other.Hours.WeeklyHigh
 	}
 	if other.Models != nil {
 		if c.Models == nil {

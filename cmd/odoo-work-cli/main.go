@@ -276,7 +276,7 @@ var tuiCmd = &cobra.Command{
 			return err
 		}
 
-		m := tui.NewModel(client, tui.MondayTime{Time: monday})
+		m := tui.NewModel(client, tui.MondayTime{Time: monday}, cfg.Hours)
 		p := tea.NewProgram(m)
 		_, err = p.Run()
 		return err
