@@ -41,6 +41,7 @@ type Model struct {
 	bundesland string
 	holidays   HolidayMap
 	weekHols   [7]string
+	loading    bool
 	err        error
 	width      int
 	height     int
@@ -90,6 +91,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case timesheetsLoadedMsg:
+		m.loading = false
 		if msg.err != nil {
 			m.state = stateError
 			m.err = msg.err
@@ -109,7 +111,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.state == stateLoading {
+		if m.state == stateLoading || m.loading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
@@ -126,17 +128,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case key.Matches(msg, m.keys.Refresh):
-			m.state = stateLoading
+			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 
 		case key.Matches(msg, m.keys.Left):
 			m.monday = MondayTime{m.monday.AddDate(0, 0, -7)}
-			m.state = stateLoading
+			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 
 		case key.Matches(msg, m.keys.Right):
 			m.monday = MondayTime{m.monday.AddDate(0, 0, 7)}
-			m.state = stateLoading
+			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 		}
 
@@ -180,9 +182,14 @@ func (m Model) View() tea.View {
 
 	case stateGrid:
 		sunday := m.monday.AddDate(0, 0, 6)
-		title := fmt.Sprintf("  Week: %s — %s\n\n",
+		loadingIndicator := ""
+		if m.loading {
+			loadingIndicator = " " + m.spinner.View()
+		}
+		title := fmt.Sprintf("  Week: %s — %s%s\n\n",
 			m.monday.Format("Mon 02 Jan 2006"),
-			sunday.Format("Mon 02 Jan 2006"))
+			sunday.Format("Mon 02 Jan 2006"),
+			loadingIndicator)
 		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols)
 		helpView := m.help.View(m.keys)
 		s = "\n" + title + grid + "\n  " + helpView + "\n"
