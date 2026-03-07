@@ -10,7 +10,8 @@ import (
 var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
 // RenderGrid renders the weekly grid as a styled string.
-func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits) string {
+// holidays is a [7]string with holiday names per day (empty = no holiday).
+func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string) string {
 	colWidth := 7
 	minLabelWidth := 10
 
@@ -21,15 +22,20 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		labelWidth = minLabelWidth
 	}
 
+	isHoliday := func(d int) bool { return holidays[d] != "" }
+
 	var b strings.Builder
 
 	// Header row.
 	header := fmt.Sprintf("%-*s  ", labelWidth, "Project / Task")
 	for i, name := range dayNames {
 		cell := fmt.Sprintf("%*s", colWidth, name)
-		if i >= 5 {
+		switch {
+		case isHoliday(i):
+			cell = holidayStyle.Render(cell)
+		case i >= 5:
 			cell = weekendStyle.Render(cell)
-		} else {
+		default:
 			cell = headerStyle.Render(cell)
 		}
 		header += cell
@@ -37,6 +43,29 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	header += headerStyle.Render(fmt.Sprintf("%*s", colWidth, "Total"))
 	b.WriteString(header)
 	b.WriteString("\n")
+
+	// Holiday names row (only if any holiday in this week).
+	hasHoliday := false
+	for _, h := range holidays {
+		if h != "" {
+			hasHoliday = true
+			break
+		}
+	}
+	if hasHoliday {
+		hline := fmt.Sprintf("%-*s  ", labelWidth, "")
+		for d := 0; d < 7; d++ {
+			name := holidays[d]
+			if len(name) > colWidth {
+				name = name[:colWidth-1] + "…"
+			}
+			cell := fmt.Sprintf("%*s", colWidth, name)
+			cell = holidayStyle.Render(cell)
+			hline += cell
+		}
+		b.WriteString(hline)
+		b.WriteString("\n")
+	}
 
 	// Separator.
 	b.WriteString(strings.Repeat("─", labelWidth+2+8*colWidth))
@@ -54,11 +83,14 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		for d := 0; d < 7; d++ {
 			rowTotal += row.Hours[d]
 			cell := fmt.Sprintf("%*s", colWidth, FormatHours(row.Hours[d]))
-			if ri == cursorRow && d == cursorCol {
+			switch {
+			case ri == cursorRow && d == cursorCol:
 				cell = cursorStyle.Render(cell)
-			} else if d >= 5 {
+			case isHoliday(d):
+				cell = holidayStyle.Render(cell)
+			case d >= 5:
 				cell = weekendStyle.Render(cell)
-			} else if row.Hours[d] > 0 {
+			case row.Hours[d] > 0:
 				cell = hoursStyle(grid.DayTotals[d], limits).Render(cell)
 			}
 			line += cell
@@ -75,7 +107,11 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	totalsLine := fmt.Sprintf("%-*s  ", labelWidth, "Total")
 	for d := 0; d < 7; d++ {
 		cell := fmt.Sprintf("%*s", colWidth, FormatHours(grid.DayTotals[d]))
-		cell = totalsStyle.Render(cell)
+		if isHoliday(d) {
+			cell = holidayStyle.Bold(true).Render(cell)
+		} else {
+			cell = totalsStyle.Render(cell)
+		}
 		totalsLine += cell
 	}
 	weekCell := fmt.Sprintf("%*s", colWidth, FormatHours(grid.WeekTotal))

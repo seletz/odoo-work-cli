@@ -27,7 +27,7 @@ func (c *mockClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, erro
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
 	client := &mockClient{entries: entries, err: err}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	return NewModel(client, mon, config.DefaultHoursLimits())
+	return NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
 }
 
 func TestModel_LoadedTransitionsToGrid(t *testing.T) {

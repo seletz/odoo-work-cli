@@ -35,6 +35,9 @@ type ModelConfig struct {
 	Filters     []Filter     `toml:"filters"`
 }
 
+// DefaultBundesland is the default German federal state for holidays.
+const DefaultBundesland = "Baden-Württemberg"
+
 // HoursLimits holds threshold values for hour coloring in the TUI.
 type HoursLimits struct {
 	DailyLow  float64 `toml:"daily_low"`  // below this: yellow (default 6)
@@ -59,8 +62,9 @@ type Config struct {
 	Database string                 `toml:"database"`
 	Username string                 `toml:"username"`
 	Password string                 `toml:"-"`
-	Models   map[string]ModelConfig `toml:"models"`
-	Hours    HoursLimits            `toml:"hours"`
+	Models     map[string]ModelConfig `toml:"models"`
+	Hours      HoursLimits            `toml:"hours"`
+	Bundesland string                 `toml:"bundesland"` // German federal state for holidays (e.g. "Bayern")
 }
 
 func (c *Config) OdooURL() string      { return c.URL }
@@ -73,16 +77,17 @@ func (c *Config) OdooPassword() string   { return c.Password }
 // Use Validate to check that all required fields are present.
 func LoadFromEnv() *Config {
 	return &Config{
-		URL:      os.Getenv("ODOO_URL"),
-		Database: os.Getenv("ODOO_DATABASE"),
-		Username: os.Getenv("ODOO_USERNAME"),
-		Password: os.Getenv("ODOO_PASSWORD"),
-		Hours:    DefaultHoursLimits(),
+		URL:        os.Getenv("ODOO_URL"),
+		Database:   os.Getenv("ODOO_DATABASE"),
+		Username:   os.Getenv("ODOO_USERNAME"),
+		Password:   os.Getenv("ODOO_PASSWORD"),
+		Hours:      DefaultHoursLimits(),
+		Bundesland: DefaultBundesland,
 	}
 }
 
-// ApplyHoursDefaults fills in zero-valued hour limits with defaults.
-func (c *Config) ApplyHoursDefaults() {
+// ApplyDefaults fills in zero-valued fields with defaults.
+func (c *Config) ApplyDefaults() {
 	d := DefaultHoursLimits()
 	if c.Hours.DailyLow == 0 {
 		c.Hours.DailyLow = d.DailyLow
@@ -95,6 +100,9 @@ func (c *Config) ApplyHoursDefaults() {
 	}
 	if c.Hours.WeeklyHigh == 0 {
 		c.Hours.WeeklyHigh = d.WeeklyHigh
+	}
+	if c.Bundesland == "" {
+		c.Bundesland = DefaultBundesland
 	}
 }
 
@@ -132,7 +140,7 @@ func LoadFromTOML(path string) (*Config, error) {
 	if meta.IsDefined("password") {
 		return nil, fmt.Errorf("config file %s contains a password field; passwords must be set via ODOO_PASSWORD env var, not in config files", path)
 	}
-	cfg.ApplyHoursDefaults()
+	cfg.ApplyDefaults()
 	return cfg, nil
 }
 
@@ -151,6 +159,9 @@ func (c *Config) Merge(other *Config) {
 	}
 	if other.Password != "" {
 		c.Password = other.Password
+	}
+	if other.Bundesland != "" {
+		c.Bundesland = other.Bundesland
 	}
 	if other.Hours.DailyLow != 0 {
 		c.Hours.DailyLow = other.Hours.DailyLow

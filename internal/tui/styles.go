@@ -11,9 +11,10 @@ var (
 	totalsStyle  = lipgloss.NewStyle().Bold(true)
 	cursorStyle  = lipgloss.NewStyle().Reverse(true)
 
-	hoursLow    = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
-	hoursNormal = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
-	hoursHigh   = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
+	holidayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("5")) // magenta
+	hoursLow     = lipgloss.NewStyle().Foreground(lipgloss.Color("3")) // yellow
+	hoursNormal  = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
+	hoursHigh    = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
 )
 
 // hoursStyle returns the appropriate style based on daily total hours.

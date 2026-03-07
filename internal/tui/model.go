@@ -37,10 +37,13 @@ type Model struct {
 	spinner spinner.Model
 	help    help.Model
 	keys    KeyMap
-	limits  config.HoursLimits
-	err     error
-	width   int
-	height  int
+	limits     config.HoursLimits
+	bundesland string
+	holidays   HolidayMap
+	weekHols   [7]string
+	err        error
+	width      int
+	height     int
 }
 
 // MondayTime wraps time.Time for the Monday of the displayed week.
@@ -49,15 +52,17 @@ type MondayTime struct {
 }
 
 // NewModel creates a new TUI model with the given client and starting Monday.
-func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits) Model {
+func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, bundesland string) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	return Model{
 		state:   stateLoading,
 		client:  client,
-		monday:  monday,
-		limits:  limits,
-		spinner: s,
+		monday:     monday,
+		limits:     limits,
+		bundesland: bundesland,
+		holidays:   BuildHolidayMap(monday.Year(), bundesland),
+		spinner:    s,
 		help:    help.New(),
 		keys:    DefaultKeyMap(),
 	}
@@ -92,6 +97,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.state = stateGrid
 		m.grid = BuildWeekGrid(msg.entries, m.monday.Time)
+		m.holidays = BuildHolidayMap(m.monday.Year(), m.bundesland)
+		m.weekHols = WeekHolidays(m.monday.Time, m.holidays)
 		m.cursor = [2]int{0, 0}
 		return m, nil
 
@@ -176,7 +183,7 @@ func (m Model) View() tea.View {
 		title := fmt.Sprintf("  Week: %s — %s\n\n",
 			m.monday.Format("Mon 02 Jan 2006"),
 			sunday.Format("Mon 02 Jan 2006"))
-		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits)
+		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols)
 		helpView := m.help.View(m.keys)
 		s = "\n" + title + grid + "\n  " + helpView + "\n"
 	}
