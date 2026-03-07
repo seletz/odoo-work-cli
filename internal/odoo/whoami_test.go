@@ -7,10 +7,16 @@ import (
 
 // mockClient implements Client for testing.
 type mockClient struct {
-	info     *UserInfo
-	err      error
-	projects []ProjectInfo
-	projErr  error
+	info       *UserInfo
+	err        error
+	projects   []ProjectInfo
+	projErr    error
+	tasks      []TaskInfo
+	taskErr    error
+	timesheets []TimesheetEntry
+	tsErr      error
+	fields     []FieldInfo
+	fieldsErr  error
 }
 
 func (m *mockClient) WhoAmI() (*UserInfo, error) {
@@ -19,6 +25,18 @@ func (m *mockClient) WhoAmI() (*UserInfo, error) {
 
 func (m *mockClient) ListProjects() ([]ProjectInfo, error) {
 	return m.projects, m.projErr
+}
+
+func (m *mockClient) ListTasks(_ int64) ([]TaskInfo, error) {
+	return m.tasks, m.taskErr
+}
+
+func (m *mockClient) ListTimesheets(_, _ string) ([]TimesheetEntry, error) {
+	return m.timesheets, m.tsErr
+}
+
+func (m *mockClient) GetFields(_ string) ([]FieldInfo, error) {
+	return m.fields, m.fieldsErr
 }
 
 func TestWhoAmI_Success(t *testing.T) {

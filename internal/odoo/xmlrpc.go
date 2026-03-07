@@ -2,6 +2,7 @@ package odoo
 
 import (
 	"fmt"
+	"sort"
 
 	goOdoo "github.com/skilld-labs/go-odoo"
 )
@@ -47,6 +48,99 @@ func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 			Active: p.Active.Get(),
 		})
 	}
+	return result, nil
+}
+
+// ListTasks returns tasks from Odoo, optionally filtered by project ID.
+// Pass projectID <= 0 to list all tasks.
+func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
+	criteria := goOdoo.NewCriteria()
+	if projectID > 0 {
+		criteria.Add("project_id", "=", projectID)
+	}
+	tasks, err := x.client.FindProjectTasks(criteria, goOdoo.NewOptions())
+	if err != nil {
+		return nil, fmt.Errorf("fetching tasks: %w", err)
+	}
+
+	result := make([]TaskInfo, 0, len(*tasks))
+	for _, t := range *tasks {
+		info := TaskInfo{
+			ID:     t.Id.Get(),
+			Name:   t.Name.Get(),
+			Active: t.Active.Get(),
+		}
+		if t.ProjectId != nil {
+			info.Project = t.ProjectId.Name
+		}
+		if t.StageId != nil {
+			info.Stage = t.StageId.Name
+		}
+		result = append(result, info)
+	}
+	return result, nil
+}
+
+// ListTimesheets returns timesheet entries for the given date range.
+func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error) {
+	criteria := goOdoo.NewCriteria().
+		Add("date", ">=", dateFrom).
+		Add("date", "<=", dateTo)
+	lines, err := x.client.FindAccountAnalyticLines(criteria, goOdoo.NewOptions())
+	if err != nil {
+		return nil, fmt.Errorf("fetching timesheets: %w", err)
+	}
+
+	result := make([]TimesheetEntry, 0, len(*lines))
+	for _, l := range *lines {
+		entry := TimesheetEntry{
+			ID:    l.Id.Get(),
+			Name:  l.Name.Get(),
+			Hours: l.UnitAmount.Get(),
+		}
+		if l.Date != nil {
+			entry.Date = l.Date.Get().Format("2006-01-02")
+		}
+		if l.ProjectId != nil {
+			entry.Project = l.ProjectId.Name
+		}
+		if l.TaskId != nil {
+			entry.Task = l.TaskId.Name
+		}
+		if l.EmployeeId != nil {
+			entry.Employee = l.EmployeeId.Name
+		}
+		result = append(result, entry)
+	}
+	return result, nil
+}
+
+// GetFields returns field metadata for the given Odoo model.
+func (x *XMLRPCClient) GetFields(model string) ([]FieldInfo, error) {
+	resp, err := x.client.FieldsGet(model, goOdoo.NewOptions())
+	if err != nil {
+		return nil, fmt.Errorf("fetching fields for %s: %w", model, err)
+	}
+
+	result := make([]FieldInfo, 0, len(resp))
+	for name, raw := range resp {
+		info := FieldInfo{Name: name}
+		if attrs, ok := raw.(map[string]interface{}); ok {
+			if t, ok := attrs["type"].(string); ok {
+				info.Type = t
+			}
+			if s, ok := attrs["string"].(string); ok {
+				info.String = s
+			}
+			if r, ok := attrs["required"].(bool); ok {
+				info.Required = r
+			}
+		}
+		result = append(result, info)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 	return result, nil
 }
 

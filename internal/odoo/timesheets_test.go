@@ -1,0 +1,80 @@
+package odoo
+
+import (
+	"errors"
+	"testing"
+)
+
+func TestListTimesheets(t *testing.T) {
+	tests := []struct {
+		name    string
+		client  *mockClient
+		wantLen int
+		wantErr bool
+		wantMsg string
+		checkFn func(t *testing.T, entries []TimesheetEntry)
+	}{
+		{
+			name: "success returns entries",
+			client: &mockClient{
+				timesheets: []TimesheetEntry{
+					{ID: 100, Date: "2026-03-02", Project: "Alpha", Task: "Task A", Name: "Dev work", Hours: 4.0, Employee: "Test User"},
+					{ID: 101, Date: "2026-03-02", Project: "Beta", Task: "Task B", Name: "Review", Hours: 2.5, Employee: "Test User"},
+				},
+			},
+			wantLen: 2,
+			checkFn: func(t *testing.T, entries []TimesheetEntry) {
+				t.Helper()
+				if entries[0].ID != 100 {
+					t.Errorf("entries[0].ID = %d, want 100", entries[0].ID)
+				}
+				if entries[0].Date != "2026-03-02" {
+					t.Errorf("entries[0].Date = %q, want %q", entries[0].Date, "2026-03-02")
+				}
+				if entries[0].Hours != 4.0 {
+					t.Errorf("entries[0].Hours = %f, want 4.0", entries[0].Hours)
+				}
+				if entries[0].Project != "Alpha" {
+					t.Errorf("entries[0].Project = %q, want %q", entries[0].Project, "Alpha")
+				}
+			},
+		},
+		{
+			name:    "empty list returns no error",
+			client:  &mockClient{timesheets: []TimesheetEntry{}},
+			wantLen: 0,
+		},
+		{
+			name:    "error is propagated",
+			client:  &mockClient{tsErr: errors.New("timeout")},
+			wantErr: true,
+			wantMsg: "timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entries, err := tt.client.ListTimesheets("2026-03-02", "2026-03-06")
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if err.Error() != tt.wantMsg {
+					t.Errorf("error = %q, want %q", err.Error(), tt.wantMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(entries) != tt.wantLen {
+				t.Fatalf("len(entries) = %d, want %d", len(entries), tt.wantLen)
+			}
+			if tt.checkFn != nil {
+				tt.checkFn(t, entries)
+			}
+		})
+	}
+}

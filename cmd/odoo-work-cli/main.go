@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
@@ -30,6 +32,8 @@ func init() {
 	rootCmd.AddCommand(timesheetsCmd)
 	rootCmd.AddCommand(fieldsCmd)
 	rootCmd.AddCommand(whoamiCmd)
+
+	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 }
 
 var projectsCmd = &cobra.Command{
@@ -59,26 +63,130 @@ var projectsCmd = &cobra.Command{
 }
 
 var tasksCmd = &cobra.Command{
-	Use:   "tasks",
+	Use:   "tasks [project-id]",
 	Short: "List Odoo tasks",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("not implemented yet")
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadFromEnv()
+		if err != nil {
+			return err
+		}
+		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		var projectID int64
+		if len(args) == 1 {
+			projectID, err = strconv.ParseInt(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid project ID: %w", err)
+			}
+		}
+
+		tasks, err := client.ListTasks(projectID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%-8s %-40s %-30s %s\n", "ID", "Name", "Project", "Stage")
+		fmt.Printf("%-8s %-40s %-30s %s\n", "--------", "----------------------------------------", "------------------------------", "--------------------")
+		for _, t := range tasks {
+			fmt.Printf("%-8d %-40s %-30s %s\n", t.ID, t.Name, t.Project, t.Stage)
+		}
+		return nil
 	},
 }
 
+// weekDateRange returns the Monday and Sunday of the ISO week specified
+// as "2006-W02" format, or the current week if empty.
+func weekDateRange(week string) (string, string, error) {
+	var year, isoWeek int
+	if week == "" {
+		now := time.Now()
+		year, isoWeek = now.ISOWeek()
+	} else {
+		_, err := fmt.Sscanf(week, "%d-W%d", &year, &isoWeek)
+		if err != nil {
+			return "", "", fmt.Errorf("invalid week format %q (expected YYYY-Www): %w", week, err)
+		}
+	}
+	// Find Monday of ISO week 1 for the given year.
+	jan4 := time.Date(year, 1, 4, 0, 0, 0, 0, time.Local)
+	weekday := jan4.Weekday()
+	if weekday == 0 {
+		weekday = 7
+	}
+	monday1 := jan4.AddDate(0, 0, -int(weekday-1))
+	monday := monday1.AddDate(0, 0, (isoWeek-1)*7)
+	sunday := monday.AddDate(0, 0, 6)
+	return monday.Format("2006-01-02"), sunday.Format("2006-01-02"), nil
+}
+
+var tsWeek string
+
 var timesheetsCmd = &cobra.Command{
 	Use:   "timesheets",
-	Short: "Manage Odoo timesheets",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("not implemented yet")
+	Short: "List Odoo timesheets for a week",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadFromEnv()
+		if err != nil {
+			return err
+		}
+		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		dateFrom, dateTo, err := weekDateRange(tsWeek)
+		if err != nil {
+			return err
+		}
+
+		entries, err := client.ListTimesheets(dateFrom, dateTo)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Week: %s to %s\n\n", dateFrom, dateTo)
+		fmt.Printf("%-8s %-12s %-25s %-25s %-30s %s\n", "ID", "Date", "Project", "Task", "Description", "Hours")
+		fmt.Printf("%-8s %-12s %-25s %-25s %-30s %s\n",
+			"--------", "------------", "-------------------------", "-------------------------", "------------------------------", "-----")
+		var total float64
+		for _, e := range entries {
+			fmt.Printf("%-8d %-12s %-25s %-25s %-30s %.2f\n", e.ID, e.Date, e.Project, e.Task, e.Name, e.Hours)
+			total += e.Hours
+		}
+		fmt.Printf("\nTotal: %.2f hours\n", total)
+		return nil
 	},
 }
 
 var fieldsCmd = &cobra.Command{
-	Use:   "fields",
+	Use:   "fields <model>",
 	Short: "Inspect Odoo model fields",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("not implemented yet")
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadFromEnv()
+		if err != nil {
+			return err
+		}
+		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		fields, err := client.GetFields(args[0])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%-30s %-15s %-30s %s\n", "Field", "Type", "Label", "Required")
+		fmt.Printf("%-30s %-15s %-30s %s\n", "------------------------------", "---------------", "------------------------------", "--------")
+		for _, f := range fields {
+			fmt.Printf("%-30s %-15s %-30s %v\n", f.Name, f.Type, f.String, f.Required)
+		}
+		return nil
 	},
 }
 
