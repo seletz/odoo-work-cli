@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/help"
@@ -175,6 +176,12 @@ func (m Model) View() tea.View {
 		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4)
 		helpView := m.help.View(m.keys)
 		s = "\n" + title + grid + "\n  " + helpView + "\n"
+	}
+
+	// Pad to full terminal height so alt screen doesn't show artifacts.
+	lines := strings.Count(s, "\n")
+	if m.height > 0 && lines < m.height {
+		s += strings.Repeat("\n", m.height-lines)
 	}
 
 	v := tea.NewView(s)

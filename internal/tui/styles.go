@@ -24,3 +24,15 @@ func hoursStyle(total float64) lipgloss.Style {
 		return hoursLow
 	}
 }
+
+// weekTotalStyle returns the appropriate style based on weekly total hours.
+func weekTotalStyle(total float64) lipgloss.Style {
+	switch {
+	case total > 40:
+		return hoursHigh
+	case total >= 35:
+		return hoursNormal
+	default:
+		return hoursLow
+	}
+}

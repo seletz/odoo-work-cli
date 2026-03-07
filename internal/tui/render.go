@@ -9,16 +9,14 @@ var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
 // RenderGrid renders the weekly grid as a styled string.
 func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int) string {
-	labelWidth := 30
 	colWidth := 7
+	minLabelWidth := 10
 
-	// Clamp label width so grid fits in terminal.
-	gridWidth := labelWidth + 2 + 7*colWidth + colWidth // +colWidth for total col
-	if width > 0 && gridWidth > width {
-		labelWidth = width - 2 - 8*colWidth
-		if labelWidth < 10 {
-			labelWidth = 10
-		}
+	// Expand label column to fill available width.
+	fixedCols := 2 + 8*colWidth // gap + 7 day cols + total col
+	labelWidth := width - fixedCols
+	if labelWidth < minLabelWidth {
+		labelWidth = minLabelWidth
 	}
 
 	var b strings.Builder
@@ -78,7 +76,8 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int) string {
 		cell = totalsStyle.Render(cell)
 		totalsLine += cell
 	}
-	totalsLine += totalsStyle.Render(fmt.Sprintf("%*s", colWidth, FormatHours(grid.WeekTotal)))
+	weekCell := fmt.Sprintf("%*s", colWidth, FormatHours(grid.WeekTotal))
+	totalsLine += weekTotalStyle(grid.WeekTotal).Bold(true).Render(weekCell)
 	b.WriteString(totalsLine)
 	b.WriteString("\n")
 
