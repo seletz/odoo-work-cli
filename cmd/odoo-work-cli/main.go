@@ -6,11 +6,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/BurntSushi/toml"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -36,8 +37,10 @@ func init() {
 	rootCmd.AddCommand(fieldsCmd)
 	rootCmd.AddCommand(whoamiCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(tuiCmd)
 
 	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
+	tuiCmd.Flags().StringVar(&tuiWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 	configCmd.Flags().BoolVar(&configMerged, "merged", false, "print merged TOML config (password redacted)")
 }
 
@@ -151,24 +154,10 @@ var tasksCmd = &cobra.Command{
 // weekDateRange returns the Monday and Sunday of the ISO week specified
 // as "2006-W02" format, or the current week if empty.
 func weekDateRange(week string) (string, string, error) {
-	var year, isoWeek int
-	if week == "" {
-		now := time.Now()
-		year, isoWeek = now.ISOWeek()
-	} else {
-		_, err := fmt.Sscanf(week, "%d-W%d", &year, &isoWeek)
-		if err != nil {
-			return "", "", fmt.Errorf("invalid week format %q (expected YYYY-Www): %w", week, err)
-		}
+	monday, err := tui.ParseWeekMonday(week)
+	if err != nil {
+		return "", "", err
 	}
-	// Find Monday of ISO week 1 for the given year.
-	jan4 := time.Date(year, 1, 4, 0, 0, 0, 0, time.Local)
-	weekday := jan4.Weekday()
-	if weekday == 0 {
-		weekday = 7
-	}
-	monday1 := jan4.AddDate(0, 0, -int(weekday-1))
-	monday := monday1.AddDate(0, 0, (isoWeek-1)*7)
 	sunday := monday.AddDate(0, 0, 6)
 	return monday.Format("2006-01-02"), sunday.Format("2006-01-02"), nil
 }
@@ -263,6 +252,34 @@ var whoamiCmd = &cobra.Command{
 		fmt.Printf("Email:   %s\n", info.Email)
 		fmt.Printf("Company: %s\n", info.Company)
 		return nil
+	},
+}
+
+var tuiWeek string
+
+var tuiCmd = &cobra.Command{
+	Use:   "tui",
+	Short: "Interactive weekly timesheet view",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		monday, err := tui.ParseWeekMonday(tuiWeek)
+		if err != nil {
+			return err
+		}
+
+		m := tui.NewModel(client, tui.MondayTime{Time: monday})
+		p := tea.NewProgram(m)
+		_, err = p.Run()
+		return err
 	},
 }
 
