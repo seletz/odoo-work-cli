@@ -36,6 +36,9 @@ func (x *XMLRPCClient) Close() {
 func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 	criteria := goOdoo.NewCriteria()
 	projects, err := x.client.FindProjectProjects(criteria, goOdoo.NewOptions())
+	if IsNotFound(err) {
+		return []ProjectInfo{}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetching projects: %w", err)
 	}
@@ -59,6 +62,9 @@ func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
 		criteria.Add("project_id", "=", projectID)
 	}
 	tasks, err := x.client.FindProjectTasks(criteria, goOdoo.NewOptions())
+	if IsNotFound(err) {
+		return []TaskInfo{}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetching tasks: %w", err)
 	}
@@ -88,6 +94,9 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 		Add("date", "<=", dateTo).
 		Add("user_id.login", "=", x.login)
 	lines, err := x.client.FindAccountAnalyticLines(criteria, goOdoo.NewOptions())
+	if IsNotFound(err) {
+		return []TimesheetEntry{}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetching timesheets: %w", err)
 	}
