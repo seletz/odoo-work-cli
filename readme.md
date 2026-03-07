@@ -29,15 +29,16 @@ mise run lint
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `whoami` | Show current Odoo user info (ID, name, login, email, company) |
-| `projects` | List Odoo projects (with customer, company, phase, project manager) |
-| `tasks [project-id]` | List Odoo tasks, optionally filtered by project ID |
-| `timesheets [--week YYYY-Www]` | List timesheets for a week (defaults to current week) |
-| `fields <model>` | Inspect field metadata for any Odoo model |
-| `config` | Show discovered config file paths (merge order) |
-| `config --merged` | Print the fully merged TOML config (password omitted) |
+| Command                                                  | Description                                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `whoami`                                                 | Show current Odoo user info (ID, name, login, email, company)                              |
+| `projects`                                               | List Odoo projects (with customer, company, phase, project manager)                        |
+| `tasks [project-id]`                                     | List Odoo tasks, optionally filtered by project ID                                         |
+| `timesheets [--week YYYY-Www]`                           | List timesheets for a week (defaults to current week)                                      |
+| `entries [--week\|--date] [--project\|--task\|--status]` | List individual timesheet entries with full detail (description, hours, validation status) |
+| `fields <model>`                                         | Inspect field metadata for any Odoo model                                                  |
+| `config`                                                 | Show discovered config file paths (merge order)                                            |
+| `config --merged`                                        | Print the fully merged TOML config (password omitted)                                      |
 
 ## Configuration
 
@@ -105,6 +106,10 @@ Filters **accumulate** across config levels (AND semantics). If a child config d
 ./odoo-work-cli timesheets
 ./odoo-work-cli timesheets --week 2026-W10
 ./odoo-work-cli fields project.project
+./odoo-work-cli entries
+./odoo-work-cli entries --week 2026-W10
+./odoo-work-cli entries --date 2026-03-02
+./odoo-work-cli entries --project "Acme" --status draft
 ./odoo-work-cli config
 ./odoo-work-cli config --merged
 ```
