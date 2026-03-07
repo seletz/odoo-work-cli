@@ -12,14 +12,22 @@ var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 // RenderGrid renders the weekly grid as a styled string.
 // holidays is a [7]string with holiday names per day (empty = no holiday).
 func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string) string {
-	colWidth := 7
-	minLabelWidth := 10
+	minColWidth := 7
+	minLabelWidth := 20
+	maxLabelWidth := 40
 
-	// Expand label column to fill available width.
-	fixedCols := 2 + 8*colWidth // gap + 7 day cols + total col
-	labelWidth := width - fixedCols
+	// Label gets up to maxLabelWidth; remaining space goes to day columns.
+	labelWidth := maxLabelWidth
+	if labelWidth > width/3 {
+		labelWidth = width / 3
+	}
 	if labelWidth < minLabelWidth {
 		labelWidth = minLabelWidth
+	}
+	remaining := width - labelWidth - 2 // 2 for gap
+	colWidth := remaining / 8           // 7 days + total
+	if colWidth < minColWidth {
+		colWidth = minColWidth
 	}
 
 	isHoliday := func(d int) bool { return holidays[d] != "" }
