@@ -170,6 +170,74 @@ func TestDiscover(t *testing.T) {
 		}
 	})
 
+	t.Run("filters accumulate across walk levels", func(t *testing.T) {
+		for _, k := range envKeys {
+			t.Setenv(k, "")
+		}
+		t.Setenv("ODOO_USERNAME", "user")
+		t.Setenv("ODOO_PASSWORD", "pass")
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+		// Parent dir: company filter.
+		root := t.TempDir()
+		child := filepath.Join(root, "sub")
+		if err := os.MkdirAll(child, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		parentContent := `
+[models.task]
+filters = [
+  { field = "company_id.name", op = "=", value = "Company A" },
+]
+`
+		if err := os.WriteFile(filepath.Join(root, ".odoo-work-cli.toml"),
+			[]byte(parentContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		// Child dir: project filter + override company.
+		childContent := `
+[models.task]
+filters = [
+  { field = "project_id.name", op = "=", value = "Project X" },
+  { field = "company_id.name", op = "=", value = "Company B" },
+]
+`
+		if err := os.WriteFile(filepath.Join(child, ".odoo-work-cli.toml"),
+			[]byte(childContent), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		origDir, _ := os.Getwd()
+		if err := os.Chdir(child); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+		result, err := Discover("")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		task, ok := result.Config.Models["task"]
+		if !ok {
+			t.Fatal("Models[\"task\"] not found")
+		}
+		// Expect 2 filters: company overridden to B, project added.
+		if len(task.Filters) != 2 {
+			t.Fatalf("len(Filters) = %d, want 2", len(task.Filters))
+		}
+		filterMap := make(map[string]string)
+		for _, f := range task.Filters {
+			filterMap[f.Field] = f.Value
+		}
+		if filterMap["company_id.name"] != "Company B" {
+			t.Errorf("company filter = %q, want %q", filterMap["company_id.name"], "Company B")
+		}
+		if filterMap["project_id.name"] != "Project X" {
+			t.Errorf("project filter = %q, want %q", filterMap["project_id.name"], "Project X")
+		}
+	})
+
 	t.Run("walk files override global", func(t *testing.T) {
 		for _, k := range envKeys {
 			t.Setenv(k, "")

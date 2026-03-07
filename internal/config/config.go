@@ -22,9 +22,17 @@ type ExtraField struct {
 	Type  string `toml:"type"`  // Odoo type: many2one, char, boolean, integer, float
 }
 
+// Filter describes a default query filter for a model.
+type Filter struct {
+	Field string `toml:"field"` // Odoo field path (e.g. "company_id.name")
+	Op    string `toml:"op"`    // comparison operator (e.g. "=", "!=", "ilike")
+	Value string `toml:"value"` // filter value
+}
+
 // ModelConfig holds per-model configuration.
 type ModelConfig struct {
 	ExtraFields []ExtraField `toml:"extra_fields"`
+	Filters     []Filter     `toml:"filters"`
 }
 
 // Config holds the application configuration.
@@ -110,8 +118,50 @@ func (c *Config) Merge(other *Config) {
 		if c.Models == nil {
 			c.Models = make(map[string]ModelConfig)
 		}
-		for k, v := range other.Models {
-			c.Models[k] = v
+		for k, overlay := range other.Models {
+			base, exists := c.Models[k]
+			if !exists {
+				c.Models[k] = overlay
+				continue
+			}
+			if len(overlay.ExtraFields) > 0 {
+				base.ExtraFields = overlay.ExtraFields
+			}
+			base.Filters = mergeFilters(base.Filters, overlay.Filters)
+			c.Models[k] = base
 		}
 	}
+}
+
+// mergeFilters accumulates filters from base and overlay.
+// If overlay has a filter with the same Field as a base filter, the overlay
+// entry replaces the base entry.
+func mergeFilters(base, overlay []Filter) []Filter {
+	if len(overlay) == 0 {
+		return base
+	}
+	if len(base) == 0 {
+		return overlay
+	}
+	// Build result starting from base, replacing same-field entries.
+	overrideFields := make(map[string]Filter, len(overlay))
+	for _, f := range overlay {
+		overrideFields[f.Field] = f
+	}
+	var result []Filter
+	seen := make(map[string]bool)
+	for _, f := range base {
+		if ov, ok := overrideFields[f.Field]; ok {
+			result = append(result, ov)
+			seen[f.Field] = true
+		} else {
+			result = append(result, f)
+		}
+	}
+	for _, f := range overlay {
+		if !seen[f.Field] {
+			result = append(result, f)
+		}
+	}
+	return result
 }

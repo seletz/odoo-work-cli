@@ -354,12 +354,78 @@ func TestMerge_Models(t *testing.T) {
 	}
 }
 
+func TestLoadFromTOML_Filters(t *testing.T) {
+	content := `
+url = "https://odoo.example.com"
+
+[models.task]
+filters = [
+  { field = "company_id.name", op = "=", value = "Company A" },
+  { field = "stage_id.name", op = "!=", value = "Cancelled" },
+]
+
+[models.project]
+extra_fields = [
+  { name = "owner", field = "x_owner", type = "many2one" },
+]
+filters = [
+  { field = "active", op = "=", value = "true" },
+]
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check task filters.
+	task, ok := cfg.Models["task"]
+	if !ok {
+		t.Fatal("Models[\"task\"] not found")
+	}
+	if len(task.Filters) != 2 {
+		t.Fatalf("len(task.Filters) = %d, want 2", len(task.Filters))
+	}
+	if task.Filters[0].Field != "company_id.name" {
+		t.Errorf("Filters[0].Field = %q, want %q", task.Filters[0].Field, "company_id.name")
+	}
+	if task.Filters[0].Op != "=" {
+		t.Errorf("Filters[0].Op = %q, want %q", task.Filters[0].Op, "=")
+	}
+	if task.Filters[0].Value != "Company A" {
+		t.Errorf("Filters[0].Value = %q, want %q", task.Filters[0].Value, "Company A")
+	}
+
+	// Check project has both extra_fields and filters.
+	proj, ok := cfg.Models["project"]
+	if !ok {
+		t.Fatal("Models[\"project\"] not found")
+	}
+	if len(proj.ExtraFields) != 1 {
+		t.Fatalf("len(project.ExtraFields) = %d, want 1", len(proj.ExtraFields))
+	}
+	if len(proj.Filters) != 1 {
+		t.Fatalf("len(project.Filters) = %d, want 1", len(proj.Filters))
+	}
+	if proj.Filters[0].Field != "active" {
+		t.Errorf("Filters[0].Field = %q, want %q", proj.Filters[0].Field, "active")
+	}
+}
+
 func TestMerge_ModelsOverlayOverrides(t *testing.T) {
 	base := &Config{
 		Models: map[string]ModelConfig{
 			"project": {
 				ExtraFields: []ExtraField{
 					{Name: "owner", Field: "x_owner", Type: "many2one"},
+				},
+				Filters: []Filter{
+					{Field: "active", Op: "=", Value: "true"},
 				},
 			},
 		},
@@ -377,10 +443,88 @@ func TestMerge_ModelsOverlayOverrides(t *testing.T) {
 	base.Merge(overlay)
 
 	proj := base.Models["project"]
+	// Overlay ExtraFields replaces base.
 	if len(proj.ExtraFields) != 1 {
 		t.Fatalf("len(ExtraFields) = %d, want 1", len(proj.ExtraFields))
 	}
 	if proj.ExtraFields[0].Name != "new_field" {
 		t.Errorf("ExtraFields[0].Name = %q, want %q", proj.ExtraFields[0].Name, "new_field")
+	}
+	// Base Filters survive when overlay has none.
+	if len(proj.Filters) != 1 {
+		t.Fatalf("len(Filters) = %d, want 1 (base filters should survive)", len(proj.Filters))
+	}
+	if proj.Filters[0].Field != "active" {
+		t.Errorf("Filters[0].Field = %q, want %q", proj.Filters[0].Field, "active")
+	}
+}
+
+func TestMerge_FiltersAccumulate(t *testing.T) {
+	base := &Config{
+		Models: map[string]ModelConfig{
+			"task": {
+				Filters: []Filter{
+					{Field: "company_id.name", Op: "=", Value: "Company A"},
+				},
+			},
+		},
+	}
+	overlay := &Config{
+		Models: map[string]ModelConfig{
+			"task": {
+				Filters: []Filter{
+					{Field: "project_id.name", Op: "=", Value: "Project X"},
+				},
+			},
+		},
+	}
+
+	base.Merge(overlay)
+
+	task := base.Models["task"]
+	if len(task.Filters) != 2 {
+		t.Fatalf("len(Filters) = %d, want 2 (filters should accumulate)", len(task.Filters))
+	}
+}
+
+func TestMerge_FiltersSameFieldOverride(t *testing.T) {
+	base := &Config{
+		Models: map[string]ModelConfig{
+			"task": {
+				Filters: []Filter{
+					{Field: "company_id.name", Op: "=", Value: "Company A"},
+					{Field: "active", Op: "=", Value: "true"},
+				},
+			},
+		},
+	}
+	overlay := &Config{
+		Models: map[string]ModelConfig{
+			"task": {
+				Filters: []Filter{
+					{Field: "company_id.name", Op: "=", Value: "Company B"},
+				},
+			},
+		},
+	}
+
+	base.Merge(overlay)
+
+	task := base.Models["task"]
+	if len(task.Filters) != 2 {
+		t.Fatalf("len(Filters) = %d, want 2", len(task.Filters))
+	}
+	// Find the company filter — should be overridden.
+	var companyFilter *Filter
+	for i := range task.Filters {
+		if task.Filters[i].Field == "company_id.name" {
+			companyFilter = &task.Filters[i]
+		}
+	}
+	if companyFilter == nil {
+		t.Fatal("company_id.name filter not found")
+	}
+	if companyFilter.Value != "Company B" {
+		t.Errorf("company filter Value = %q, want %q", companyFilter.Value, "Company B")
 	}
 }

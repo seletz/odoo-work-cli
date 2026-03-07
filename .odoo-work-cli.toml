@@ -2,6 +2,14 @@
 extra_fields = [
   { name = "product_owner", field = "x_studio_productowner", type = "many2one" },
 ]
+filters = [
+    { field = "company_id.name", op = "=", value = "digitalgedacht GmbH" },
+]
 
 [models.task]
 extra_fields = []
+filters = [
+    { field = "project_id.name", op = "=", value = "Infrastruktur und Betrieb" },
+    { field = "company_id.name", op = "=", value = "digitalgedacht GmbH" },
+    { field = "stage_id.name", op = "=", value = "Umsetzung" },
+]

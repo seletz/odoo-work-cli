@@ -125,9 +125,30 @@ func (x *XMLRPCClient) extractExtraFields(modelKey string, record map[string]int
 	return extras
 }
 
+// filtersForModel returns configured default filters for the given model key.
+func (x *XMLRPCClient) filtersForModel(modelKey string) []config.Filter {
+	if x.models == nil {
+		return nil
+	}
+	mc, ok := x.models[modelKey]
+	if !ok || len(mc.Filters) == 0 {
+		return nil
+	}
+	return mc.Filters
+}
+
+// applyCriteriaFilters adds configured default filters for the given model
+// to the criteria.
+func (x *XMLRPCClient) applyCriteriaFilters(criteria *goOdoo.Criteria, modelKey string) {
+	for _, f := range x.filtersForModel(modelKey) {
+		criteria.Add(f.Field, f.Op, f.Value)
+	}
+}
+
 // ListProjects returns all projects from Odoo.
 func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 	criteria := goOdoo.NewCriteria()
+	x.applyCriteriaFilters(criteria, "project")
 
 	// Build field list: standard fields + configured extra fields.
 	fields := []string{"id", "name", "active", "partner_id", "company_id", "stage_id", "user_id"}
@@ -175,6 +196,7 @@ func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 // Pass projectID <= 0 to list all tasks.
 func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
 	criteria := goOdoo.NewCriteria()
+	x.applyCriteriaFilters(criteria, "task")
 	if projectID > 0 {
 		criteria.Add("project_id", "=", projectID)
 	}
@@ -210,6 +232,7 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 		Add("date", ">=", dateFrom).
 		Add("date", "<=", dateTo).
 		Add("user_id.login", "=", x.login)
+	x.applyCriteriaFilters(criteria, "timesheet")
 	lines, err := x.client.FindAccountAnalyticLines(criteria, goOdoo.NewOptions())
 	if IsNotFound(err) {
 		return []TimesheetEntry{}, nil
