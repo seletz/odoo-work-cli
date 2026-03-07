@@ -186,7 +186,9 @@ func (m Model) View() tea.View {
 		if m.loading {
 			loadingIndicator = " " + m.spinner.View()
 		}
-		title := fmt.Sprintf("  Week: %s — %s%s\n\n",
+		_, isoWeek := m.monday.ISOWeek()
+		title := fmt.Sprintf("  W%02d: %s — %s%s\n\n",
+			isoWeek,
 			m.monday.Format("Mon 02 Jan 2006"),
 			sunday.Format("Mon 02 Jan 2006"),
 			loadingIndicator)
