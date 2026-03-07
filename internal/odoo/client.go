@@ -17,8 +17,8 @@ type ProjectInfo struct {
 	Customer       string
 	Company        string
 	Stage          string
-	ProductOwner   string
 	ProjectManager string
+	ExtraFields    map[string]string
 }
 
 // TaskInfo holds summary information for an Odoo task.

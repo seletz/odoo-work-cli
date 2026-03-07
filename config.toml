@@ -1,0 +1,7 @@
+[models.project]
+extra_fields = [
+  { name = "product_owner", field = "x_studio_productowner", type = "many2one" },
+]
+
+[models.task]
+extra_fields = []

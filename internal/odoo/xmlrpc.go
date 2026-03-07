@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/seletz/odoo-work-cli/internal/config"
 	goOdoo "github.com/skilld-labs/go-odoo"
 )
 
@@ -11,10 +12,12 @@ import (
 type XMLRPCClient struct {
 	client *goOdoo.Client
 	login  string
+	models map[string]config.ModelConfig
 }
 
 // NewXMLRPCClient creates a new Odoo client and authenticates.
-func NewXMLRPCClient(url, database, username, password string) (*XMLRPCClient, error) {
+// The models parameter provides per-model extra field configuration.
+func NewXMLRPCClient(url, database, username, password string, models map[string]config.ModelConfig) (*XMLRPCClient, error) {
 	c, err := goOdoo.NewClient(&goOdoo.ClientConfig{
 		Admin:    username,
 		Password: password,
@@ -24,7 +27,7 @@ func NewXMLRPCClient(url, database, username, password string) (*XMLRPCClient, e
 	if err != nil {
 		return nil, fmt.Errorf("connecting to odoo: %w", err)
 	}
-	return &XMLRPCClient{client: c, login: username}, nil
+	return &XMLRPCClient{client: c, login: username, models: models}, nil
 }
 
 // Close closes the underlying XML-RPC connections.
@@ -32,54 +35,136 @@ func (x *XMLRPCClient) Close() {
 	x.client.Close()
 }
 
-// projectRecord is a custom struct for deserializing project.project via SearchRead.
-// It includes the custom field x_studio_productowner that is not in the generated go-odoo types.
-type projectRecord struct {
-	Id                   *goOdoo.Int     `xmlrpc:"id,omitempty"`
-	Name                 *goOdoo.String  `xmlrpc:"name,omitempty"`
-	Active               *goOdoo.Bool    `xmlrpc:"active,omitempty"`
-	PartnerId            *goOdoo.Many2One `xmlrpc:"partner_id,omitempty"`
-	CompanyId            *goOdoo.Many2One `xmlrpc:"company_id,omitempty"`
-	StageId              *goOdoo.Many2One `xmlrpc:"stage_id,omitempty"`
-	UserId               *goOdoo.Many2One `xmlrpc:"user_id,omitempty"`
-	XStudioProductowner  *goOdoo.Many2One `xmlrpc:"x_studio_productowner,omitempty"`
+// searchReadRaw calls ExecuteKw("search_read", ...) and returns raw maps.
+func (x *XMLRPCClient) searchReadRaw(model string, criteria *goOdoo.Criteria, opts *goOdoo.Options) ([]map[string]interface{}, error) {
+	resp, err := x.client.ExecuteKw("search_read", model, []interface{}{*criteria}, opts)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, nil
+	}
+	items, ok := resp.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type %T", resp)
+	}
+	result := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		result = append(result, m)
+	}
+	return result, nil
 }
 
-type projectRecords []projectRecord
+// extractMany2OneName extracts the display name from a Many2One field value.
+// Many2One fields are represented as [id, name] or false in XML-RPC.
+func extractMany2OneName(v interface{}) string {
+	if v == nil || v == false {
+		return ""
+	}
+	arr, ok := v.([]interface{})
+	if !ok || len(arr) < 2 {
+		return ""
+	}
+	name, _ := arr[1].(string)
+	return name
+}
+
+// extractFieldValue extracts a field value as a string based on its Odoo type.
+func extractFieldValue(v interface{}, fieldType string) string {
+	if v == nil || v == false {
+		return ""
+	}
+	switch fieldType {
+	case "many2one":
+		return extractMany2OneName(v)
+	case "char", "selection", "text":
+		s, _ := v.(string)
+		return s
+	case "boolean":
+		b, _ := v.(bool)
+		if b {
+			return "true"
+		}
+		return "false"
+	case "integer":
+		switch n := v.(type) {
+		case int64:
+			return fmt.Sprintf("%d", n)
+		case float64:
+			return fmt.Sprintf("%d", int64(n))
+		}
+		return fmt.Sprintf("%v", v)
+	case "float":
+		switch n := v.(type) {
+		case float64:
+			return fmt.Sprintf("%.2f", n)
+		case int64:
+			return fmt.Sprintf("%.2f", float64(n))
+		}
+		return fmt.Sprintf("%v", v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// extractExtraFields reads configured extra fields from a raw record map.
+func (x *XMLRPCClient) extractExtraFields(modelKey string, record map[string]interface{}) map[string]string {
+	mc, ok := x.models[modelKey]
+	if !ok || len(mc.ExtraFields) == 0 {
+		return nil
+	}
+	extras := make(map[string]string, len(mc.ExtraFields))
+	for _, ef := range mc.ExtraFields {
+		v := record[ef.Field]
+		extras[ef.Name] = extractFieldValue(v, ef.Type)
+	}
+	return extras
+}
 
 // ListProjects returns all projects from Odoo.
 func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 	criteria := goOdoo.NewCriteria()
-	var records projectRecords
-	err := x.client.SearchRead("project.project", criteria, goOdoo.NewOptions(), &records)
-	if IsNotFound(err) {
-		return []ProjectInfo{}, nil
+
+	// Build field list: standard fields + configured extra fields.
+	fields := []string{"id", "name", "active", "partner_id", "company_id", "stage_id", "user_id"}
+	if mc, ok := x.models["project"]; ok {
+		for _, ef := range mc.ExtraFields {
+			fields = append(fields, ef.Field)
+		}
 	}
+	opts := goOdoo.NewOptions().FetchFields(fields...)
+
+	records, err := x.searchReadRaw("project.project", criteria, opts)
 	if err != nil {
+		if IsNotFound(err) {
+			return []ProjectInfo{}, nil
+		}
 		return nil, fmt.Errorf("fetching projects: %w", err)
 	}
 
 	result := make([]ProjectInfo, 0, len(records))
-	for _, p := range records {
+	for _, r := range records {
 		info := ProjectInfo{
-			ID:     p.Id.Get(),
-			Name:   p.Name.Get(),
-			Active: p.Active.Get(),
+			Customer:       extractMany2OneName(r["partner_id"]),
+			Company:        extractMany2OneName(r["company_id"]),
+			Stage:          extractMany2OneName(r["stage_id"]),
+			ProjectManager: extractMany2OneName(r["user_id"]),
+			ExtraFields:    x.extractExtraFields("project", r),
 		}
-		if p.PartnerId != nil {
-			info.Customer = p.PartnerId.Name
+		if id, ok := r["id"].(int64); ok {
+			info.ID = id
+		} else if id, ok := r["id"].(float64); ok {
+			info.ID = int64(id)
 		}
-		if p.CompanyId != nil {
-			info.Company = p.CompanyId.Name
+		if name, ok := r["name"].(string); ok {
+			info.Name = name
 		}
-		if p.StageId != nil {
-			info.Stage = p.StageId.Name
-		}
-		if p.UserId != nil {
-			info.ProjectManager = p.UserId.Name
-		}
-		if p.XStudioProductowner != nil {
-			info.ProductOwner = p.XStudioProductowner.Name
+		if active, ok := r["active"].(bool); ok {
+			info.Active = active
 		}
 		result = append(result, info)
 	}

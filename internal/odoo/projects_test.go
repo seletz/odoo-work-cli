@@ -21,14 +21,18 @@ func TestListProjects(t *testing.T) {
 					{
 						ID: 1, Name: "Project Alpha", Active: true,
 						Customer: "ACME Corp", Company: "nexiles",
-						Stage: "In Progress", ProductOwner: "Jane Doe",
-						ProjectManager: "John Smith",
+						Stage: "In Progress", ProjectManager: "John Smith",
+						ExtraFields: map[string]string{
+							"product_owner": "Jane Doe",
+						},
 					},
 					{
 						ID: 2, Name: "Project Beta", Active: false,
 						Customer: "Globex", Company: "digitalgedacht",
-						Stage: "Done", ProductOwner: "Bob",
-						ProjectManager: "Alice",
+						Stage: "Done", ProjectManager: "Alice",
+						ExtraFields: map[string]string{
+							"product_owner": "Bob",
+						},
 					},
 				},
 			},
@@ -54,8 +58,8 @@ func TestListProjects(t *testing.T) {
 				if p.Stage != "In Progress" {
 					t.Errorf("Stage = %q, want %q", p.Stage, "In Progress")
 				}
-				if p.ProductOwner != "Jane Doe" {
-					t.Errorf("ProductOwner = %q, want %q", p.ProductOwner, "Jane Doe")
+				if p.ExtraFields["product_owner"] != "Jane Doe" {
+					t.Errorf("ExtraFields[product_owner] = %q, want %q", p.ExtraFields["product_owner"], "Jane Doe")
 				}
 				if p.ProjectManager != "John Smith" {
 					t.Errorf("ProjectManager = %q, want %q", p.ProjectManager, "John Smith")

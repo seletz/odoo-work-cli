@@ -171,3 +171,134 @@ func TestMerge(t *testing.T) {
 		t.Errorf("Username = %q, want overlay value", base.Username)
 	}
 }
+
+func TestLoadFromTOML_ExtraFields(t *testing.T) {
+	content := `
+url = "https://odoo.example.com"
+database = "odoo.170"
+
+[models.project]
+extra_fields = [
+  { name = "product_owner", field = "x_studio_productowner", type = "many2one" },
+  { name = "status", field = "x_studio_status", type = "char" },
+]
+
+[models.task]
+extra_fields = []
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.URL != "https://odoo.example.com" {
+		t.Errorf("URL = %q, want %q", cfg.URL, "https://odoo.example.com")
+	}
+
+	// Check models map exists.
+	if cfg.Models == nil {
+		t.Fatal("Models is nil")
+	}
+	if len(cfg.Models) != 2 {
+		t.Fatalf("len(Models) = %d, want 2", len(cfg.Models))
+	}
+
+	// Check project model extra fields.
+	proj, ok := cfg.Models["project"]
+	if !ok {
+		t.Fatal("Models[\"project\"] not found")
+	}
+	if len(proj.ExtraFields) != 2 {
+		t.Fatalf("len(project.ExtraFields) = %d, want 2", len(proj.ExtraFields))
+	}
+	ef := proj.ExtraFields[0]
+	if ef.Name != "product_owner" {
+		t.Errorf("ExtraFields[0].Name = %q, want %q", ef.Name, "product_owner")
+	}
+	if ef.Field != "x_studio_productowner" {
+		t.Errorf("ExtraFields[0].Field = %q, want %q", ef.Field, "x_studio_productowner")
+	}
+	if ef.Type != "many2one" {
+		t.Errorf("ExtraFields[0].Type = %q, want %q", ef.Type, "many2one")
+	}
+
+	// Check task model has empty extra fields.
+	task, ok := cfg.Models["task"]
+	if !ok {
+		t.Fatal("Models[\"task\"] not found")
+	}
+	if len(task.ExtraFields) != 0 {
+		t.Errorf("len(task.ExtraFields) = %d, want 0", len(task.ExtraFields))
+	}
+}
+
+func TestMerge_Models(t *testing.T) {
+	base := &Config{
+		URL: "https://base.example.com",
+		Models: map[string]ModelConfig{
+			"project": {
+				ExtraFields: []ExtraField{
+					{Name: "owner", Field: "x_owner", Type: "many2one"},
+				},
+			},
+		},
+	}
+	overlay := &Config{
+		Models: map[string]ModelConfig{
+			"task": {
+				ExtraFields: []ExtraField{
+					{Name: "priority", Field: "x_priority", Type: "char"},
+				},
+			},
+		},
+	}
+
+	base.Merge(overlay)
+
+	if len(base.Models) != 2 {
+		t.Fatalf("len(Models) = %d, want 2", len(base.Models))
+	}
+	if _, ok := base.Models["project"]; !ok {
+		t.Error("Models[\"project\"] missing after merge")
+	}
+	if _, ok := base.Models["task"]; !ok {
+		t.Error("Models[\"task\"] missing after merge")
+	}
+}
+
+func TestMerge_ModelsOverlayOverrides(t *testing.T) {
+	base := &Config{
+		Models: map[string]ModelConfig{
+			"project": {
+				ExtraFields: []ExtraField{
+					{Name: "owner", Field: "x_owner", Type: "many2one"},
+				},
+			},
+		},
+	}
+	overlay := &Config{
+		Models: map[string]ModelConfig{
+			"project": {
+				ExtraFields: []ExtraField{
+					{Name: "new_field", Field: "x_new", Type: "char"},
+				},
+			},
+		},
+	}
+
+	base.Merge(overlay)
+
+	proj := base.Models["project"]
+	if len(proj.ExtraFields) != 1 {
+		t.Fatalf("len(ExtraFields) = %d, want 1", len(proj.ExtraFields))
+	}
+	if proj.ExtraFields[0].Name != "new_field" {
+		t.Errorf("ExtraFields[0].Name = %q, want %q", proj.ExtraFields[0].Name, "new_field")
+	}
+}

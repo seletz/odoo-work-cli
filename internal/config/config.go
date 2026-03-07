@@ -15,12 +15,25 @@ type ConfigReader interface {
 	OdooPassword() string
 }
 
+// ExtraField describes a custom Odoo field to fetch for a model.
+type ExtraField struct {
+	Name  string `toml:"name"`  // display name (e.g. "product_owner")
+	Field string `toml:"field"` // Odoo field name (e.g. "x_studio_productowner")
+	Type  string `toml:"type"`  // Odoo type: many2one, char, boolean, integer, float
+}
+
+// ModelConfig holds per-model configuration.
+type ModelConfig struct {
+	ExtraFields []ExtraField `toml:"extra_fields"`
+}
+
 // Config holds the application configuration.
 type Config struct {
-	URL      string `toml:"url"`
-	Database string `toml:"database"`
-	Username string `toml:"username"`
-	Password string `toml:"password"`
+	URL      string                 `toml:"url"`
+	Database string                 `toml:"database"`
+	Username string                 `toml:"username"`
+	Password string                 `toml:"password"`
+	Models   map[string]ModelConfig `toml:"models"`
 }
 
 func (c *Config) OdooURL() string      { return c.URL }
@@ -71,7 +84,8 @@ func LoadFromTOML(path string) (*Config, error) {
 }
 
 // Merge overlays values from other onto c. Non-empty fields in other
-// take precedence.
+// take precedence. Model configs from other are merged key-by-key,
+// with overlay models replacing base models of the same name.
 func (c *Config) Merge(other *Config) {
 	if other.URL != "" {
 		c.URL = other.URL
@@ -84,5 +98,13 @@ func (c *Config) Merge(other *Config) {
 	}
 	if other.Password != "" {
 		c.Password = other.Password
+	}
+	if other.Models != nil {
+		if c.Models == nil {
+			c.Models = make(map[string]ModelConfig)
+		}
+		for k, v := range other.Models {
+			c.Models[k] = v
+		}
 	}
 }

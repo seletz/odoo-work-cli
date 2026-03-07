@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/config"
@@ -25,7 +26,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.config/odoo-work-cli/config.toml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "config.toml", "config file path")
 
 	rootCmd.AddCommand(projectsCmd)
 	rootCmd.AddCommand(tasksCmd)
@@ -36,15 +37,36 @@ func init() {
 	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 }
 
+// loadConfig loads and merges TOML config with environment variables.
+func loadConfig() (*config.Config, error) {
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if cfgFile != "" {
+		fileCfg, err := config.LoadFromTOML(cfgFile)
+		if err != nil {
+			return nil, err
+		}
+		cfg.Merge(fileCfg)
+	}
+	return cfg, nil
+}
+
+// newClient creates a new Odoo client from the merged config.
+func newClient(cfg *config.Config) (*odoo.XMLRPCClient, error) {
+	return odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password, cfg.Models)
+}
+
 var projectsCmd = &cobra.Command{
 	Use:   "projects",
 	Short: "List Odoo projects",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadFromEnv()
+		cfg, err := loadConfig()
 		if err != nil {
 			return err
 		}
-		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		client, err := newClient(cfg)
 		if err != nil {
 			return err
 		}
@@ -53,13 +75,38 @@ var projectsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%-6s %-30s %-20s %-15s %-15s %-20s %-20s %s\n",
-			"ID", "Name", "Customer", "Company", "Stage", "Product Owner", "Project Manager", "Active")
-		fmt.Printf("%-6s %-30s %-20s %-15s %-15s %-20s %-20s %s\n",
-			"------", "------------------------------", "--------------------", "---------------", "---------------", "--------------------", "--------------------", "------")
+
+		// Build dynamic column headers from config extra fields.
+		var extraNames []string
+		if mc, ok := cfg.Models["project"]; ok {
+			for _, ef := range mc.ExtraFields {
+				extraNames = append(extraNames, ef.Name)
+			}
+		}
+
+		// Print header.
+		header := fmt.Sprintf("%-6s %-30s %-20s %-15s %-15s %-20s",
+			"ID", "Name", "Customer", "Company", "Phase", "Project Manager")
+		sep := fmt.Sprintf("%-6s %-30s %-20s %-15s %-15s %-20s",
+			"------", "------------------------------", "--------------------", "---------------", "---------------", "--------------------")
+		for _, name := range extraNames {
+			label := strings.ReplaceAll(name, "_", " ")
+			header += fmt.Sprintf(" %-20s", label)
+			sep += fmt.Sprintf(" %-20s", "--------------------")
+		}
+		header += fmt.Sprintf(" %s", "Active")
+		sep += fmt.Sprintf(" %s", "------")
+		fmt.Println(header)
+		fmt.Println(sep)
+
 		for _, p := range projects {
-			fmt.Printf("%-6d %-30s %-20s %-15s %-15s %-20s %-20s %v\n",
-				p.ID, p.Name, p.Customer, p.Company, p.Stage, p.ProductOwner, p.ProjectManager, p.Active)
+			line := fmt.Sprintf("%-6d %-30s %-20s %-15s %-15s %-20s",
+				p.ID, p.Name, p.Customer, p.Company, p.Stage, p.ProjectManager)
+			for _, name := range extraNames {
+				line += fmt.Sprintf(" %-20s", p.ExtraFields[name])
+			}
+			line += fmt.Sprintf(" %v", p.Active)
+			fmt.Println(line)
 		}
 		return nil
 	},
@@ -70,11 +117,11 @@ var tasksCmd = &cobra.Command{
 	Short: "List Odoo tasks",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadFromEnv()
+		cfg, err := loadConfig()
 		if err != nil {
 			return err
 		}
-		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		client, err := newClient(cfg)
 		if err != nil {
 			return err
 		}
@@ -132,11 +179,11 @@ var timesheetsCmd = &cobra.Command{
 	Use:   "timesheets",
 	Short: "List Odoo timesheets for a week",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadFromEnv()
+		cfg, err := loadConfig()
 		if err != nil {
 			return err
 		}
-		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		client, err := newClient(cfg)
 		if err != nil {
 			return err
 		}
@@ -170,11 +217,11 @@ var fieldsCmd = &cobra.Command{
 	Short: "Inspect Odoo model fields",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadFromEnv()
+		cfg, err := loadConfig()
 		if err != nil {
 			return err
 		}
-		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		client, err := newClient(cfg)
 		if err != nil {
 			return err
 		}
@@ -197,11 +244,11 @@ var whoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Show current Odoo user info",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadFromEnv()
+		cfg, err := loadConfig()
 		if err != nil {
 			return err
 		}
-		client, err := odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password)
+		client, err := newClient(cfg)
 		if err != nil {
 			return err
 		}
