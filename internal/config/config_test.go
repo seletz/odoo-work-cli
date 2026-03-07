@@ -3,14 +3,15 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestLoadFromEnv(t *testing.T) {
 	tests := []struct {
-		name    string
-		env     map[string]string
-		wantErr bool
+		name string
+		env  map[string]string
+		want map[string]string
 	}{
 		{
 			name: "all set",
@@ -20,29 +21,28 @@ func TestLoadFromEnv(t *testing.T) {
 				"ODOO_USERNAME": "admin",
 				"ODOO_PASSWORD": "secret",
 			},
-			wantErr: false,
+			want: map[string]string{
+				"url": "https://odoo.example.com", "database": "mydb",
+				"username": "admin", "password": "secret",
+			},
 		},
 		{
-			name:    "none set",
-			env:     map[string]string{},
-			wantErr: true,
+			name: "none set",
+			env:  map[string]string{},
+			want: map[string]string{
+				"url": "", "database": "", "username": "", "password": "",
+			},
 		},
 		{
-			name: "missing password",
+			name: "partial",
 			env: map[string]string{
 				"ODOO_URL":      "https://odoo.example.com",
-				"ODOO_DATABASE": "mydb",
 				"ODOO_USERNAME": "admin",
 			},
-			wantErr: true,
-		},
-		{
-			name: "missing url and database",
-			env: map[string]string{
-				"ODOO_USERNAME": "admin",
-				"ODOO_PASSWORD": "secret",
+			want: map[string]string{
+				"url": "https://odoo.example.com", "database": "",
+				"username": "admin", "password": "",
 			},
-			wantErr: true,
 		},
 	}
 
@@ -50,37 +50,85 @@ func TestLoadFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear all relevant env vars.
 			for _, k := range envKeys {
 				t.Setenv(k, "")
 			}
-			// Set test-specific env vars.
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
 
-			cfg, err := LoadFromEnv()
+			cfg := LoadFromEnv()
+
+			if cfg.OdooURL() != tt.want["url"] {
+				t.Errorf("URL = %q, want %q", cfg.OdooURL(), tt.want["url"])
+			}
+			if cfg.OdooDatabase() != tt.want["database"] {
+				t.Errorf("Database = %q, want %q", cfg.OdooDatabase(), tt.want["database"])
+			}
+			if cfg.OdooUsername() != tt.want["username"] {
+				t.Errorf("Username = %q, want %q", cfg.OdooUsername(), tt.want["username"])
+			}
+			if cfg.OdooPassword() != tt.want["password"] {
+				t.Errorf("Password = %q, want %q", cfg.OdooPassword(), tt.want["password"])
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "all set",
+			cfg: &Config{
+				URL: "https://odoo.example.com", Database: "mydb",
+				Username: "admin", Password: "secret",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "all missing",
+			cfg:     &Config{},
+			wantErr: true,
+			errMsg:  "URL",
+		},
+		{
+			name: "missing password",
+			cfg: &Config{
+				URL: "https://odoo.example.com", Database: "mydb",
+				Username: "admin",
+			},
+			wantErr: true,
+			errMsg:  "Password",
+		},
+		{
+			name: "missing url and database",
+			cfg: &Config{
+				Username: "admin", Password: "secret",
+			},
+			wantErr: true,
+			errMsg:  "URL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Validate()
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
+				}
+				if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("error %q should contain %q", err.Error(), tt.errMsg)
 				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if cfg.OdooURL() != tt.env["ODOO_URL"] {
-				t.Errorf("URL = %q, want %q", cfg.OdooURL(), tt.env["ODOO_URL"])
-			}
-			if cfg.OdooDatabase() != tt.env["ODOO_DATABASE"] {
-				t.Errorf("Database = %q, want %q", cfg.OdooDatabase(), tt.env["ODOO_DATABASE"])
-			}
-			if cfg.OdooUsername() != tt.env["ODOO_USERNAME"] {
-				t.Errorf("Username = %q, want %q", cfg.OdooUsername(), tt.env["ODOO_USERNAME"])
-			}
-			if cfg.OdooPassword() != tt.env["ODOO_PASSWORD"] {
-				t.Errorf("Password = %q, want %q", cfg.OdooPassword(), tt.env["ODOO_PASSWORD"])
 			}
 		})
 	}
@@ -145,6 +193,40 @@ func TestLoadFromTOML_FileNotFound(t *testing.T) {
 	_, err := LoadFromTOML("/nonexistent/path/config.toml")
 	if err == nil {
 		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
+func TestLoadFromTOML_RejectsPassword(t *testing.T) {
+	content := "url = \"https://odoo.example.com\"\npassword = \"should-be-rejected\"\n"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadFromTOML(path)
+	if err == nil {
+		t.Fatal("expected error when config file contains password, got nil")
+	}
+	if !strings.Contains(err.Error(), "password") {
+		t.Errorf("error %q should mention password", err.Error())
+	}
+}
+
+func TestLoadFromTOML_NoPasswordIsOK(t *testing.T) {
+	content := "url = \"https://odoo.example.com\"\ndatabase = \"mydb\"\n"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.URL != "https://odoo.example.com" {
+		t.Errorf("URL = %q, want %q", cfg.URL, "https://odoo.example.com")
 	}
 }
 

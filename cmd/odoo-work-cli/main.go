@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/spf13/cobra"
@@ -26,31 +28,29 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "config.toml", "config file path")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file path (skip discovery)")
 
 	rootCmd.AddCommand(projectsCmd)
 	rootCmd.AddCommand(tasksCmd)
 	rootCmd.AddCommand(timesheetsCmd)
 	rootCmd.AddCommand(fieldsCmd)
 	rootCmd.AddCommand(whoamiCmd)
+	rootCmd.AddCommand(configCmd)
 
 	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
+	configCmd.Flags().BoolVar(&configMerged, "merged", false, "print merged TOML config (password redacted)")
 }
 
-// loadConfig loads and merges TOML config with environment variables.
+// loadConfig loads and merges config using file discovery and env vars.
 func loadConfig() (*config.Config, error) {
-	cfg, err := config.LoadFromEnv()
+	result, err := config.Discover(cfgFile)
 	if err != nil {
 		return nil, err
 	}
-	if cfgFile != "" {
-		fileCfg, err := config.LoadFromTOML(cfgFile)
-		if err != nil {
-			return nil, err
-		}
-		cfg.Merge(fileCfg)
+	if err := result.Config.Validate(); err != nil {
+		return nil, err
 	}
-	return cfg, nil
+	return result.Config, nil
 }
 
 // newClient creates a new Odoo client from the merged config.
@@ -262,6 +262,40 @@ var whoamiCmd = &cobra.Command{
 		fmt.Printf("Login:   %s\n", info.Login)
 		fmt.Printf("Email:   %s\n", info.Email)
 		fmt.Printf("Company: %s\n", info.Company)
+		return nil
+	},
+}
+
+var configMerged bool
+
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Show discovered config files and merged configuration",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		result, err := config.Discover(cfgFile)
+		if err != nil {
+			return err
+		}
+
+		if !configMerged {
+			if len(result.Files) == 0 {
+				fmt.Println("No config files discovered.")
+			} else {
+				fmt.Println("Discovered config files (merge order):")
+				for _, f := range result.Files {
+					fmt.Printf("  %s\n", f)
+				}
+			}
+			return nil
+		}
+
+		// Password is tagged toml:"-" on Config, so the encoder
+		// omits it automatically — output is a valid config file.
+		var buf bytes.Buffer
+		if err := toml.NewEncoder(&buf).Encode(result.Config); err != nil {
+			return fmt.Errorf("encoding config: %w", err)
+		}
+		fmt.Print(buf.String())
 		return nil
 	},
 }

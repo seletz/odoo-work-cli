@@ -32,7 +32,7 @@ type Config struct {
 	URL      string                 `toml:"url"`
 	Database string                 `toml:"database"`
 	Username string                 `toml:"username"`
-	Password string                 `toml:"password"`
+	Password string                 `toml:"-"`
 	Models   map[string]ModelConfig `toml:"models"`
 }
 
@@ -42,43 +42,50 @@ func (c *Config) OdooUsername() string   { return c.Username }
 func (c *Config) OdooPassword() string   { return c.Password }
 
 // LoadFromEnv reads configuration from environment variables.
-// Required: ODOO_URL, ODOO_DATABASE, ODOO_USERNAME, ODOO_PASSWORD.
-func LoadFromEnv() (*Config, error) {
-	cfg := &Config{
+// It reads whatever env vars are set without requiring any.
+// Use Validate to check that all required fields are present.
+func LoadFromEnv() *Config {
+	return &Config{
 		URL:      os.Getenv("ODOO_URL"),
 		Database: os.Getenv("ODOO_DATABASE"),
 		Username: os.Getenv("ODOO_USERNAME"),
 		Password: os.Getenv("ODOO_PASSWORD"),
 	}
+}
 
+// Validate checks that all required configuration fields are set.
+// Returns an error listing missing fields.
+func (c *Config) Validate() error {
 	var missing []string
-	if cfg.URL == "" {
-		missing = append(missing, "ODOO_URL")
+	if c.URL == "" {
+		missing = append(missing, "URL")
 	}
-	if cfg.Database == "" {
-		missing = append(missing, "ODOO_DATABASE")
+	if c.Database == "" {
+		missing = append(missing, "Database")
 	}
-	if cfg.Username == "" {
-		missing = append(missing, "ODOO_USERNAME")
+	if c.Username == "" {
+		missing = append(missing, "Username")
 	}
-	if cfg.Password == "" {
-		missing = append(missing, "ODOO_PASSWORD")
+	if c.Password == "" {
+		missing = append(missing, "Password")
 	}
-
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing required environment variables: %v", missing)
+		return fmt.Errorf("missing required config fields: %v", missing)
 	}
-
-	return cfg, nil
+	return nil
 }
 
 // LoadFromTOML reads configuration from a TOML file.
-// Secret fields (username, password) should come from environment variables;
-// this is intended for non-secret fields like URL and database.
+// Returns an error if the file contains a password key — passwords
+// must come from environment variables only, never from config files.
 func LoadFromTOML(path string) (*Config, error) {
 	cfg := &Config{}
-	if _, err := toml.DecodeFile(path, cfg); err != nil {
+	meta, err := toml.DecodeFile(path, cfg)
+	if err != nil {
 		return nil, fmt.Errorf("reading config file %s: %w", path, err)
+	}
+	if meta.IsDefined("password") {
+		return nil, fmt.Errorf("config file %s contains a password field; passwords must be set via ODOO_PASSWORD env var, not in config files", path)
 	}
 	return cfg, nil
 }
