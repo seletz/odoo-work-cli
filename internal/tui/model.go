@@ -119,9 +119,13 @@ type MondayTime struct {
 }
 
 // NewModel creates a new TUI model with the given client and starting Monday.
-func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, bundesland string) Model {
+func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, bundesland string, keys config.KeysConfig) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
+	km := DefaultKeyMap()
+	if keys != nil {
+		km = ApplyKeysConfig(km, keys)
+	}
 	return Model{
 		state:      stateLoading,
 		client:     client,
@@ -131,7 +135,7 @@ func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, 
 		holidays:   BuildHolidayMap(monday.Year(), bundesland),
 		spinner:    s,
 		help:       help.New(),
-		keys:       DefaultKeyMap(),
+		keys:       km,
 	}
 }
 

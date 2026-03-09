@@ -78,7 +78,7 @@ func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) { return
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
 	client := &mockClient{entries: entries, err: err}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	return NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	return NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 }
 
 func TestModel_LoadedTransitionsToGrid(t *testing.T) {
@@ -314,7 +314,7 @@ func TestModel_WindowSizeMsg(t *testing.T) {
 func newDetailModel(entries []odoo.TimesheetEntry) Model {
 	client := &mockClient{entries: entries}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(entries, mon.Time)
 	m.cursor = [2]int{0, 0}
@@ -449,7 +449,7 @@ func TestModel_EditSubmitSuccess(t *testing.T) {
 	}
 	client := &mockClient{entries: entries}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(entries, mon.Time)
 	m.cursor = [2]int{0, 0}
@@ -719,7 +719,7 @@ func TestModel_AddSubmitCallsCreate(t *testing.T) {
 	}
 	client := &mockClient{entries: entries, createdID: 99}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(entries, mon.Time)
 	m.cursor = [2]int{0, 0}
@@ -885,7 +885,7 @@ func TestModel_DeleteEntryTriggersReload(t *testing.T) {
 	}
 	client := &mockClient{entries: entries}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(entries, mon.Time)
 	m.cursor = [2]int{0, 0}
@@ -939,7 +939,7 @@ func TestModel_DeleteEntryNoEntriesNoop(t *testing.T) {
 	}
 	client := &mockClient{entries: entries}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(entries, mon.Time)
 	m.cursor = [2]int{0, 0} // Monday — no entries
@@ -1022,7 +1022,7 @@ func newSearchModel(projects []odoo.ProjectInfo, tasks []odoo.TaskInfo) Model {
 		},
 	}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(client.entries, mon.Time)
 	m.cursor = [2]int{0, 0}
@@ -1200,7 +1200,7 @@ func TestModel_SearchToggleFilter(t *testing.T) {
 		},
 	}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(client.entries, mon.Time)
 	m.cursor = [2]int{0, 0}
@@ -1377,7 +1377,7 @@ func TestModel_DeleteEntryError(t *testing.T) {
 	}
 	client := &mockClient{entries: entries, deleteErr: errors.New("forbidden")}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
-	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil)
 	m.state = stateGrid
 	m.grid = BuildWeekGrid(entries, mon.Time)
 	m.cursor = [2]int{0, 0}

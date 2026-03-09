@@ -7,6 +7,40 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// KeysConfig maps action names to key binding strings.
+// Each action maps to one or more key strings (e.g. "q", "ctrl+c").
+type KeysConfig map[string][]string
+
+// UnmarshalTOML normalizes TOML values: a single string becomes a
+// one-element slice, and an array of strings stays as-is.
+func (kc *KeysConfig) UnmarshalTOML(data interface{}) error {
+	m, ok := data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("keys: expected table, got %T", data)
+	}
+	result := make(KeysConfig, len(m))
+	for action, val := range m {
+		switch v := val.(type) {
+		case string:
+			result[action] = []string{v}
+		case []interface{}:
+			keys := make([]string, 0, len(v))
+			for _, elem := range v {
+				s, ok := elem.(string)
+				if !ok {
+					return fmt.Errorf("keys.%s: expected string element, got %T", action, elem)
+				}
+				keys = append(keys, s)
+			}
+			result[action] = keys
+		default:
+			return fmt.Errorf("keys.%s: expected string or array, got %T", action, val)
+		}
+	}
+	*kc = result
+	return nil
+}
+
 // ConfigReader provides access to configuration values.
 type ConfigReader interface {
 	OdooURL() string
@@ -64,6 +98,7 @@ type Config struct {
 	Password   string                 `toml:"-"`
 	Models     map[string]ModelConfig `toml:"models"`
 	Hours      HoursLimits            `toml:"hours"`
+	Keys       KeysConfig             `toml:"keys"`
 	Bundesland string                 `toml:"bundesland"` // German federal state for holidays (e.g. "Bayern")
 }
 
@@ -174,6 +209,14 @@ func (c *Config) Merge(other *Config) {
 	}
 	if other.Hours.WeeklyHigh != 0 {
 		c.Hours.WeeklyHigh = other.Hours.WeeklyHigh
+	}
+	if other.Keys != nil {
+		if c.Keys == nil {
+			c.Keys = make(KeysConfig)
+		}
+		for action, keys := range other.Keys {
+			c.Keys[action] = keys
+		}
 	}
 	if other.Models != nil {
 		if c.Models == nil {

@@ -26,3 +26,30 @@ filters = [
     { field = "company_id.name", op = "=", value = "digitalgedacht GmbH" },
     { field = "stage_id.name", op = "=", value = "Umsetzung" },
 ]
+
+[keys]
+# Cursor movement (shared across grid, detail, search views)
+cursor_up = ["up", "k"]
+cursor_down = ["down", "j"]
+
+# Grid view
+grid_next_col = ["right", "l"]
+grid_prev_col = ["left", "h"]
+grid_enter = ["enter"]
+grid_search = ["/"]
+
+# Detail view
+detail_edit = ["e"]
+detail_add = ["a"]
+detail_delete = ["d"]
+
+# Search view
+search_toggle = ["ctrl+a"]
+
+# Global (available in all non-modal views)
+global_prev_week = ["p"]
+global_next_week = ["n"]
+global_back = ["esc"]
+global_refresh = ["r"]
+global_help = ["?"]
+global_quit = ["q", "ctrl+c"]
