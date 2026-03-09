@@ -27,8 +27,9 @@ const (
 
 // timesheetsLoadedMsg is sent when timesheets finish loading.
 type timesheetsLoadedMsg struct {
-	entries []odoo.TimesheetEntry
-	err     error
+	entries     []odoo.TimesheetEntry
+	prevEntries []odoo.TimesheetEntry
+	err         error
 }
 
 // attendanceLoadedMsg is sent when attendance status finishes loading.
@@ -107,13 +108,26 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) loadTimesheets() tea.Cmd {
 	monday := m.monday.Time
+	prevMonday := monday.AddDate(0, 0, -7)
 	sunday := monday.AddDate(0, 0, 6)
-	dateFrom := monday.Format("2006-01-02")
+	dateFrom := prevMonday.Format("2006-01-02")
 	dateTo := sunday.Format("2006-01-02")
 	client := m.client
+	mondayStr := monday.Format("2006-01-02")
 	return func() tea.Msg {
 		entries, err := client.ListTimesheets(dateFrom, dateTo)
-		return timesheetsLoadedMsg{entries: entries, err: err}
+		if err != nil {
+			return timesheetsLoadedMsg{err: err}
+		}
+		var current, prev []odoo.TimesheetEntry
+		for _, e := range entries {
+			if e.Date >= mondayStr {
+				current = append(current, e)
+			} else {
+				prev = append(prev, e)
+			}
+		}
+		return timesheetsLoadedMsg{entries: current, prevEntries: prev}
 	}
 }
 
@@ -147,7 +161,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = stateGrid
 			m.cursor = [2]int{0, 0}
 		}
-		m.grid = BuildWeekGrid(msg.entries, m.monday.Time)
+		hints := HintLabelsFromEntries(msg.prevEntries)
+		m.grid = BuildWeekGridWithHints(msg.entries, m.monday.Time, hints)
 		m.holidays = BuildHolidayMap(m.monday.Year(), m.bundesland)
 		m.weekHols = WeekHolidays(m.monday.Time, m.holidays)
 		return m, nil

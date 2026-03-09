@@ -936,6 +936,55 @@ func TestModel_DeleteEntryNoEntriesNoop(t *testing.T) {
 	}
 }
 
+func TestModel_LoadTimesheetsIncludesPrevWeek(t *testing.T) {
+	m := newTestModel(nil, nil)
+
+	// Simulate loaded msg with current entries and previous week entries.
+	msg := timesheetsLoadedMsg{
+		entries: []odoo.TimesheetEntry{
+			{Date: "2026-03-02", Project: "Acme", Task: "Dev", ProjectID: 10, TaskID: 20, Hours: 2.0},
+		},
+		prevEntries: []odoo.TimesheetEntry{
+			{Date: "2026-02-23", Project: "Beta", Task: "QA", ProjectID: 30, TaskID: 40, Hours: 3.0},
+		},
+	}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	if len(um.grid.Rows) != 2 {
+		t.Fatalf("expected 2 rows (1 current + 1 hint), got %d", len(um.grid.Rows))
+	}
+	// Both rows should be present, sorted.
+	if um.grid.Rows[0].Label != "Acme / Dev" {
+		t.Fatalf("expected first row 'Acme / Dev', got %q", um.grid.Rows[0].Label)
+	}
+	if um.grid.Rows[1].Label != "Beta / QA" {
+		t.Fatalf("expected second row 'Beta / QA', got %q", um.grid.Rows[1].Label)
+	}
+	// Hint row should have IDs.
+	pid, tid := um.grid.Rows[1].ProjectTaskIDs()
+	if pid != 30 || tid != 40 {
+		t.Fatalf("expected hint IDs 30/40, got %d/%d", pid, tid)
+	}
+}
+
+func TestModel_LoadTimesheetsNoPrevEntries(t *testing.T) {
+	m := newTestModel(nil, nil)
+
+	// No previous entries — should behave like before.
+	msg := timesheetsLoadedMsg{
+		entries: []odoo.TimesheetEntry{
+			{Date: "2026-03-02", Project: "Acme", Task: "Dev", ProjectID: 10, TaskID: 20, Hours: 2.0},
+		},
+	}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	if len(um.grid.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(um.grid.Rows))
+	}
+}
+
 func TestModel_DeleteEntryError(t *testing.T) {
 	entries := []odoo.TimesheetEntry{
 		{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 2.0, Name: "Task A", ProjectID: 10, TaskID: 20},
