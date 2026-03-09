@@ -12,8 +12,19 @@ import (
 // GridRow represents a single project/task row in the weekly grid.
 type GridRow struct {
 	Label   string
-	Hours   [7]float64                // Mon=0 .. Sun=6
-	Entries [7][]odoo.TimesheetEntry  // individual entries per day
+	Hours   [7]float64               // Mon=0 .. Sun=6
+	Entries [7][]odoo.TimesheetEntry // individual entries per day
+}
+
+// ProjectTaskIDs scans all days in the row and returns the ProjectID and TaskID
+// from the first non-empty entry found. Returns 0, 0 if the row has no entries.
+func (r GridRow) ProjectTaskIDs() (projectID, taskID int64) {
+	for d := 0; d < 7; d++ {
+		if len(r.Entries[d]) > 0 {
+			return r.Entries[d][0].ProjectID, r.Entries[d][0].TaskID
+		}
+	}
+	return 0, 0
 }
 
 // WeekGrid holds the aggregated weekly timesheet data.

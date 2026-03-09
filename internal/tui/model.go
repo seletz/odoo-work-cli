@@ -47,29 +47,30 @@ type attendanceTickMsg time.Time
 
 // Model is the bubbletea model for the weekly timesheet TUI.
 type Model struct {
-	state   uiState
-	client  odoo.Client
-	grid    WeekGrid
-	monday  MondayTime
-	cursor  [2]int // [row, col]
-	spinner spinner.Model
-	help    help.Model
-	keys    KeyMap
-	limits     config.HoursLimits
-	bundesland string
-	holidays   HolidayMap
-	weekHols   [7]string
+	state        uiState
+	client       odoo.Client
+	grid         WeekGrid
+	monday       MondayTime
+	cursor       [2]int // [row, col]
+	spinner      spinner.Model
+	help         help.Model
+	keys         KeyMap
+	limits       config.HoursLimits
+	bundesland   string
+	holidays     HolidayMap
+	weekHols     [7]string
 	attendance   *odoo.AttendanceStatus
 	loading      bool
 	err          error
 	width        int
 	height       int
-	detailCursor int              // selected entry row in detail view
-	editIndex    int              // index into current day's entries slice
-	editHours    textinput.Model  // hours input
-	editDesc     textinput.Model  // description input
-	editFocus    int              // 0=hours, 1=description
-	editErr      error            // last edit error
+	detailCursor int             // selected entry row in detail view
+	editIndex    int             // index into current day's entries slice
+	editHours    textinput.Model // hours input
+	editDesc     textinput.Model // description input
+	editFocus    int             // 0=hours, 1=description
+	editErr      error           // last edit error
+	editIsNew    bool            // true = creating new entry, false = editing existing
 }
 
 // MondayTime wraps time.Time for the Monday of the displayed week.
@@ -82,15 +83,15 @@ func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	return Model{
-		state:   stateLoading,
-		client:  client,
+		state:      stateLoading,
+		client:     client,
 		monday:     monday,
 		limits:     limits,
 		bundesland: bundesland,
 		holidays:   BuildHolidayMap(monday.Year(), bundesland),
 		spinner:    s,
-		help:    help.New(),
-		keys:    DefaultKeyMap(),
+		help:       help.New(),
+		keys:       DefaultKeyMap(),
 	}
 }
 
@@ -270,6 +271,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.enterEdit()
 				}
 				return m, nil
+			case key.Matches(msg, m.keys.Add):
+				return m.enterAdd()
 			}
 		}
 
@@ -295,6 +298,7 @@ func (m Model) enterEdit() (tea.Model, tea.Cmd) {
 	}
 	entry := entries[m.detailCursor]
 
+	m.editIsNew = false
 	m.editIndex = m.detailCursor
 	m.editFocus = 0
 	m.editErr = nil
@@ -307,6 +311,27 @@ func (m Model) enterEdit() (tea.Model, tea.Cmd) {
 
 	m.editDesc = textinput.New()
 	m.editDesc.SetValue(entry.Name)
+	m.editDesc.SetWidth(50)
+	m.editDesc.Placeholder = "Description"
+	m.editDesc.Blur()
+
+	m.state = stateEdit
+	return m, cmd
+}
+
+// enterAdd transitions from detail to edit state for creating a new entry.
+func (m Model) enterAdd() (tea.Model, tea.Cmd) {
+	m.editIsNew = true
+	m.editIndex = -1
+	m.editFocus = 0
+	m.editErr = nil
+
+	m.editHours = textinput.New()
+	m.editHours.SetWidth(10)
+	m.editHours.Placeholder = "0.0"
+	cmd := m.editHours.Focus()
+
+	m.editDesc = textinput.New()
 	m.editDesc.SetWidth(50)
 	m.editDesc.Placeholder = "Description"
 	m.editDesc.Blur()
@@ -363,6 +388,25 @@ func (m Model) submitEdit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	client := m.client
+
+	if m.editIsNew {
+		row := m.grid.Rows[m.cursor[0]]
+		projectID, taskID := row.ProjectTaskIDs()
+		day := m.monday.AddDate(0, 0, m.cursor[1])
+		params := odoo.TimesheetWriteParams{
+			ProjectID: projectID,
+			TaskID:    taskID,
+			Date:      day.Format("2006-01-02"),
+			Name:      desc,
+			Hours:     hours,
+		}
+		return m, func() tea.Msg {
+			_, err := client.CreateTimesheet(params)
+			return editSavedMsg{err: err}
+		}
+	}
+
 	entries := m.detailEntries()
 	if m.editIndex >= len(entries) {
 		return m, nil
@@ -374,7 +418,6 @@ func (m Model) submitEdit() (tea.Model, tea.Cmd) {
 		"name":        desc,
 	}
 
-	client := m.client
 	id := entry.ID
 	return m, func() tea.Msg {
 		err := client.UpdateTimesheet(id, fields)
@@ -424,7 +467,7 @@ func (m Model) View() tea.View {
 		if m.state == stateEdit && m.cursor[0] < len(m.grid.Rows) {
 			row := m.grid.Rows[m.cursor[0]]
 			day := m.monday.AddDate(0, 0, m.cursor[1])
-			edit := renderEditForm(row, day, m.editHours, m.editDesc, m.editFocus, m.editErr, m.width)
+			edit := renderEditForm(row, day, m.editHours, m.editDesc, m.editFocus, m.editErr, m.width, m.editIsNew)
 			s = RenderDetailOverlay(s, edit, m.width, m.height)
 		} else if m.state == stateDetail && m.cursor[0] < len(m.grid.Rows) {
 			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.detailCursor, m.width)

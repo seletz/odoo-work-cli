@@ -201,7 +201,7 @@ func RenderDetail(row GridRow, col int, monday time.Time, detailCursor int, widt
 	total := fmt.Sprintf("Total: %s (%d entries)", FormatHours(row.Hours[col]), len(entries))
 	b.WriteString(detailHeaderStyle.Render(total))
 	b.WriteString("\n")
-	b.WriteString(detailHintStyle.Render("j/k: select  e: edit  esc: back"))
+	b.WriteString(detailHintStyle.Render("j/k: select  e: edit  a: add  esc: back"))
 
 	return b.String()
 }
@@ -279,11 +279,15 @@ func renderClockStatus(attendance *odoo.AttendanceStatus) string {
 }
 
 // renderEditForm renders the edit form overlay content.
-func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.Model, focus int, editErr error, width int) string {
+func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.Model, focus int, editErr error, width int, isNew bool) string {
 	_ = width // reserved for future layout adjustments
 	var b strings.Builder
 
-	header := fmt.Sprintf("Editing: %s — %s", row.Label, day.Format("Mon 02 Jan 2006"))
+	verb := "Editing"
+	if isNew {
+		verb = "Adding"
+	}
+	header := fmt.Sprintf("%s: %s — %s", verb, row.Label, day.Format("Mon 02 Jan 2006"))
 	b.WriteString(detailHeaderStyle.Render(header))
 	b.WriteString("\n\n")
 
