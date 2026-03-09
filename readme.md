@@ -42,7 +42,7 @@ mise run lint
 | `clock in`                                               | Clock in (start attendance period)                                                                                  |
 | `clock out`                                              | Clock out (end attendance period, shows duration)                                                                   |
 | `clock status`                                           | Show current attendance state and today's periods                                                                   |
-| `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline edit/add/delete, and live clock-in/out status |
+| `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
 | `config --merged`                                        | Print the fully merged TOML config (password omitted)                                                               |
@@ -69,7 +69,9 @@ ODOO_USERNAME={{ op://your-vault/odoo/username }}
 ODOO_PASSWORD={{ op://your-vault/odoo/password }}
 ```
 
-Then run `mise run inject-env` to generate `.env`. Passwords must come from the `ODOO_PASSWORD` env var -- config files that contain a `password` field are rejected.
+Then run `mise run inject-env` to generate `.env`. Passwords must come from the
+`ODOO_PASSWORD` env var -- config files that contain a `password` field are
+rejected.
 
 ### Config file example
 
@@ -95,13 +97,21 @@ filters = [
 
 ### Custom fields per model
 
-Extra Odoo fields can be fetched per model via `extra_fields`. Each entry specifies a display name, the Odoo field name, and its type (`many2one`, `char`, `boolean`, `integer`, `float`, etc.). These appear as additional columns in command output.
+Extra Odoo fields can be fetched per model via `extra_fields`. Each entry
+specifies a display name, the Odoo field name, and its type (`many2one`, `char`,
+`boolean`, `integer`, `float`, etc.). These appear as additional columns in
+command output.
 
 ### Default query filters per model
 
-Filters scope queries automatically. They are defined per model under `[models.<name>]` with `field`, `op`, and `value`. Supported operators include `=`, `!=`, `ilike`, `>`, `<`, `>=`, `<=`, etc.
+Filters scope queries automatically. They are defined per model under
+`[models.<name>]` with `field`, `op`, and `value`. Supported operators include
+`=`, `!=`, `ilike`, `>`, `<`, `>=`, `<=`, etc.
 
-Filters **accumulate** across config levels (AND semantics). If a child config defines a filter on the same field as a parent, the child's entry overrides the parent's. This lets you set a company-wide filter in a parent directory and add project-specific filters in subdirectories.
+Filters **accumulate** across config levels (AND semantics). If a child config
+defines a filter on the same field as a parent, the child's entry overrides the
+parent's. This lets you set a company-wide filter in a parent directory and add
+project-specific filters in subdirectories.
 
 ## Usage
 
