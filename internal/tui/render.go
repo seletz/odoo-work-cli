@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
@@ -319,6 +320,137 @@ func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.
 
 	b.WriteString("\n")
 	b.WriteString(detailHintStyle.Render("Enter: save  Esc: cancel  Tab: next field"))
+
+	return b.String()
+}
+
+// renderSearchOverlay renders the search overlay content with a fixed size
+// derived from terminal dimensions so the overlay does not jump while typing.
+func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, sub searchSubState, useFilter bool, searchErr error, spin spinner.Model, width, height int) string {
+	// Fixed inner width: full terminal minus outer padding (8 each side),
+	// border (2), and box padding (4).
+	const outerPad = 8
+	innerWidth := width - 2*outerPad - 6
+	if innerWidth < 40 {
+		innerWidth = 40
+	}
+
+	// Fixed content area: use ~60% of terminal height for the overlay inner
+	// content (border + padding consume ~6 lines on top of this).
+	fixedLines := height*3/5 - 6
+	if fixedLines < 8 {
+		fixedLines = 8
+	}
+	// Max visible result items = fixedLines minus header(1), blank(1),
+	// input(1), blank before results(1), footer blank(1), hint(1) = 6 overhead.
+	maxVisible := fixedLines - 6
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+
+	// padLine right-pads a line to the fixed inner width.
+	padLine := func(s string) string {
+		runes := []rune(s)
+		if len(runes) < innerWidth {
+			return s + strings.Repeat(" ", innerWidth-len(runes))
+		}
+		return s
+	}
+
+	var b strings.Builder
+	lines := 0
+
+	// Header with filter state.
+	filterLabel := "filtered"
+	if !useFilter {
+		filterLabel = searchFilterWarning.Render("all")
+	}
+	header := fmt.Sprintf("Search (%s)", filterLabel)
+	toggleHint := "Ctrl+A: toggle filter"
+	headerLine := "  " + detailHeaderStyle.Render(header) + "    " + detailHintStyle.Render(toggleHint)
+	b.WriteString(padLine(headerLine))
+	b.WriteString("\n")
+	b.WriteString(padLine(""))
+	b.WriteString("\n")
+	lines += 2
+
+	// Input field.
+	inputLine := "  > " + input.View()
+	b.WriteString(padLine(inputLine))
+	b.WriteString("\n")
+	lines++
+
+	if searchErr != nil {
+		b.WriteString(padLine(""))
+		b.WriteString("\n")
+		b.WriteString(padLine(editErrorStyle.Render(fmt.Sprintf("  Error: %s", searchErr))))
+		b.WriteString("\n")
+		lines += 2
+	} else if sub == searchLoading {
+		b.WriteString(padLine(""))
+		b.WriteString("\n")
+		b.WriteString(padLine(fmt.Sprintf("  %s Loading...", spin.View())))
+		b.WriteString("\n")
+		lines += 2
+	} else if len(items) == 0 {
+		b.WriteString(padLine(""))
+		b.WriteString("\n")
+		b.WriteString(padLine("  No matches"))
+		b.WriteString("\n")
+		lines += 2
+	} else {
+		// Render items grouped by kind.
+		shown := 0
+		lastKind := ""
+
+		for i, item := range items {
+			if shown >= maxVisible {
+				remaining := len(items) - i
+				b.WriteString(padLine(fmt.Sprintf("\n  ... and %d more", remaining)))
+				lines++
+				break
+			}
+
+			// Section header.
+			if item.Kind != lastKind {
+				b.WriteString(padLine(""))
+				b.WriteString("\n")
+				lines++
+				if item.Kind == "project" {
+					b.WriteString(padLine(searchSectionStyle.Render("  Projects:")))
+				} else {
+					b.WriteString(padLine(searchSectionStyle.Render("  Tasks:")))
+				}
+				b.WriteString("\n")
+				lines++
+				lastKind = item.Kind
+			}
+
+			label := fmt.Sprintf("    [%s] %s", strings.ToUpper(item.Kind[:1]), item.Name)
+			if item.Extra != "" {
+				label += " — " + item.Extra
+			}
+
+			if i == cursor {
+				label = cursorStyle.Render(padLine(label))
+			} else {
+				label = padLine(label)
+			}
+			b.WriteString(label)
+			b.WriteString("\n")
+			lines++
+			shown++
+		}
+	}
+
+	// Pad to fixed height so the overlay size stays constant.
+	for lines < fixedLines-1 {
+		b.WriteString(padLine(""))
+		b.WriteString("\n")
+		lines++
+	}
+
+	b.WriteString(detailHintStyle.Render("  j/k: navigate  Enter: select  Esc: cancel"))
 
 	return b.String()
 }

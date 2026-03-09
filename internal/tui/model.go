@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,7 +24,25 @@ const (
 	stateDetail
 	stateError
 	stateEdit
+	stateSearch
 )
+
+type searchSubState int
+
+const (
+	searchLoading searchSubState = iota
+	searchReady
+)
+
+// searchItem represents a unified search result (project or task).
+type searchItem struct {
+	Kind      string // "project" or "task"
+	ID        int64
+	Name      string
+	Extra     string // company for projects, project name for tasks
+	ProjectID int64  // for tasks: the parent project ID
+	TaskID    int64  // 0 for projects, task ID for tasks
+}
 
 // timesheetsLoadedMsg is sent when timesheets finish loading.
 type timesheetsLoadedMsg struct {
@@ -46,6 +65,13 @@ type editSavedMsg struct {
 // deleteEntryMsg is sent when a delete operation completes.
 type deleteEntryMsg struct {
 	err error
+}
+
+// searchDataLoadedMsg is sent when search data finishes loading.
+type searchDataLoadedMsg struct {
+	projects []odoo.ProjectInfo
+	tasks    []odoo.TaskInfo
+	err      error
 }
 
 // attendanceTickMsg triggers a re-render to update elapsed clock-in time.
@@ -77,6 +103,14 @@ type Model struct {
 	editFocus    int             // 0=hours, 1=description
 	editErr      error           // last edit error
 	editIsNew    bool            // true = creating new entry, false = editing existing
+
+	searchSub       searchSubState
+	searchInput     textinput.Model
+	searchItems     []searchItem // full combined list
+	searchFiltered  []searchItem // after text filter
+	searchCursor    int
+	searchUseFilter bool // true = config filters active (default)
+	searchErr       error
 }
 
 // MondayTime wraps time.Time for the Monday of the displayed week.
@@ -215,7 +249,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case searchDataLoadedMsg:
+		if m.state != stateSearch {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.searchErr = msg.err
+			m.searchSub = searchReady
+			return m, nil
+		}
+		m.searchItems = buildSearchItems(msg.projects, msg.tasks)
+		m.searchFiltered = filterSearchItems(m.searchItems, m.searchInput.Value())
+		m.searchSub = searchReady
+		m.searchCursor = 0
+		return m, nil
+
 	case tea.KeyPressMsg:
+		// In search state, forward keys to search handler.
+		if m.state == stateSearch {
+			return m.updateSearch(msg)
+		}
 		// In edit state, forward keys to text inputs.
 		if m.state == stateEdit {
 			return m.updateEdit(msg)
@@ -282,6 +335,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor[1] > 0 {
 					m.cursor[1]--
 				}
+			case key.Matches(msg, m.keys.Search):
+				return m.enterSearch()
 			}
 		}
 
@@ -476,6 +531,199 @@ func (m Model) deleteEntry() (tea.Model, tea.Cmd) {
 	}
 }
 
+// enterSearch transitions from grid to search state.
+func (m Model) enterSearch() (tea.Model, tea.Cmd) {
+	m.state = stateSearch
+	m.searchSub = searchLoading
+	m.searchUseFilter = true
+	m.searchCursor = 0
+	m.searchItems = nil
+	m.searchFiltered = nil
+	m.searchErr = nil
+
+	m.searchInput = textinput.New()
+	m.searchInput.Placeholder = "Type to search..."
+	m.searchInput.SetWidth(40)
+	cmd := m.searchInput.Focus()
+
+	return m, tea.Batch(cmd, m.spinner.Tick, m.loadSearchData())
+}
+
+// loadSearchData fires parallel API calls to load projects and tasks.
+func (m Model) loadSearchData() tea.Cmd {
+	client := m.client
+	filtered := m.searchUseFilter
+	return func() tea.Msg {
+		var projects []odoo.ProjectInfo
+		var tasks []odoo.TaskInfo
+		var pErr, tErr error
+
+		done := make(chan struct{}, 2)
+		go func() {
+			if filtered {
+				projects, pErr = client.ListProjects()
+			} else {
+				projects, pErr = client.ListAllProjects()
+			}
+			done <- struct{}{}
+		}()
+		go func() {
+			if filtered {
+				tasks, tErr = client.ListTasks(0)
+			} else {
+				tasks, tErr = client.ListAllTasks(0)
+			}
+			done <- struct{}{}
+		}()
+		<-done
+		<-done
+
+		if pErr != nil {
+			return searchDataLoadedMsg{err: pErr}
+		}
+		if tErr != nil {
+			return searchDataLoadedMsg{err: tErr}
+		}
+		return searchDataLoadedMsg{projects: projects, tasks: tasks}
+	}
+}
+
+// buildSearchItems converts projects and tasks into a unified search item list.
+func buildSearchItems(projects []odoo.ProjectInfo, tasks []odoo.TaskInfo) []searchItem {
+	items := make([]searchItem, 0, len(projects)+len(tasks))
+	for _, p := range projects {
+		items = append(items, searchItem{
+			Kind:      "project",
+			ID:        p.ID,
+			Name:      p.Name,
+			Extra:     p.Company,
+			ProjectID: p.ID,
+			TaskID:    0,
+		})
+	}
+	for _, t := range tasks {
+		items = append(items, searchItem{
+			Kind:      "task",
+			ID:        t.ID,
+			Name:      t.Name,
+			Extra:     t.Project,
+			ProjectID: t.ProjectID,
+			TaskID:    t.ID,
+		})
+	}
+	return items
+}
+
+// filterSearchItems returns items matching the query (case-insensitive substring).
+func filterSearchItems(items []searchItem, query string) []searchItem {
+	if query == "" {
+		return items
+	}
+	q := strings.ToLower(query)
+	var result []searchItem
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(item.Name), q) ||
+			strings.Contains(strings.ToLower(item.Extra), q) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// updateSearch handles key events in the search state.
+func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Back):
+		m.state = stateGrid
+		return m, nil
+
+	case key.Matches(msg, m.keys.SearchToggle):
+		m.searchUseFilter = !m.searchUseFilter
+		m.searchSub = searchLoading
+		m.searchItems = nil
+		m.searchFiltered = nil
+		m.searchCursor = 0
+		return m, tea.Batch(m.spinner.Tick, m.loadSearchData())
+
+	case msg.Code == '\r' || msg.Code == '\n':
+		if m.searchSub == searchReady && len(m.searchFiltered) > 0 &&
+			m.searchCursor < len(m.searchFiltered) {
+			return m.selectSearchItem(m.searchFiltered[m.searchCursor])
+		}
+		return m, nil
+	}
+
+	if m.searchSub == searchReady {
+		switch {
+		case key.Matches(msg, m.keys.Up):
+			if m.searchCursor > 0 {
+				m.searchCursor--
+			}
+			return m, nil
+		case key.Matches(msg, m.keys.Down):
+			if m.searchCursor < len(m.searchFiltered)-1 {
+				m.searchCursor++
+			}
+			return m, nil
+		}
+	}
+
+	// Forward to text input.
+	var cmd tea.Cmd
+	m.searchInput, cmd = m.searchInput.Update(msg)
+
+	// Re-filter on text change.
+	if m.searchSub == searchReady {
+		m.searchFiltered = filterSearchItems(m.searchItems, m.searchInput.Value())
+		if m.searchCursor >= len(m.searchFiltered) {
+			m.searchCursor = 0
+		}
+	}
+
+	return m, cmd
+}
+
+// selectSearchItem adds the selected project/task as a grid row or moves cursor to existing.
+func (m Model) selectSearchItem(item searchItem) (tea.Model, tea.Cmd) {
+	var label string
+	if item.Kind == "project" {
+		label = item.Name
+	} else {
+		label = item.Extra + " / " + item.Name
+	}
+
+	// Check for duplicate label.
+	for i, row := range m.grid.Rows {
+		if row.Label == label {
+			m.cursor[0] = i
+			m.state = stateGrid
+			return m, nil
+		}
+	}
+
+	// Add new row.
+	newRow := GridRow{
+		Label:         label,
+		HintProjectID: item.ProjectID,
+		HintTaskID:    item.TaskID,
+	}
+	m.grid.Rows = append(m.grid.Rows, newRow)
+
+	// Re-sort and find the new row's index.
+	sort.Slice(m.grid.Rows, func(i, j int) bool {
+		return m.grid.Rows[i].Label < m.grid.Rows[j].Label
+	})
+	for i, row := range m.grid.Rows {
+		if row.Label == label {
+			m.cursor[0] = i
+			break
+		}
+	}
+
+	m.state = stateGrid
+	return m, nil
+}
+
 // formatDecimalHours formats hours as a decimal string (e.g. "2.5").
 func formatDecimalHours(h float64) string {
 	return strconv.FormatFloat(h, 'f', -1, 64)
@@ -493,7 +741,7 @@ func (m Model) View() tea.View {
 	case stateError:
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
-	case stateGrid, stateDetail, stateEdit:
+	case stateGrid, stateDetail, stateEdit, stateSearch:
 		sunday := m.monday.AddDate(0, 0, 6)
 		loadingIndicator := ""
 		if m.loading {
@@ -523,6 +771,9 @@ func (m Model) View() tea.View {
 		} else if m.state == stateDetail && m.cursor[0] < len(m.grid.Rows) {
 			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.detailCursor, m.width)
 			s = RenderDetailOverlay(s, detail, m.width, m.height)
+		} else if m.state == stateSearch {
+			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height)
+			s = RenderDetailOverlay(s, search, m.width, m.height)
 		}
 	}
 

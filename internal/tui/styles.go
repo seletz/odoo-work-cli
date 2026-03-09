@@ -29,6 +29,9 @@ var (
 	editLabelStyle       = lipgloss.NewStyle().Faint(true)
 	editActiveLabelStyle = lipgloss.NewStyle().Bold(true)
 	editErrorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
+
+	searchFilterWarning = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true) // yellow
+	searchSectionStyle  = lipgloss.NewStyle().Bold(true).Faint(true)
 )
 
 // hoursStyle returns the appropriate style based on daily total hours.

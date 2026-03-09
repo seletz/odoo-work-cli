@@ -10,9 +10,10 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 ### TUI Features
 
 - Remembers last week's tasks and projects you worked
+- Search for projects and tasks to add new rows (`/` key), with filter toggle (`Ctrl+A`)
 - German Holidays are marked and coloured
 - Shows attendance state prominently
-- Color coded wourk hour day and week summaries with configurable limits
+- Color coded work hour day and week summaries with configurable limits
 - Add, edit and delete time entries
 - It's pretty fast
 

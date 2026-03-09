@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
@@ -23,12 +25,36 @@ type mockClient struct {
 	createParams odoo.TimesheetWriteParams // capture last create call
 	deleteErr    error
 	deletedID    int64
+	projects     []odoo.ProjectInfo
+	projectsErr  error
+	allProjects  []odoo.ProjectInfo
+	allProjErr   error
+	tasks        []odoo.TaskInfo
+	tasksErr     error
+	allTasks     []odoo.TaskInfo
+	allTasksErr  error
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
-func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error)  { return nil, nil }
-func (c *mockClient) ListTasks(int64) ([]odoo.TaskInfo, error)   { return nil, nil }
 func (c *mockClient) GetFields(string) ([]odoo.FieldInfo, error) { return nil, nil }
+func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error) {
+	return c.projects, c.projectsErr
+}
+func (c *mockClient) ListAllProjects() ([]odoo.ProjectInfo, error) {
+	if c.allProjects != nil || c.allProjErr != nil {
+		return c.allProjects, c.allProjErr
+	}
+	return c.projects, c.projectsErr
+}
+func (c *mockClient) ListTasks(_ int64) ([]odoo.TaskInfo, error) {
+	return c.tasks, c.tasksErr
+}
+func (c *mockClient) ListAllTasks(_ int64) ([]odoo.TaskInfo, error) {
+	if c.allTasks != nil || c.allTasksErr != nil {
+		return c.allTasks, c.allTasksErr
+	}
+	return c.tasks, c.tasksErr
+}
 func (c *mockClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, error) {
 	return c.entries, c.err
 }
@@ -982,6 +1008,366 @@ func TestModel_LoadTimesheetsNoPrevEntries(t *testing.T) {
 
 	if len(um.grid.Rows) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(um.grid.Rows))
+	}
+}
+
+// --- Search tests ---
+
+func newSearchModel(projects []odoo.ProjectInfo, tasks []odoo.TaskInfo) Model {
+	client := &mockClient{
+		projects: projects,
+		tasks:    tasks,
+		entries: []odoo.TimesheetEntry{
+			{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 2.0, ProjectID: 10, TaskID: 20},
+		},
+	}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m.state = stateGrid
+	m.grid = BuildWeekGrid(client.entries, mon.Time)
+	m.cursor = [2]int{0, 0}
+	m.width = 120
+	m.height = 40
+	return m
+}
+
+func TestModel_SearchOpenFromGrid(t *testing.T) {
+	m := newSearchModel(nil, nil)
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	if um.state != stateSearch {
+		t.Fatalf("expected stateSearch, got %d", um.state)
+	}
+	if um.searchSub != searchLoading {
+		t.Fatalf("expected searchLoading, got %d", um.searchSub)
+	}
+	if !um.searchUseFilter {
+		t.Fatal("expected searchUseFilter=true by default")
+	}
+	if cmd == nil {
+		t.Fatal("expected command for loading search data")
+	}
+}
+
+func TestModel_SearchDataLoaded(t *testing.T) {
+	m := newSearchModel(nil, nil)
+	// Enter search.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Simulate data loaded.
+	msg := searchDataLoadedMsg{
+		projects: []odoo.ProjectInfo{
+			{ID: 1, Name: "Alpha", Company: "Corp A"},
+			{ID: 2, Name: "Beta", Company: "Corp B"},
+		},
+		tasks: []odoo.TaskInfo{
+			{ID: 10, Name: "Task X", Project: "Alpha", ProjectID: 1},
+			{ID: 11, Name: "Task Y", Project: "Beta", ProjectID: 2},
+		},
+	}
+	updated, _ = um.Update(msg)
+	um = updated.(Model)
+
+	if um.searchSub != searchReady {
+		t.Fatalf("expected searchReady, got %d", um.searchSub)
+	}
+	if len(um.searchItems) != 4 {
+		t.Fatalf("expected 4 search items, got %d", len(um.searchItems))
+	}
+	// Projects should come first.
+	if um.searchItems[0].Kind != "project" {
+		t.Fatalf("expected first item to be project, got %q", um.searchItems[0].Kind)
+	}
+	if um.searchItems[2].Kind != "task" {
+		t.Fatalf("expected third item to be task, got %q", um.searchItems[2].Kind)
+	}
+	if len(um.searchFiltered) != 4 {
+		t.Fatalf("expected 4 filtered items (no filter text), got %d", len(um.searchFiltered))
+	}
+}
+
+func TestModel_SearchDataLoadedError(t *testing.T) {
+	m := newSearchModel(nil, nil)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	msg := searchDataLoadedMsg{err: errors.New("API error")}
+	updated, _ = um.Update(msg)
+	um = updated.(Model)
+
+	if um.searchErr == nil {
+		t.Fatal("expected searchErr to be set")
+	}
+	if um.searchSub != searchReady {
+		t.Fatalf("expected searchReady on error, got %d", um.searchSub)
+	}
+}
+
+func TestModel_SearchFilter(t *testing.T) {
+	m := newSearchModel(nil, nil)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Load data.
+	msg := searchDataLoadedMsg{
+		projects: []odoo.ProjectInfo{
+			{ID: 1, Name: "Alpha", Company: "Corp A"},
+			{ID: 2, Name: "Beta", Company: "Corp B"},
+		},
+		tasks: []odoo.TaskInfo{
+			{ID: 10, Name: "Task Alpha", Project: "Alpha", ProjectID: 1},
+		},
+	}
+	updated, _ = um.Update(msg)
+	um = updated.(Model)
+
+	// Type "alpha" to filter.
+	um.searchInput.SetValue("alpha")
+	// Trigger a key to re-filter.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: ' '})
+	um = updated.(Model)
+
+	// Should match "Alpha" project and "Task Alpha" task.
+	if len(um.searchFiltered) != 2 {
+		t.Fatalf("expected 2 filtered items for 'alpha', got %d", len(um.searchFiltered))
+	}
+	if um.searchCursor != 0 {
+		t.Fatalf("expected cursor reset to 0, got %d", um.searchCursor)
+	}
+}
+
+func TestModel_SearchCursorNavigation(t *testing.T) {
+	m := newSearchModel(nil, nil)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Load data.
+	msg := searchDataLoadedMsg{
+		projects: []odoo.ProjectInfo{
+			{ID: 1, Name: "Alpha"},
+			{ID: 2, Name: "Beta"},
+		},
+	}
+	updated, _ = um.Update(msg)
+	um = updated.(Model)
+
+	// Move down.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: 'j'})
+	um = updated.(Model)
+	if um.searchCursor != 1 {
+		t.Fatalf("expected cursor 1, got %d", um.searchCursor)
+	}
+
+	// Move down at bottom stays.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: 'j'})
+	um = updated.(Model)
+	if um.searchCursor != 1 {
+		t.Fatalf("expected cursor 1 (clamped), got %d", um.searchCursor)
+	}
+
+	// Move up.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: 'k'})
+	um = updated.(Model)
+	if um.searchCursor != 0 {
+		t.Fatalf("expected cursor 0, got %d", um.searchCursor)
+	}
+}
+
+func TestModel_SearchEscCancels(t *testing.T) {
+	m := newSearchModel(nil, nil)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Esc returns to grid.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	um = updated.(Model)
+	if um.state != stateGrid {
+		t.Fatalf("expected stateGrid after esc, got %d", um.state)
+	}
+}
+
+func TestModel_SearchToggleFilter(t *testing.T) {
+	projects := []odoo.ProjectInfo{{ID: 1, Name: "Alpha"}}
+	allProjects := []odoo.ProjectInfo{{ID: 1, Name: "Alpha"}, {ID: 2, Name: "Gamma"}}
+	client := &mockClient{
+		projects:    projects,
+		allProjects: allProjects,
+		entries: []odoo.TimesheetEntry{
+			{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 2.0, ProjectID: 10, TaskID: 20},
+		},
+	}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m.state = stateGrid
+	m.grid = BuildWeekGrid(client.entries, mon.Time)
+	m.cursor = [2]int{0, 0}
+	m.width = 120
+	m.height = 40
+
+	// Enter search.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+	if !um.searchUseFilter {
+		t.Fatal("expected searchUseFilter=true initially")
+	}
+
+	// Toggle with Ctrl+A.
+	updated, cmd := um.Update(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
+	um = updated.(Model)
+	if um.searchUseFilter {
+		t.Fatal("expected searchUseFilter=false after toggle")
+	}
+	if um.searchSub != searchLoading {
+		t.Fatalf("expected searchLoading after toggle, got %d", um.searchSub)
+	}
+	if cmd == nil {
+		t.Fatal("expected reload command after toggle")
+	}
+}
+
+func TestModel_SearchSelectProject(t *testing.T) {
+	m := newSearchModel(
+		[]odoo.ProjectInfo{{ID: 5, Name: "NewProject", Company: "Acme"}},
+		nil,
+	)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Load data.
+	updated, _ = um.Update(searchDataLoadedMsg{
+		projects: []odoo.ProjectInfo{{ID: 5, Name: "NewProject", Company: "Acme"}},
+	})
+	um = updated.(Model)
+
+	// Select with Enter.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: '\r'})
+	um = updated.(Model)
+
+	if um.state != stateGrid {
+		t.Fatalf("expected stateGrid after select, got %d", um.state)
+	}
+	// Should have added a new row.
+	found := false
+	for _, row := range um.grid.Rows {
+		if row.Label == "NewProject" {
+			found = true
+			if row.HintProjectID != 5 {
+				t.Fatalf("expected HintProjectID=5, got %d", row.HintProjectID)
+			}
+			if row.HintTaskID != 0 {
+				t.Fatalf("expected HintTaskID=0, got %d", row.HintTaskID)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected 'NewProject' row in grid")
+	}
+}
+
+func TestModel_SearchSelectTask(t *testing.T) {
+	m := newSearchModel(
+		nil,
+		[]odoo.TaskInfo{{ID: 42, Name: "TaskZ", Project: "ProjX", ProjectID: 7}},
+	)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Load data.
+	updated, _ = um.Update(searchDataLoadedMsg{
+		tasks: []odoo.TaskInfo{{ID: 42, Name: "TaskZ", Project: "ProjX", ProjectID: 7}},
+	})
+	um = updated.(Model)
+
+	// Select with Enter.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: '\r'})
+	um = updated.(Model)
+
+	if um.state != stateGrid {
+		t.Fatalf("expected stateGrid after select, got %d", um.state)
+	}
+	found := false
+	for _, row := range um.grid.Rows {
+		if row.Label == "ProjX / TaskZ" {
+			found = true
+			if row.HintProjectID != 7 {
+				t.Fatalf("expected HintProjectID=7, got %d", row.HintProjectID)
+			}
+			if row.HintTaskID != 42 {
+				t.Fatalf("expected HintTaskID=42, got %d", row.HintTaskID)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected 'ProjX / TaskZ' row in grid")
+	}
+}
+
+func TestModel_SearchDuplicateRow(t *testing.T) {
+	// "Acme / Dev" already exists from entries.
+	m := newSearchModel(nil, nil)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
+	um := updated.(Model)
+
+	// Load data with a task that matches existing row label.
+	updated, _ = um.Update(searchDataLoadedMsg{
+		tasks: []odoo.TaskInfo{{ID: 20, Name: "Dev", Project: "Acme", ProjectID: 10}},
+	})
+	um = updated.(Model)
+
+	rowCountBefore := len(um.grid.Rows)
+
+	// Select.
+	updated, _ = um.Update(tea.KeyPressMsg{Code: '\r'})
+	um = updated.(Model)
+
+	if um.state != stateGrid {
+		t.Fatalf("expected stateGrid, got %d", um.state)
+	}
+	if len(um.grid.Rows) != rowCountBefore {
+		t.Fatalf("expected no new row (duplicate), got %d rows (was %d)", len(um.grid.Rows), rowCountBefore)
+	}
+}
+
+func TestRenderSearchOverlay(t *testing.T) {
+	input := textinput.New()
+	input.SetValue("test")
+
+	items := []searchItem{
+		{Kind: "project", Name: "Alpha", Extra: "Corp"},
+		{Kind: "task", Name: "Task X", Extra: "Alpha"},
+	}
+
+	result := renderSearchOverlay(input, items, 0, searchReady, true, nil, spinner.New(), 80, 40)
+
+	if !strings.Contains(result, "Search (filtered)") {
+		t.Fatal("expected 'Search (filtered)' in output")
+	}
+	if !strings.Contains(result, "Projects:") {
+		t.Fatal("expected 'Projects:' section")
+	}
+	if !strings.Contains(result, "Tasks:") {
+		t.Fatal("expected 'Tasks:' section")
+	}
+	if !strings.Contains(result, "[P] Alpha") {
+		t.Fatal("expected '[P] Alpha' in output")
+	}
+	if !strings.Contains(result, "[T] Task X") {
+		t.Fatal("expected '[T] Task X' in output")
+	}
+}
+
+func TestRenderSearchOverlay_Unfiltered(t *testing.T) {
+	input := textinput.New()
+	result := renderSearchOverlay(input, nil, 0, searchReady, false, nil, spinner.New(), 80, 40)
+
+	if !strings.Contains(result, "all") {
+		t.Fatal("expected 'all' in output for unfiltered mode")
+	}
+	if !strings.Contains(result, "No matches") {
+		t.Fatal("expected 'No matches' when no items")
 	}
 }
 

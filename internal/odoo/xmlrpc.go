@@ -165,10 +165,22 @@ func (x *XMLRPCClient) applyCriteriaFilters(criteria *goOdoo.Criteria, modelKey 
 	}
 }
 
-// ListProjects returns all projects from Odoo.
+// ListProjects returns projects from Odoo with configured filters applied.
 func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
+	return x.listProjects(true)
+}
+
+// ListAllProjects returns all projects from Odoo, ignoring configured filters.
+func (x *XMLRPCClient) ListAllProjects() ([]ProjectInfo, error) {
+	return x.listProjects(false)
+}
+
+// listProjects is the shared implementation for ListProjects and ListAllProjects.
+func (x *XMLRPCClient) listProjects(filtered bool) ([]ProjectInfo, error) {
 	criteria := goOdoo.NewCriteria()
-	x.applyCriteriaFilters(criteria, "project")
+	if filtered {
+		x.applyCriteriaFilters(criteria, "project")
+	}
 
 	// Build field list: standard fields + configured extra fields.
 	fields := []string{"id", "name", "active", "partner_id", "company_id", "stage_id", "user_id"}
@@ -212,11 +224,24 @@ func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
 	return result, nil
 }
 
-// ListTasks returns tasks from Odoo, optionally filtered by project ID.
+// ListTasks returns tasks from Odoo with configured filters applied.
 // Pass projectID <= 0 to list all tasks.
 func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
+	return x.listTasks(projectID, true)
+}
+
+// ListAllTasks returns tasks from Odoo, ignoring configured filters.
+// Pass projectID <= 0 to list all tasks.
+func (x *XMLRPCClient) ListAllTasks(projectID int64) ([]TaskInfo, error) {
+	return x.listTasks(projectID, false)
+}
+
+// listTasks is the shared implementation for ListTasks and ListAllTasks.
+func (x *XMLRPCClient) listTasks(projectID int64, filtered bool) ([]TaskInfo, error) {
 	criteria := goOdoo.NewCriteria()
-	x.applyCriteriaFilters(criteria, "task")
+	if filtered {
+		x.applyCriteriaFilters(criteria, "task")
+	}
 	if projectID > 0 {
 		criteria.Add("project_id", "=", projectID)
 	}
@@ -237,6 +262,7 @@ func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
 		}
 		if t.ProjectId != nil {
 			info.Project = t.ProjectId.Name
+			info.ProjectID = t.ProjectId.ID
 		}
 		if t.StageId != nil {
 			info.Stage = t.StageId.Name

@@ -4,22 +4,24 @@ import "charm.land/bubbles/v2/key"
 
 // KeyMap defines key bindings for the TUI.
 type KeyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Left     key.Binding
-	Right    key.Binding
-	NextCol  key.Binding
-	PrevCol  key.Binding
-	Refresh  key.Binding
-	Help     key.Binding
-	Quit     key.Binding
-	PrevWeek key.Binding
-	NextWeek key.Binding
-	Enter    key.Binding
-	Back     key.Binding
-	Edit     key.Binding
-	Add      key.Binding
-	Delete   key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	Left         key.Binding
+	Right        key.Binding
+	NextCol      key.Binding
+	PrevCol      key.Binding
+	Refresh      key.Binding
+	Help         key.Binding
+	Quit         key.Binding
+	PrevWeek     key.Binding
+	NextWeek     key.Binding
+	Enter        key.Binding
+	Back         key.Binding
+	Edit         key.Binding
+	Add          key.Binding
+	Delete       key.Binding
+	Search       key.Binding
+	SearchToggle key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -81,12 +83,20 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("d"),
 			key.WithHelp("d", "delete"),
 		),
+		Search: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
+		),
+		SearchToggle: key.NewBinding(
+			key.WithKeys("ctrl+a"),
+			key.WithHelp("C-a", "toggle filter"),
+		),
 	}
 }
 
 // ShortHelp returns key bindings for the short help view.
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.NextCol, k.Left, k.Right, k.Enter, k.Edit, k.Add, k.Delete, k.Refresh, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.NextCol, k.Left, k.Right, k.Enter, k.Edit, k.Add, k.Delete, k.Search, k.Refresh, k.Help, k.Quit}
 }
 
 // FullHelp returns key bindings for the full help view.
@@ -95,7 +105,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down},
 		{k.NextCol, k.PrevCol},
 		{k.Left, k.Right},
-		{k.Enter, k.Back, k.Edit, k.Add, k.Delete},
+		{k.Enter, k.Back, k.Edit, k.Add, k.Delete, k.Search},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }

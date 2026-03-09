@@ -25,11 +25,12 @@ type ProjectInfo struct {
 
 // TaskInfo holds summary information for an Odoo task.
 type TaskInfo struct {
-	ID      int64
-	Name    string
-	Project string
-	Stage   string
-	Active  bool
+	ID        int64
+	Name      string
+	Project   string
+	ProjectID int64
+	Stage     string
+	Active    bool
 }
 
 // TimesheetEntry holds a single timesheet line from Odoo.
@@ -91,10 +92,14 @@ type AttendanceStatus struct {
 type Client interface {
 	// WhoAmI returns the identity of the currently authenticated user.
 	WhoAmI() (*UserInfo, error)
-	// ListProjects returns all projects from Odoo.
+	// ListProjects returns projects from Odoo, applying configured filters.
 	ListProjects() ([]ProjectInfo, error)
-	// ListTasks returns tasks, optionally filtered by project ID.
+	// ListAllProjects returns all projects from Odoo, ignoring configured filters.
+	ListAllProjects() ([]ProjectInfo, error)
+	// ListTasks returns tasks, optionally filtered by project ID, applying configured filters.
 	ListTasks(projectID int64) ([]TaskInfo, error)
+	// ListAllTasks returns tasks ignoring configured filters, optionally filtered by project ID.
+	ListAllTasks(projectID int64) ([]TaskInfo, error)
 	// ListTimesheets returns timesheet entries for the given date range.
 	ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error)
 	// GetFields returns field metadata for the given Odoo model.
