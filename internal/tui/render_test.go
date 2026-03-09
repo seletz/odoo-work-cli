@@ -58,7 +58,7 @@ func TestRenderDetail_ShowsEntries(t *testing.T) {
 	row.Hours[0] = 3.5
 
 	mon := monday(2026, 3, 2)
-	out := RenderDetail(row, 0, mon, 80)
+	out := RenderDetail(row, 0, mon, 0, 80)
 
 	checks := []struct {
 		substr string
@@ -86,7 +86,7 @@ func TestRenderDetail_ShowsEntries(t *testing.T) {
 func TestRenderDetail_EmptyCell(t *testing.T) {
 	row := GridRow{Label: "Acme / Dev"}
 	mon := monday(2026, 3, 2)
-	out := RenderDetail(row, 0, mon, 80)
+	out := RenderDetail(row, 0, mon, 0, 80)
 
 	if !strings.Contains(out, "No entries") {
 		t.Error("output should indicate no entries")
@@ -107,7 +107,7 @@ func TestRenderDetailOverlay_CentersBox(t *testing.T) {
 	}
 	row.Hours[0] = 1.0
 
-	detail := RenderDetail(row, 0, monday(2026, 3, 2), 60)
+	detail := RenderDetail(row, 0, monday(2026, 3, 2), 0, 60)
 	result := RenderDetailOverlay(bg, detail, 60, 20)
 
 	// The overlay should contain the box border characters.

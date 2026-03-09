@@ -17,6 +17,7 @@ type KeyMap struct {
 	NextWeek key.Binding
 	Enter    key.Binding
 	Back     key.Binding
+	Edit     key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -66,12 +67,16 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("esc"),
 			key.WithHelp("esc", "back"),
 		),
+		Edit: key.NewBinding(
+			key.WithKeys("e"),
+			key.WithHelp("e", "edit"),
+		),
 	}
 }
 
 // ShortHelp returns key bindings for the short help view.
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.NextCol, k.Left, k.Right, k.Enter, k.Refresh, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.NextCol, k.Left, k.Right, k.Enter, k.Edit, k.Refresh, k.Help, k.Quit}
 }
 
 // FullHelp returns key bindings for the full help view.
@@ -80,7 +85,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down},
 		{k.NextCol, k.PrevCol},
 		{k.Left, k.Right},
-		{k.Enter, k.Back},
+		{k.Enter, k.Back, k.Edit},
 		{k.Refresh, k.Help, k.Quit},
 	}
 }

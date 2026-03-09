@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/table"
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
@@ -137,8 +138,8 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 // RenderDetail renders a detail panel for a specific cell showing individual entries.
 // Uses the bubbles table widget for the entries listing. The returned string is the
 // inner content (no border); use RenderDetailOverlay to composite it as a centered
-// overlay box on top of a background.
-func RenderDetail(row GridRow, col int, monday time.Time, width int) string {
+// overlay box on top of a background. detailCursor highlights the selected entry row.
+func RenderDetail(row GridRow, col int, monday time.Time, detailCursor int, width int) string {
 	// Inner content width is reduced by border (2) + padding (4).
 	innerWidth := width - 8
 	if innerWidth < 40 {
@@ -190,13 +191,17 @@ func RenderDetail(row GridRow, col int, monday time.Time, width int) string {
 		table.WithHeight(len(entries)+1),
 		table.WithWidth(innerWidth),
 		table.WithStyles(detailTableStyles()),
+		table.WithFocused(true),
 	)
+	t.SetCursor(detailCursor)
 
 	b.WriteString("\n")
 	b.WriteString(t.View())
 	b.WriteString("\n\n")
 	total := fmt.Sprintf("Total: %s (%d entries)", FormatHours(row.Hours[col]), len(entries))
 	b.WriteString(detailHeaderStyle.Render(total))
+	b.WriteString("\n")
+	b.WriteString(detailHintStyle.Render("j/k: select  e: edit  esc: back"))
 
 	return b.String()
 }
@@ -211,7 +216,6 @@ func detailTableStyles() table.Styles {
 		BorderBottom(true).
 		Padding(0, 1)
 	s.Cell = s.Cell.Padding(0, 1)
-	s.Selected = lipgloss.NewStyle() // no selection highlighting
 	return s
 }
 
@@ -272,6 +276,47 @@ func renderClockStatus(attendance *odoo.AttendanceStatus) string {
 	text := fmt.Sprintf("🟢 Clocked in since %s (%d:%02d)",
 		attendance.CheckIn.Local().Format("15:04"), h, m)
 	return clockedInStyle.Render(text)
+}
+
+// renderEditForm renders the edit form overlay content.
+func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.Model, focus int, editErr error, width int) string {
+	_ = width // reserved for future layout adjustments
+	var b strings.Builder
+
+	header := fmt.Sprintf("Editing: %s — %s", row.Label, day.Format("Mon 02 Jan 2006"))
+	b.WriteString(detailHeaderStyle.Render(header))
+	b.WriteString("\n\n")
+
+	hoursLabel := "  Hours:       "
+	descLabel := "  Description: "
+	if focus == 0 {
+		hoursLabel = editActiveLabelStyle.Render(hoursLabel)
+	} else {
+		hoursLabel = editLabelStyle.Render(hoursLabel)
+	}
+	if focus == 1 {
+		descLabel = editActiveLabelStyle.Render(descLabel)
+	} else {
+		descLabel = editLabelStyle.Render(descLabel)
+	}
+
+	b.WriteString(hoursLabel)
+	b.WriteString(hoursInput.View())
+	b.WriteString("\n")
+	b.WriteString(descLabel)
+	b.WriteString(descInput.View())
+	b.WriteString("\n")
+
+	if editErr != nil {
+		b.WriteString("\n")
+		b.WriteString(editErrorStyle.Render(fmt.Sprintf("  Error: %s", editErr)))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(detailHintStyle.Render("Enter: save  Esc: cancel  Tab: next field"))
+
+	return b.String()
 }
 
 // lipglossWidth returns the visual width of the widest line.

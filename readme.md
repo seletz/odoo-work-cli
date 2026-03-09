@@ -42,7 +42,7 @@ mise run lint
 | `clock in`                                               | Clock in (start attendance period)                                                         |
 | `clock out`                                              | Clock out (end attendance period, shows duration)                                          |
 | `clock status`                                           | Show current attendance state and today's periods                                          |
-| `tui`                                                    | Weekly timesheet TUI with live clock-in/out status indicator in header                     |
+| `tui`                                                    | Weekly timesheet TUI with detail view, inline editing, and live clock-in/out status        |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                  |
 | `config`                                                 | Show discovered config file paths (merge order)                                            |
 | `config --merged`                                        | Print the fully merged TOML config (password omitted)                                      |

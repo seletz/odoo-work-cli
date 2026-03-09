@@ -24,6 +24,11 @@ var (
 
 	clockedInStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true) // green
 	clockedOutStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))            // red
+
+	detailHintStyle      = lipgloss.NewStyle().Faint(true)
+	editLabelStyle       = lipgloss.NewStyle().Faint(true)
+	editActiveLabelStyle = lipgloss.NewStyle().Bold(true)
+	editErrorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
 )
 
 // hoursStyle returns the appropriate style based on daily total hours.
