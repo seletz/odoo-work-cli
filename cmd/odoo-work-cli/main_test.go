@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
@@ -106,6 +107,130 @@ func TestParseDateRange(t *testing.T) {
 			}
 			if to != tt.wantTo {
 				t.Errorf("to = %q, want %q", to, tt.wantTo)
+			}
+		})
+	}
+}
+
+func TestBuildTimesheetWriteParams(t *testing.T) {
+	tests := []struct {
+		name        string
+		projectID   int64
+		taskID      int64
+		date        string
+		description string
+		hours       float64
+		wantErr     bool
+		wantMsg     string
+	}{
+		{
+			name:        "valid all fields",
+			projectID:   42,
+			taskID:      7,
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       2.5,
+		},
+		{
+			name:        "valid without task",
+			projectID:   42,
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       2.5,
+		},
+		{
+			name:        "valid with only task ID",
+			taskID:      10,
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       1.0,
+		},
+		{
+			name:        "missing both project and task ID",
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       1.0,
+			wantErr:     true,
+			wantMsg:     "project ID or task ID is required",
+		},
+		{
+			name:        "empty date defaults to today",
+			projectID:   42,
+			description: "coding",
+			hours:       1.0,
+		},
+		{
+			name:        "invalid date format",
+			projectID:   42,
+			date:        "09/03/2026",
+			description: "coding",
+			hours:       1.0,
+			wantErr:     true,
+			wantMsg:     `invalid date "09/03/2026": expected YYYY-MM-DD`,
+		},
+		{
+			name:      "missing description",
+			projectID: 42,
+			date:      "2026-03-09",
+			hours:     1.0,
+			wantErr:   true,
+			wantMsg:   "description is required",
+		},
+		{
+			name:        "zero hours",
+			projectID:   42,
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       0,
+			wantErr:     true,
+			wantMsg:     "hours must be greater than zero",
+		},
+		{
+			name:        "negative hours",
+			projectID:   42,
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       -1.0,
+			wantErr:     true,
+			wantMsg:     "hours must be greater than zero",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params, err := buildTimesheetWriteParams(tt.projectID, tt.taskID, tt.date, tt.description, tt.hours)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if err.Error() != tt.wantMsg {
+					t.Errorf("error = %q, want %q", err.Error(), tt.wantMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if params.ProjectID != tt.projectID {
+				t.Errorf("ProjectID = %d, want %d", params.ProjectID, tt.projectID)
+			}
+			if params.TaskID != tt.taskID {
+				t.Errorf("TaskID = %d, want %d", params.TaskID, tt.taskID)
+			}
+			wantDate := tt.date
+			if wantDate == "" {
+				wantDate = time.Now().Format("2006-01-02")
+			}
+			if params.Date != wantDate {
+				t.Errorf("Date = %q, want %q", params.Date, wantDate)
+			}
+			if params.Name != tt.description {
+				t.Errorf("Name = %q, want %q", params.Name, tt.description)
+			}
+			if params.Hours != tt.hours {
+				t.Errorf("Hours = %f, want %f", params.Hours, tt.hours)
 			}
 		})
 	}

@@ -49,6 +49,15 @@ func init() {
 	entriesCmd.Flags().StringVar(&entriesStatus, "status", "", "filter by validation status (e.g. draft, validated)")
 	tuiCmd.Flags().StringVar(&tuiWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 	configCmd.Flags().BoolVar(&configMerged, "merged", false, "print merged TOML config (password redacted)")
+
+	entriesCmd.AddCommand(entriesAddCmd)
+	entriesAddCmd.Flags().Int64Var(&addProjectID, "project-id", 0, "Odoo project ID (required)")
+	entriesAddCmd.Flags().Int64Var(&addTaskID, "task-id", 0, "Odoo task ID (optional)")
+	entriesAddCmd.Flags().StringVar(&addDate, "date", "", "entry date YYYY-MM-DD (defaults to today)")
+	entriesAddCmd.Flags().Float64Var(&addHours, "hours", 0, "hours worked (required, > 0)")
+	entriesAddCmd.Flags().StringVar(&addDescription, "description", "", "work description (required)")
+	_ = entriesAddCmd.MarkFlagRequired("hours")
+	_ = entriesAddCmd.MarkFlagRequired("description")
 }
 
 // loadConfig loads and merges config using file discovery and env vars.
@@ -301,6 +310,66 @@ var entriesCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\nTotal: %s (%d entries)\n", tui.FormatHours(total), len(entries))
+		return nil
+	},
+}
+
+// buildTimesheetWriteParams constructs and validates TimesheetWriteParams from CLI flag values.
+// An empty date defaults to today.
+func buildTimesheetWriteParams(projectID, taskID int64, date, description string, hours float64) (odoo.TimesheetWriteParams, error) {
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	} else {
+		if _, err := time.Parse("2006-01-02", date); err != nil {
+			return odoo.TimesheetWriteParams{}, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", date)
+		}
+	}
+	p := odoo.TimesheetWriteParams{
+		ProjectID: projectID,
+		TaskID:    taskID,
+		Date:      date,
+		Name:      description,
+		Hours:     hours,
+	}
+	if err := odoo.ValidateTimesheetParams(p); err != nil {
+		return odoo.TimesheetWriteParams{}, err
+	}
+	return p, nil
+}
+
+var (
+	addProjectID   int64
+	addTaskID      int64
+	addDate        string
+	addHours       float64
+	addDescription string
+)
+
+var entriesAddCmd = &cobra.Command{
+	Use:   "add",
+	Short: "Create a new timesheet entry",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		params, err := buildTimesheetWriteParams(addProjectID, addTaskID, addDate, addDescription, addHours)
+		if err != nil {
+			return err
+		}
+
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		id, err := client.CreateTimesheet(params)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Created entry %d\n", id)
 		return nil
 	},
 }

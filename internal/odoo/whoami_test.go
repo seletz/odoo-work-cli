@@ -17,6 +17,10 @@ type mockClient struct {
 	tsErr      error
 	fields     []FieldInfo
 	fieldsErr  error
+	createID   int64
+	createErr  error
+	updateErr  error
+	deleteErr  error
 }
 
 func (m *mockClient) WhoAmI() (*UserInfo, error) {
@@ -37,6 +41,18 @@ func (m *mockClient) ListTimesheets(_, _ string) ([]TimesheetEntry, error) {
 
 func (m *mockClient) GetFields(_ string) ([]FieldInfo, error) {
 	return m.fields, m.fieldsErr
+}
+
+func (m *mockClient) CreateTimesheet(_ TimesheetWriteParams) (int64, error) {
+	return m.createID, m.createErr
+}
+
+func (m *mockClient) UpdateTimesheet(_ int64, _ TimesheetWriteParams) error {
+	return m.updateErr
+}
+
+func (m *mockClient) DeleteTimesheet(_ int64) error {
+	return m.deleteErr
 }
 
 func TestWhoAmI_Success(t *testing.T) {
