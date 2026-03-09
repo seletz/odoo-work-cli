@@ -28,6 +28,15 @@ type timesheetsLoadedMsg struct {
 	err     error
 }
 
+// attendanceLoadedMsg is sent when attendance status finishes loading.
+type attendanceLoadedMsg struct {
+	status *odoo.AttendanceStatus
+	err    error
+}
+
+// attendanceTickMsg triggers a re-render to update elapsed clock-in time.
+type attendanceTickMsg time.Time
+
 // Model is the bubbletea model for the weekly timesheet TUI.
 type Model struct {
 	state   uiState
@@ -42,6 +51,7 @@ type Model struct {
 	bundesland string
 	holidays   HolidayMap
 	weekHols   [7]string
+	attendance *odoo.AttendanceStatus
 	loading    bool
 	err        error
 	width      int
@@ -72,7 +82,7 @@ func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, 
 
 // Init starts the spinner and triggers the initial data load.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, m.loadTimesheets())
+	return tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
 }
 
 func (m Model) loadTimesheets() tea.Cmd {
@@ -85,6 +95,20 @@ func (m Model) loadTimesheets() tea.Cmd {
 		entries, err := client.ListTimesheets(dateFrom, dateTo)
 		return timesheetsLoadedMsg{entries: entries, err: err}
 	}
+}
+
+func (m Model) loadAttendance() tea.Cmd {
+	client := m.client
+	return func() tea.Msg {
+		status, err := client.AttendanceStatus()
+		return attendanceLoadedMsg{status: status, err: err}
+	}
+}
+
+func attendanceTick() tea.Cmd {
+	return tea.Tick(time.Minute, func(t time.Time) tea.Msg {
+		return attendanceTickMsg(t)
+	})
 }
 
 // Update handles messages and updates the model state.
@@ -103,6 +127,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.holidays = BuildHolidayMap(m.monday.Year(), m.bundesland)
 		m.weekHols = WeekHolidays(m.monday.Time, m.holidays)
 		m.cursor = [2]int{0, 0}
+		return m, nil
+
+	case attendanceLoadedMsg:
+		if msg.err == nil {
+			m.attendance = msg.status
+		}
+		if m.attendance != nil && m.attendance.ClockedIn {
+			return m, attendanceTick()
+		}
+		return m, nil
+
+	case attendanceTickMsg:
+		if m.attendance != nil && m.attendance.ClockedIn {
+			return m, attendanceTick()
+		}
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -130,7 +169,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keys.Refresh):
 			m.loading = true
-			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
+			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
 
 		case key.Matches(msg, m.keys.Back):
 			if m.state == stateDetail {
@@ -205,11 +244,16 @@ func (m Model) View() tea.View {
 			loadingIndicator = " " + m.spinner.View()
 		}
 		_, isoWeek := m.monday.ISOWeek()
-		title := fmt.Sprintf("  W%02d: %s — %s%s\n\n",
+		clockStatus := renderClockStatus(m.attendance)
+		if clockStatus != "" {
+			clockStatus = "  " + clockStatus
+		}
+		title := fmt.Sprintf("  W%02d: %s — %s%s%s\n\n",
 			isoWeek,
 			m.monday.Format("Mon 02 Jan 2006"),
 			sunday.Format("Mon 02 Jan 2006"),
-			loadingIndicator)
+			loadingIndicator,
+			clockStatus)
 		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols)
 
 		helpView := m.help.View(m.keys)

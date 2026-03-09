@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/table"
 	"charm.land/lipgloss/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
+	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
 
 var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
@@ -255,6 +256,22 @@ func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int) string {
 	}
 
 	return strings.Join(bgLines, "\n")
+}
+
+// renderClockStatus returns a styled clock-in/out status string.
+func renderClockStatus(attendance *odoo.AttendanceStatus) string {
+	if attendance == nil {
+		return ""
+	}
+	if !attendance.ClockedIn || attendance.CheckIn == nil {
+		return clockedOutStyle.Render("🔴 Not clocked in")
+	}
+	elapsed := time.Since(*attendance.CheckIn)
+	h := int(elapsed.Hours())
+	m := int(elapsed.Minutes()) % 60
+	text := fmt.Sprintf("🟢 Clocked in since %s (%d:%02d)",
+		attendance.CheckIn.Local().Format("15:04"), h, m)
+	return clockedInStyle.Render(text)
 }
 
 // lipglossWidth returns the visual width of the widest line.

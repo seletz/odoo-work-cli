@@ -21,6 +21,9 @@ var (
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("4")). // blue
 				Padding(1, 2)
+
+	clockedInStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true) // green
+	clockedOutStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))            // red
 )
 
 // hoursStyle returns the appropriate style based on daily total hours.

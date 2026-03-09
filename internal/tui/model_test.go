@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,6 +141,119 @@ func TestModel_WeekNavigation(t *testing.T) {
 	}
 	if um.state != stateLoading {
 		t.Fatalf("expected stateLoading after week nav, got %d", um.state)
+	}
+}
+
+func TestModel_AttendanceLoadedClockedIn(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+
+	checkIn := time.Now().Add(-2 * time.Hour)
+	msg := attendanceLoadedMsg{
+		status: &odoo.AttendanceStatus{
+			ClockedIn: true,
+			CheckIn:   &checkIn,
+		},
+	}
+	updated, cmd := m.Update(msg)
+	um := updated.(Model)
+
+	if um.attendance == nil {
+		t.Fatal("expected attendance to be set")
+	}
+	if !um.attendance.ClockedIn {
+		t.Fatal("expected ClockedIn to be true")
+	}
+	if cmd == nil {
+		t.Fatal("expected tick command when clocked in")
+	}
+}
+
+func TestModel_AttendanceLoadedNotClockedIn(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+
+	msg := attendanceLoadedMsg{
+		status: &odoo.AttendanceStatus{
+			ClockedIn: false,
+		},
+	}
+	updated, cmd := m.Update(msg)
+	um := updated.(Model)
+
+	if um.attendance == nil {
+		t.Fatal("expected attendance to be set")
+	}
+	if um.attendance.ClockedIn {
+		t.Fatal("expected ClockedIn to be false")
+	}
+	if cmd != nil {
+		t.Fatal("expected no tick command when not clocked in")
+	}
+}
+
+func TestModel_AttendanceLoadedError(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+
+	msg := attendanceLoadedMsg{err: errors.New("network error")}
+	updated, cmd := m.Update(msg)
+	um := updated.(Model)
+
+	if um.attendance != nil {
+		t.Fatal("expected attendance to be nil on error")
+	}
+	if cmd != nil {
+		t.Fatal("expected no tick command on error")
+	}
+	// State should not change to error for attendance failure.
+	if um.state != stateGrid {
+		t.Fatalf("expected stateGrid, got %d", um.state)
+	}
+}
+
+func TestModel_AttendanceTickContinuesWhenClockedIn(t *testing.T) {
+	m := newTestModel(nil, nil)
+	checkIn := time.Now().Add(-time.Hour)
+	m.attendance = &odoo.AttendanceStatus{ClockedIn: true, CheckIn: &checkIn}
+
+	_, cmd := m.Update(attendanceTickMsg(time.Now()))
+	if cmd == nil {
+		t.Fatal("expected tick to continue when clocked in")
+	}
+}
+
+func TestModel_AttendanceTickStopsWhenNotClockedIn(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.attendance = &odoo.AttendanceStatus{ClockedIn: false}
+
+	_, cmd := m.Update(attendanceTickMsg(time.Now()))
+	if cmd != nil {
+		t.Fatal("expected tick to stop when not clocked in")
+	}
+}
+
+func TestRenderClockStatus_Nil(t *testing.T) {
+	result := renderClockStatus(nil)
+	if result != "" {
+		t.Fatalf("expected empty string for nil attendance, got %q", result)
+	}
+}
+
+func TestRenderClockStatus_NotClockedIn(t *testing.T) {
+	status := &odoo.AttendanceStatus{ClockedIn: false}
+	result := renderClockStatus(status)
+	if !strings.Contains(result, "Not clocked in") {
+		t.Fatalf("expected 'Not clocked in' in %q", result)
+	}
+}
+
+func TestRenderClockStatus_ClockedIn(t *testing.T) {
+	checkIn := time.Now().Add(-90 * time.Minute)
+	status := &odoo.AttendanceStatus{ClockedIn: true, CheckIn: &checkIn}
+	result := renderClockStatus(status)
+	if !strings.Contains(result, "Clocked in since") {
+		t.Fatalf("expected 'Clocked in since' in %q", result)
 	}
 }
 
