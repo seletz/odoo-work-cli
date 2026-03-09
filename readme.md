@@ -1,33 +1,34 @@
 # odoo-work-cli
 
-CLI tool for managing Odoo 17 timesheets and projects from the terminal.
+CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well as attendance (clock-in and clock-out).
 
-## Prerequisites
+## Features
 
-- [Go](https://go.dev/) 1.21+
-- [mise](https://mise.jdx.dev/) for task running and tool management
-- [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) for secrets injection
+- **CLI:** ClI commands for scripting
+- **TUI:** Terminal UI for fast interactive usage
 
-## Setup
+### TUI Features
+
+- Remembers last week's tasks and projects you worked
+- German Holidays are marked and coloured
+- Shows attendance state prominently
+- Color coded wourk hour day and week summaries with configurable limits
+- Add, edit and delete time entries
+- It's pretty fast
+
+## Usage
+
+### TUI
+
+Just do:
 
 ```bash
-# Install tools via mise
-mise install
-
-# Inject secrets from 1Password (edit .env.1p with your vault/item references first)
-mise run inject-env
-
-# Build
-mise run build
-
-# Run tests
-mise run test
-
-# Lint
-mise run lint
+odoo-work-cli tui
 ```
 
-## Commands
+### CLI
+
+Commands:
 
 | Command                                                  | Description                                                                                                         |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -42,10 +43,36 @@ mise run lint
 | `clock in`                                               | Clock in (start attendance period)                                                                                  |
 | `clock out`                                              | Clock out (end attendance period, shows duration)                                                                   |
 | `clock status`                                           | Show current attendance state and today's periods                                                                   |
-| `tui`                                                    | Weekly timesheet TUI with detail view, inline editing/adding, previous-week project hints, and live clock-in/out status |
+| `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
 | `config --merged`                                        | Print the fully merged TOML config (password omitted)                                                               |
+
+Examples:
+
+```bash
+./odoo-work-cli whoami
+./odoo-work-cli projects
+./odoo-work-cli tasks
+./odoo-work-cli tasks 42
+./odoo-work-cli timesheets
+./odoo-work-cli timesheets --week 2026-W10
+./odoo-work-cli fields project.project
+./odoo-work-cli entries
+./odoo-work-cli entries --week 2026-W10
+./odoo-work-cli entries --date 2026-03-02
+./odoo-work-cli entries --project "Acme" --status draft
+./odoo-work-cli entries add --project-id 42 --hours 2.5 --description "Dev work"
+./odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-03-09 --hours 1.5 --description "Code review"
+./odoo-work-cli entries update 100 --hours 3.0
+./odoo-work-cli entries update 100 --description "Updated description" --hours 2.5
+./odoo-work-cli entries delete 100
+./odoo-work-cli clock in
+./odoo-work-cli clock out
+./odoo-work-cli clock status
+./odoo-work-cli config
+./odoo-work-cli config --merged
+```
 
 ## Configuration
 
@@ -113,37 +140,29 @@ defines a filter on the same field as a parent, the child's entry overrides the
 parent's. This lets you set a company-wide filter in a parent directory and add
 project-specific filters in subdirectories.
 
-## Usage
-
-```bash
-./odoo-work-cli whoami
-./odoo-work-cli projects
-./odoo-work-cli tasks
-./odoo-work-cli tasks 42
-./odoo-work-cli timesheets
-./odoo-work-cli timesheets --week 2026-W10
-./odoo-work-cli fields project.project
-./odoo-work-cli entries
-./odoo-work-cli entries --week 2026-W10
-./odoo-work-cli entries --date 2026-03-02
-./odoo-work-cli entries --project "Acme" --status draft
-./odoo-work-cli entries add --project-id 42 --hours 2.5 --description "Dev work"
-./odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-03-09 --hours 1.5 --description "Code review"
-./odoo-work-cli entries update 100 --hours 3.0
-./odoo-work-cli entries update 100 --description "Updated description" --hours 2.5
-./odoo-work-cli entries delete 100
-./odoo-work-cli clock in
-./odoo-work-cli clock out
-./odoo-work-cli clock status
-./odoo-work-cli config
-./odoo-work-cli config --merged
-```
-
 ## Development
 
+### Prerequisites
+
+- [Go](https://go.dev/) 1.21+
+- [mise](https://mise.jdx.dev/) for task running and tool management
+- [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) for secrets injection
+
+### Mise Tasks
+
 ```bash
-mise run fmt     # format code
-mise run lint    # run linters (golangci-lint v2)
-mise run test    # run tests
-mise run build   # compile binary
+# Install tools via mise
+mise install
+
+# Inject secrets from 1Password (edit .env.1p with your vault/item references first)
+mise run inject-env
+
+# Build
+mise run build
+
+# Run tests
+mise run test
+
+# Lint
+mise run lint
 ```
