@@ -14,6 +14,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - German Holidays are marked and coloured
 - Shows attendance state prominently
 - Color coded work hour day and week summaries with configurable limits
+- Configurable key bindings via `[keys]` section in config file
 - Add, edit and delete time entries
 - It's pretty fast
 
@@ -135,6 +136,41 @@ command output.
 Filters scope queries automatically. They are defined per model under
 `[models.<name>]` with `field`, `op`, and `value`. Supported operators include
 `=`, `!=`, `ilike`, `>`, `<`, `>=`, `<=`, etc.
+
+### Configurable key bindings
+
+TUI key bindings can be overridden in the `[keys]` section. Action names are
+prefixed with the context they apply to. Only overridden keys change; others
+keep their defaults. Values can be a single string or an array of strings.
+
+```toml
+[keys]
+# Cursor movement (shared across grid, detail, search views)
+cursor_up = ["up", "k"]
+cursor_down = ["down", "j"]
+
+# Grid view
+grid_next_col = ["tab"]
+grid_prev_col = ["shift+tab"]
+grid_enter = ["enter"]
+grid_search = ["/"]
+
+# Detail view
+detail_edit = ["e"]
+detail_add = ["a"]
+detail_delete = ["d"]
+
+# Search view
+search_toggle = ["ctrl+a"]
+
+# Global (available in all non-modal views)
+global_prev_week = ["left", "h"]
+global_next_week = ["right", "l"]
+global_back = ["esc"]
+global_refresh = ["r"]
+global_help = ["?"]
+global_quit = ["q", "ctrl+c"]
+```
 
 Filters **accumulate** across config levels (AND semantics). If a child config
 defines a filter on the same field as a parent, the child's entry overrides the
