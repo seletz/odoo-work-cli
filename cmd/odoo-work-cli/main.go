@@ -40,6 +40,11 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(tuiCmd)
 	rootCmd.AddCommand(entriesCmd)
+	rootCmd.AddCommand(clockCmd)
+
+	clockCmd.AddCommand(clockInCmd)
+	clockCmd.AddCommand(clockOutCmd)
+	clockCmd.AddCommand(clockStatusCmd)
 
 	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 	entriesCmd.Flags().StringVar(&entriesWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
@@ -579,6 +584,113 @@ var tuiCmd = &cobra.Command{
 		p := tea.NewProgram(m)
 		_, err = p.Run()
 		return err
+	},
+}
+
+var clockCmd = &cobra.Command{
+	Use:   "clock",
+	Short: "Clock in/out and attendance status",
+}
+
+var clockInCmd = &cobra.Command{
+	Use:   "in",
+	Short: "Clock in (start attendance)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		_, err = client.ClockIn()
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Clocked in at %s\n", time.Now().Format("15:04"))
+		return nil
+	},
+}
+
+var clockOutCmd = &cobra.Command{
+	Use:   "out",
+	Short: "Clock out (end attendance)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		rec, err := client.ClockOut()
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Clocked out at %s\n", time.Now().Format("15:04"))
+		fmt.Printf("Duration: %s (%.2fh)\n", tui.FormatHours(rec.WorkedHours), rec.WorkedHours)
+		return nil
+	},
+}
+
+var clockStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show current attendance status",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		status, err := client.AttendanceStatus()
+		if err != nil {
+			return err
+		}
+
+		if status.ClockedIn && status.CheckIn != nil {
+			elapsed := time.Since(*status.CheckIn).Hours()
+			fmt.Printf("Status: Clocked in since %s (%s elapsed)\n",
+				status.CheckIn.Local().Format("15:04"),
+				tui.FormatHours(elapsed))
+		} else {
+			fmt.Println("Status: Not clocked in")
+		}
+
+		if len(status.Periods) > 0 {
+			fmt.Print("\nToday's attendance:\n\n")
+			fmt.Printf("%-3s %-10s %-10s %s\n", "#", "Check In", "Check Out", "Duration")
+			fmt.Printf("%-3s %-10s %-10s %s\n", "---", "----------", "----------", "--------")
+			for i, p := range status.Periods {
+				checkIn := p.CheckIn.Local().Format("15:04")
+				var checkOut, duration string
+				if p.CheckOut != nil {
+					checkOut = p.CheckOut.Local().Format("15:04")
+					duration = tui.FormatHours(p.WorkedHours)
+				} else {
+					checkOut = "--:--"
+					elapsed := time.Since(p.CheckIn).Hours()
+					duration = tui.FormatHours(elapsed) + " (running)"
+				}
+				fmt.Printf("%-3d %-10s %-10s %s\n", i+1, checkIn, checkOut, duration)
+			}
+			fmt.Printf("\nTotal: %s\n", tui.FormatHours(status.TotalHours))
+		} else {
+			fmt.Println("\nNo attendance records today.")
+		}
+		return nil
 	},
 }
 

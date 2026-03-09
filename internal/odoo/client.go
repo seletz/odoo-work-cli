@@ -1,5 +1,7 @@
 package odoo
 
+import "time"
+
 // UserInfo holds identity information for the current Odoo user.
 type UserInfo struct {
 	ID       int64
@@ -66,6 +68,25 @@ type FieldInfo struct {
 	Required bool
 }
 
+// AttendanceRecord holds a single attendance period from Odoo.
+type AttendanceRecord struct {
+	ID          int64
+	EmployeeID  int64
+	Employee    string
+	CheckIn     time.Time
+	CheckOut    *time.Time // nil if still clocked in
+	WorkedHours float64
+}
+
+// AttendanceStatus holds the current clock-in/out state and today's periods.
+type AttendanceStatus struct {
+	ClockedIn  bool
+	CurrentID  int64              // open record ID (0 if not clocked in)
+	CheckIn    *time.Time         // current period start
+	Periods    []AttendanceRecord // all today's records
+	TotalHours float64
+}
+
 // Client defines the interface for interacting with an Odoo instance.
 type Client interface {
 	// WhoAmI returns the identity of the currently authenticated user.
@@ -85,4 +106,10 @@ type Client interface {
 	UpdateTimesheet(id int64, fields map[string]interface{}) error
 	// DeleteTimesheet deletes a timesheet entry by ID.
 	DeleteTimesheet(id int64) error
+	// ClockIn creates an attendance record with check_in = now.
+	ClockIn() (int64, error)
+	// ClockOut writes check_out = now on the open attendance record.
+	ClockOut() (*AttendanceRecord, error)
+	// AttendanceStatus returns the current clock state and today's periods.
+	AttendanceStatus() (*AttendanceStatus, error)
 }

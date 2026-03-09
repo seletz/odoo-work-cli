@@ -39,6 +39,9 @@ mise run lint
 | `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (date defaults to today, task-id optional)                    |
 | `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (only set flags are sent)                               |
 | `entries delete ID`                                      | Delete a timesheet entry by ID                                                             |
+| `clock in`                                               | Clock in (start attendance period)                                                         |
+| `clock out`                                              | Clock out (end attendance period, shows duration)                                          |
+| `clock status`                                           | Show current attendance state and today's periods                                          |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                  |
 | `config`                                                 | Show discovered config file paths (merge order)                                            |
 | `config --merged`                                        | Print the fully merged TOML config (password omitted)                                      |
@@ -118,6 +121,9 @@ Filters **accumulate** across config levels (AND semantics). If a child config d
 ./odoo-work-cli entries update 100 --hours 3.0
 ./odoo-work-cli entries update 100 --description "Updated description" --hours 2.5
 ./odoo-work-cli entries delete 100
+./odoo-work-cli clock in
+./odoo-work-cli clock out
+./odoo-work-cli clock status
 ./odoo-work-cli config
 ./odoo-work-cli config --merged
 ```

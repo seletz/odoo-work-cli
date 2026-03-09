@@ -21,6 +21,13 @@ type mockClient struct {
 	createErr  error
 	updateErr  error
 	deleteErr  error
+
+	clockInID        int64
+	clockInErr       error
+	clockOutRecord   *AttendanceRecord
+	clockOutErr      error
+	attendanceStatus *AttendanceStatus
+	attendanceErr    error
 }
 
 func (m *mockClient) WhoAmI() (*UserInfo, error) {
@@ -53,6 +60,18 @@ func (m *mockClient) UpdateTimesheet(_ int64, _ map[string]interface{}) error {
 
 func (m *mockClient) DeleteTimesheet(_ int64) error {
 	return m.deleteErr
+}
+
+func (m *mockClient) ClockIn() (int64, error) {
+	return m.clockInID, m.clockInErr
+}
+
+func (m *mockClient) ClockOut() (*AttendanceRecord, error) {
+	return m.clockOutRecord, m.clockOutErr
+}
+
+func (m *mockClient) AttendanceStatus() (*AttendanceStatus, error) {
+	return m.attendanceStatus, m.attendanceErr
 }
 
 func TestWhoAmI_Success(t *testing.T) {
