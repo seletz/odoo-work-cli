@@ -1,6 +1,11 @@
 package tui
 
-import "charm.land/bubbles/v2/key"
+import (
+	"strings"
+
+	"charm.land/bubbles/v2/key"
+	"github.com/seletz/odoo-work-cli/internal/config"
+)
 
 // KeyMap defines key bindings for the TUI.
 type KeyMap struct {
@@ -13,8 +18,6 @@ type KeyMap struct {
 	Refresh      key.Binding
 	Help         key.Binding
 	Quit         key.Binding
-	PrevWeek     key.Binding
-	NextWeek     key.Binding
 	Enter        key.Binding
 	Back         key.Binding
 	Edit         key.Binding
@@ -92,6 +95,85 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("C-a", "toggle filter"),
 		),
 	}
+}
+
+// actionHelpDesc maps config action names to their help description text.
+// Action names are prefixed with the context they apply to:
+//   - cursor_  : shared cursor movement (grid, detail, search)
+//   - grid_    : grid view actions
+//   - detail_  : detail view actions
+//   - search_  : search view actions
+//   - global_  : actions available in all non-modal views
+var actionHelpDesc = map[string]string{
+	"cursor_up":        "up",
+	"cursor_down":      "down",
+	"grid_next_col":    "next day",
+	"grid_prev_col":    "prev day",
+	"grid_enter":       "detail",
+	"grid_search":      "search",
+	"detail_edit":      "edit",
+	"detail_add":       "add",
+	"detail_delete":    "delete",
+	"search_toggle":    "toggle filter",
+	"global_quit":      "quit",
+	"global_help":      "help",
+	"global_refresh":   "refresh",
+	"global_back":      "back",
+	"global_prev_week": "prev week",
+	"global_next_week": "next week",
+}
+
+// ApplyKeysConfig overrides key bindings in km from the given config.
+// Unknown action names are silently ignored. Returns the modified KeyMap.
+func ApplyKeysConfig(km KeyMap, cfg config.KeysConfig) KeyMap {
+	if cfg == nil {
+		return km
+	}
+	for action, keys := range cfg {
+		desc, ok := actionHelpDesc[action]
+		if !ok {
+			continue
+		}
+		binding := key.NewBinding(
+			key.WithKeys(keys...),
+			key.WithHelp(strings.Join(keys, "/"), desc),
+		)
+		switch action {
+		case "cursor_up":
+			km.Up = binding
+		case "cursor_down":
+			km.Down = binding
+		case "grid_next_col":
+			km.NextCol = binding
+		case "grid_prev_col":
+			km.PrevCol = binding
+		case "grid_enter":
+			km.Enter = binding
+		case "grid_search":
+			km.Search = binding
+		case "detail_edit":
+			km.Edit = binding
+		case "detail_add":
+			km.Add = binding
+		case "detail_delete":
+			km.Delete = binding
+		case "search_toggle":
+			km.SearchToggle = binding
+		case "global_quit":
+			km.Quit = binding
+		case "global_help":
+			km.Help = binding
+		case "global_refresh":
+			km.Refresh = binding
+		case "global_back":
+			km.Back = binding
+		case "global_prev_week":
+			km.Left = binding
+		case "global_next_week":
+			km.Right = binding
+		}
+	}
+	return km
 }
 
 // ShortHelp returns key bindings for the short help view.

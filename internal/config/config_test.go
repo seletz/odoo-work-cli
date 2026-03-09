@@ -563,6 +563,151 @@ func TestMerge_HoursLimits(t *testing.T) {
 	}
 }
 
+func TestKeysConfig_UnmarshalTOML_SingleString(t *testing.T) {
+	content := `
+[keys]
+quit = "q"
+edit = "e"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Keys == nil {
+		t.Fatal("Keys is nil")
+	}
+	if got := cfg.Keys["quit"]; len(got) != 1 || got[0] != "q" {
+		t.Errorf("Keys[quit] = %v, want [q]", got)
+	}
+	if got := cfg.Keys["edit"]; len(got) != 1 || got[0] != "e" {
+		t.Errorf("Keys[edit] = %v, want [e]", got)
+	}
+}
+
+func TestKeysConfig_UnmarshalTOML_Array(t *testing.T) {
+	content := `
+[keys]
+quit = ["q", "ctrl+c"]
+up = ["up", "k"]
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := cfg.Keys["quit"]; len(got) != 2 || got[0] != "q" || got[1] != "ctrl+c" {
+		t.Errorf("Keys[quit] = %v, want [q ctrl+c]", got)
+	}
+	if got := cfg.Keys["up"]; len(got) != 2 || got[0] != "up" || got[1] != "k" {
+		t.Errorf("Keys[up] = %v, want [up k]", got)
+	}
+}
+
+func TestKeysConfig_UnmarshalTOML_Mixed(t *testing.T) {
+	content := `
+[keys]
+quit = ["q", "ctrl+c"]
+edit = "e"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := cfg.Keys["quit"]; len(got) != 2 {
+		t.Errorf("Keys[quit] = %v, want 2 elements", got)
+	}
+	if got := cfg.Keys["edit"]; len(got) != 1 || got[0] != "e" {
+		t.Errorf("Keys[edit] = %v, want [e]", got)
+	}
+}
+
+func TestLoadFromTOML_NoKeysSection(t *testing.T) {
+	content := `url = "https://odoo.example.com"`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Keys != nil {
+		t.Errorf("Keys = %v, want nil when [keys] section absent", cfg.Keys)
+	}
+}
+
+func TestMerge_Keys(t *testing.T) {
+	base := &Config{
+		Keys: KeysConfig{
+			"quit": {"q", "ctrl+c"},
+			"edit": {"e"},
+		},
+	}
+	overlay := &Config{
+		Keys: KeysConfig{
+			"quit": {"ctrl+q"},
+		},
+	}
+
+	base.Merge(overlay)
+
+	if got := base.Keys["quit"]; len(got) != 1 || got[0] != "ctrl+q" {
+		t.Errorf("Keys[quit] = %v, want [ctrl+q] (overlay replaces)", got)
+	}
+	if got := base.Keys["edit"]; len(got) != 1 || got[0] != "e" {
+		t.Errorf("Keys[edit] = %v, want [e] (base preserved)", got)
+	}
+}
+
+func TestMerge_Keys_NilOverlay(t *testing.T) {
+	base := &Config{
+		Keys: KeysConfig{
+			"quit": {"q"},
+		},
+	}
+	overlay := &Config{}
+
+	base.Merge(overlay)
+
+	if got := base.Keys["quit"]; len(got) != 1 || got[0] != "q" {
+		t.Errorf("Keys[quit] = %v, want [q] (nil overlay preserves base)", got)
+	}
+}
+
+func TestMerge_Keys_NilBase(t *testing.T) {
+	base := &Config{}
+	overlay := &Config{
+		Keys: KeysConfig{
+			"quit": {"ctrl+q"},
+		},
+	}
+
+	base.Merge(overlay)
+
+	if got := base.Keys["quit"]; len(got) != 1 || got[0] != "ctrl+q" {
+		t.Errorf("Keys[quit] = %v, want [ctrl+q]", got)
+	}
+}
+
 func TestMerge_FiltersSameFieldOverride(t *testing.T) {
 	base := &Config{
 		Models: map[string]ModelConfig{
