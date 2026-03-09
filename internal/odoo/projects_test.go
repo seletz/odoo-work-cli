@@ -7,12 +7,12 @@ import (
 
 func TestListProjects(t *testing.T) {
 	tests := []struct {
-		name     string
-		client   *mockClient
-		wantLen  int
-		wantErr  bool
-		wantMsg  string
-		checkFn  func(t *testing.T, projects []ProjectInfo)
+		name    string
+		client  *mockClient
+		wantLen int
+		wantErr bool
+		wantMsg string
+		checkFn func(t *testing.T, projects []ProjectInfo)
 	}{
 		{
 			name: "success returns projects with all fields",

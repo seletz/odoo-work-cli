@@ -170,10 +170,10 @@ func TestParseAttendanceRecord(t *testing.T) {
 		{
 			name: "open record",
 			record: map[string]interface{}{
-				"id":          int64(10),
-				"employee_id": []interface{}{int64(7), "Test User"},
-				"check_in":    "2026-03-09 08:30:00",
-				"check_out":   false,
+				"id":           int64(10),
+				"employee_id":  []interface{}{int64(7), "Test User"},
+				"check_in":     "2026-03-09 08:30:00",
+				"check_out":    false,
 				"worked_hours": float64(0),
 			},
 			wantID:  10,

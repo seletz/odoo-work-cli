@@ -13,7 +13,7 @@ func TestBuildHolidayMap_Bayern(t *testing.T) {
 		name string
 	}{
 		{"2026-01-01", "Neujahr"},
-		{"2026-01-06", "Epiphanias"},             // Bayern-specific
+		{"2026-01-06", "Epiphanias"}, // Bayern-specific
 		{"2026-05-01", "Tag der Arbeit"},
 		{"2026-10-03", "Tag der deutschen Einheit"},
 		{"2026-12-25", "Weihnachten"},

@@ -136,11 +136,11 @@ func TestValidate(t *testing.T) {
 
 func TestLoadFromTOML(t *testing.T) {
 	tests := []struct {
-		name     string
-		content  string
-		wantErr  bool
-		wantURL  string
-		wantDB   string
+		name    string
+		content string
+		wantErr bool
+		wantURL string
+		wantDB  string
 	}{
 		{
 			name:    "valid config",

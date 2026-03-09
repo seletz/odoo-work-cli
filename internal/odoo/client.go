@@ -4,11 +4,11 @@ import "time"
 
 // UserInfo holds identity information for the current Odoo user.
 type UserInfo struct {
-	ID       int64
-	Name     string
-	Login    string
-	Email    string
-	Company  string
+	ID      int64
+	Name    string
+	Login   string
+	Email   string
+	Company string
 }
 
 // ProjectInfo holds summary information for an Odoo project.

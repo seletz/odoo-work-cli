@@ -447,4 +447,3 @@ func TestFilterEntries(t *testing.T) {
 		})
 	}
 }
-

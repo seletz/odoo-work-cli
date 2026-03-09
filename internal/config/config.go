@@ -40,9 +40,9 @@ const DefaultBundesland = "Baden-Württemberg"
 
 // HoursLimits holds threshold values for hour coloring in the TUI.
 type HoursLimits struct {
-	DailyLow  float64 `toml:"daily_low"`  // below this: yellow (default 6)
-	DailyHigh float64 `toml:"daily_high"` // above this: red (default 9)
-	WeeklyLow float64 `toml:"weekly_low"` // below this: yellow (default 35)
+	DailyLow   float64 `toml:"daily_low"`   // below this: yellow (default 6)
+	DailyHigh  float64 `toml:"daily_high"`  // above this: red (default 9)
+	WeeklyLow  float64 `toml:"weekly_low"`  // below this: yellow (default 35)
 	WeeklyHigh float64 `toml:"weekly_high"` // above this: red (default 40)
 }
 
@@ -58,19 +58,19 @@ func DefaultHoursLimits() HoursLimits {
 
 // Config holds the application configuration.
 type Config struct {
-	URL      string                 `toml:"url"`
-	Database string                 `toml:"database"`
-	Username string                 `toml:"username"`
-	Password string                 `toml:"-"`
+	URL        string                 `toml:"url"`
+	Database   string                 `toml:"database"`
+	Username   string                 `toml:"username"`
+	Password   string                 `toml:"-"`
 	Models     map[string]ModelConfig `toml:"models"`
 	Hours      HoursLimits            `toml:"hours"`
 	Bundesland string                 `toml:"bundesland"` // German federal state for holidays (e.g. "Bayern")
 }
 
 func (c *Config) OdooURL() string      { return c.URL }
-func (c *Config) OdooDatabase() string  { return c.Database }
-func (c *Config) OdooUsername() string   { return c.Username }
-func (c *Config) OdooPassword() string   { return c.Password }
+func (c *Config) OdooDatabase() string { return c.Database }
+func (c *Config) OdooUsername() string { return c.Username }
+func (c *Config) OdooPassword() string { return c.Password }
 
 // LoadFromEnv reads configuration from environment variables.
 // It reads whatever env vars are set without requiring any.
