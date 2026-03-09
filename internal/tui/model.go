@@ -42,6 +42,11 @@ type editSavedMsg struct {
 	err error
 }
 
+// deleteEntryMsg is sent when a delete operation completes.
+type deleteEntryMsg struct {
+	err error
+}
+
 // attendanceTickMsg triggers a re-render to update elapsed clock-in time.
 type attendanceTickMsg time.Time
 
@@ -171,6 +176,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 
+	case deleteEntryMsg:
+		if msg.err != nil {
+			m.state = stateError
+			m.err = msg.err
+			return m, nil
+		}
+		m.state = stateDetail
+		m.loading = true
+		return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -275,6 +290,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case key.Matches(msg, m.keys.Add):
 				return m.enterAdd()
+			case key.Matches(msg, m.keys.Delete):
+				if len(entries) > 0 {
+					return m.deleteEntry()
+				}
+				return m, nil
 			}
 		}
 
@@ -424,6 +444,20 @@ func (m Model) submitEdit() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		err := client.UpdateTimesheet(id, fields)
 		return editSavedMsg{err: err}
+	}
+}
+
+// deleteEntry deletes the currently selected entry in the detail view.
+func (m Model) deleteEntry() (tea.Model, tea.Cmd) {
+	entries := m.detailEntries()
+	if m.detailCursor >= len(entries) {
+		return m, nil
+	}
+	client := m.client
+	id := entries[m.detailCursor].ID
+	return m, func() tea.Msg {
+		err := client.DeleteTimesheet(id)
+		return deleteEntryMsg{err: err}
 	}
 }
 

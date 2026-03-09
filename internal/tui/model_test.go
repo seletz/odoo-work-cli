@@ -21,6 +21,8 @@ type mockClient struct {
 	createErr    error
 	createdID    int64
 	createParams odoo.TimesheetWriteParams // capture last create call
+	deleteErr    error
+	deletedID    int64
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
@@ -39,7 +41,10 @@ func (c *mockClient) UpdateTimesheet(id int64, fields map[string]interface{}) er
 	c.updated = fields
 	return c.updateErr
 }
-func (c *mockClient) DeleteTimesheet(int64) error                       { return nil }
+func (c *mockClient) DeleteTimesheet(id int64) error {
+	c.deletedID = id
+	return c.deleteErr
+}
 func (c *mockClient) ClockIn() (int64, error)                           { return 0, nil }
 func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error)         { return nil, nil }
 func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) { return nil, nil }
@@ -844,5 +849,118 @@ func TestModel_EnterDetailReloadPreservesState(t *testing.T) {
 	// Grid should be rebuilt with new data.
 	if len(um.grid.Rows) == 0 {
 		t.Fatal("expected grid rows after reload")
+	}
+}
+
+func TestModel_DeleteEntryTriggersReload(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 2.0, Name: "Task A", ProjectID: 10, TaskID: 20},
+		{ID: 2, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 3.0, Name: "Task B", ProjectID: 10, TaskID: 20},
+	}
+	client := &mockClient{entries: entries}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m.state = stateGrid
+	m.grid = BuildWeekGrid(entries, mon.Time)
+	m.cursor = [2]int{0, 0}
+	m.width = 120
+	m.height = 40
+
+	// Enter detail view.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '\r'})
+	um := updated.(Model)
+
+	// Press 'd' to delete the selected entry.
+	updated, cmd := um.Update(tea.KeyPressMsg{Code: 'd'})
+	um = updated.(Model)
+
+	if cmd == nil {
+		t.Fatal("expected command when deleting entry")
+	}
+
+	// Execute the command to get the message.
+	msg := cmd()
+	deleteMsg, ok := msg.(deleteEntryMsg)
+	if !ok {
+		t.Fatalf("expected deleteEntryMsg, got %T", msg)
+	}
+	if deleteMsg.err != nil {
+		t.Fatalf("unexpected error: %v", deleteMsg.err)
+	}
+	if client.deletedID != 1 {
+		t.Fatalf("expected deleted ID 1, got %d", client.deletedID)
+	}
+
+	// Process the delete message — should trigger reload.
+	updated, reloadCmd := um.Update(deleteMsg)
+	um = updated.(Model)
+
+	if um.state != stateDetail {
+		t.Fatalf("expected stateDetail after delete, got %v", um.state)
+	}
+	if !um.loading {
+		t.Fatal("expected loading=true after delete")
+	}
+	if reloadCmd == nil {
+		t.Fatal("expected reload command after delete")
+	}
+}
+
+func TestModel_DeleteEntryNoEntriesNoop(t *testing.T) {
+	// Create a model with an entry on a different day so the selected cell is empty.
+	entries := []odoo.TimesheetEntry{
+		{ID: 1, Date: "2026-03-03", Project: "Acme", Task: "Dev", Hours: 2.0, Name: "Task A", ProjectID: 10, TaskID: 20},
+	}
+	client := &mockClient{entries: entries}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m.state = stateGrid
+	m.grid = BuildWeekGrid(entries, mon.Time)
+	m.cursor = [2]int{0, 0} // Monday — no entries
+	m.width = 120
+	m.height = 40
+
+	// Enter detail view.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '\r'})
+	um := updated.(Model)
+
+	// Press 'd' — should be a no-op since no entries in this cell.
+	updated, cmd := um.Update(tea.KeyPressMsg{Code: 'd'})
+	um = updated.(Model)
+
+	if cmd != nil {
+		t.Fatal("expected no command when deleting from empty cell")
+	}
+	if um.state != stateDetail {
+		t.Fatalf("expected stateDetail, got %v", um.state)
+	}
+}
+
+func TestModel_DeleteEntryError(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 2.0, Name: "Task A", ProjectID: 10, TaskID: 20},
+	}
+	client := &mockClient{entries: entries, deleteErr: errors.New("forbidden")}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland")
+	m.state = stateGrid
+	m.grid = BuildWeekGrid(entries, mon.Time)
+	m.cursor = [2]int{0, 0}
+	m.width = 120
+	m.height = 40
+
+	// Enter detail + delete.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '\r'})
+	um := updated.(Model)
+	updated, cmd := um.Update(tea.KeyPressMsg{Code: 'd'})
+	um = updated.(Model)
+
+	// Execute and process error message.
+	msg := cmd()
+	updated, _ = um.Update(msg)
+	um = updated.(Model)
+
+	if um.state != stateError {
+		t.Fatalf("expected stateError on delete failure, got %v", um.state)
 	}
 }

@@ -201,7 +201,7 @@ func RenderDetail(row GridRow, col int, monday time.Time, detailCursor int, widt
 	total := fmt.Sprintf("Total: %s (%d entries)", FormatHours(row.Hours[col]), len(entries))
 	b.WriteString(detailHeaderStyle.Render(total))
 	b.WriteString("\n")
-	b.WriteString(detailHintStyle.Render("j/k: select  e: edit  a: add  esc: back"))
+	b.WriteString(detailHintStyle.Render("j/k: select  e: edit  a: add  d: delete  esc: back"))
 
 	return b.String()
 }
