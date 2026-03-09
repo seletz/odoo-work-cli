@@ -73,6 +73,26 @@ func extractMany2OneName(v interface{}) string {
 	return name
 }
 
+// extractMany2OneID extracts the numeric ID from a Many2One field value.
+// Many2One fields are represented as [id, name] or false in XML-RPC.
+func extractMany2OneID(v interface{}) int64 {
+	if v == nil || v == false {
+		return 0
+	}
+	arr, ok := v.([]interface{})
+	if !ok || len(arr) < 1 {
+		return 0
+	}
+	switch id := arr[0].(type) {
+	case int64:
+		return id
+	case float64:
+		return int64(id)
+	default:
+		return 0
+	}
+}
+
 // extractFieldValue extracts a field value as a string based on its Odoo type.
 func extractFieldValue(v interface{}, fieldType string) string {
 	if v == nil || v == false {
@@ -248,9 +268,11 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 	result := make([]TimesheetEntry, 0, len(records))
 	for _, r := range records {
 		entry := TimesheetEntry{
-			Project:  extractMany2OneName(r["project_id"]),
-			Task:     extractMany2OneName(r["task_id"]),
-			Employee: extractMany2OneName(r["employee_id"]),
+			ProjectID: extractMany2OneID(r["project_id"]),
+			Project:   extractMany2OneName(r["project_id"]),
+			TaskID:    extractMany2OneID(r["task_id"]),
+			Task:      extractMany2OneName(r["task_id"]),
+			Employee:  extractMany2OneName(r["employee_id"]),
 		}
 		if id, ok := r["id"].(int64); ok {
 			entry.ID = id

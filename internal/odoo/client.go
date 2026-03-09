@@ -34,7 +34,9 @@ type TaskInfo struct {
 type TimesheetEntry struct {
 	ID              int64
 	Date            string
+	ProjectID       int64
 	Project         string
+	TaskID          int64
 	Task            string
 	Name            string
 	Hours           float64
@@ -78,8 +80,9 @@ type Client interface {
 	GetFields(model string) ([]FieldInfo, error)
 	// CreateTimesheet creates a new timesheet entry and returns its ID.
 	CreateTimesheet(params TimesheetWriteParams) (int64, error)
-	// UpdateTimesheet updates an existing timesheet entry.
-	UpdateTimesheet(id int64, params TimesheetWriteParams) error
+	// UpdateTimesheet partially updates an existing timesheet entry.
+	// Only the fields present in the map are updated.
+	UpdateTimesheet(id int64, fields map[string]interface{}) error
 	// DeleteTimesheet deletes a timesheet entry by ID.
 	DeleteTimesheet(id int64) error
 }

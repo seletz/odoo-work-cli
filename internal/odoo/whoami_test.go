@@ -47,7 +47,7 @@ func (m *mockClient) CreateTimesheet(_ TimesheetWriteParams) (int64, error) {
 	return m.createID, m.createErr
 }
 
-func (m *mockClient) UpdateTimesheet(_ int64, _ TimesheetWriteParams) error {
+func (m *mockClient) UpdateTimesheet(_ int64, _ map[string]interface{}) error {
 	return m.updateErr
 }
 

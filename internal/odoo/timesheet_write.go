@@ -61,18 +61,18 @@ func (x *XMLRPCClient) CreateTimesheet(params TimesheetWriteParams) (int64, erro
 	}
 }
 
-// UpdateTimesheet updates an existing timesheet entry.
-func (x *XMLRPCClient) UpdateTimesheet(id int64, params TimesheetWriteParams) error {
+// UpdateTimesheet partially updates an existing timesheet entry.
+// Only the fields present in the map are sent to Odoo.
+func (x *XMLRPCClient) UpdateTimesheet(id int64, fields map[string]interface{}) error {
 	if id <= 0 {
 		return errors.New("timesheet ID is required")
 	}
-	if err := ValidateTimesheetParams(params); err != nil {
-		return err
+	if len(fields) == 0 {
+		return errors.New("at least one field to update is required")
 	}
 
-	vals := timesheetValues(params)
 	_, err := x.client.ExecuteKw("write", "account.analytic.line",
-		[]interface{}{[]int64{id}, vals}, goOdoo.NewOptions())
+		[]interface{}{[]int64{id}, fields}, goOdoo.NewOptions())
 	if err != nil {
 		return fmt.Errorf("updating timesheet %d: %w", id, err)
 	}

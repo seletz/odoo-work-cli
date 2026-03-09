@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/spf13/cobra"
 )
 
 func TestWeekDateRange(t *testing.T) {
@@ -231,6 +232,145 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 			}
 			if params.Hours != tt.hours {
 				t.Errorf("Hours = %f, want %f", params.Hours, tt.hours)
+			}
+		})
+	}
+}
+
+func TestBuildUpdateFields(t *testing.T) {
+	tests := []struct {
+		name       string
+		flags      []string
+		wantFields []string
+		wantErr    bool
+	}{
+		{
+			name:       "single field hours",
+			flags:      []string{"--hours", "2.5"},
+			wantFields: []string{"unit_amount"},
+		},
+		{
+			name:       "single field description",
+			flags:      []string{"--description", "new desc"},
+			wantFields: []string{"name"},
+		},
+		{
+			name:       "single field date",
+			flags:      []string{"--date", "2026-03-09"},
+			wantFields: []string{"date"},
+		},
+		{
+			name:       "single field project-id",
+			flags:      []string{"--project-id", "42"},
+			wantFields: []string{"project_id"},
+		},
+		{
+			name:       "multiple fields",
+			flags:      []string{"--hours", "3.0", "--description", "updated"},
+			wantFields: []string{"unit_amount", "name"},
+		},
+		{
+			name:    "no flags errors",
+			flags:   []string{},
+			wantErr: true,
+		},
+		{
+			name:    "invalid date",
+			flags:   []string{"--date", "not-a-date"},
+			wantErr: true,
+		},
+		{
+			name:    "zero hours",
+			flags:   []string{"--hours", "0"},
+			wantErr: true,
+		},
+		{
+			name:    "negative hours",
+			flags:   []string{"--hours", "-1"},
+			wantErr: true,
+		},
+		{
+			name:    "empty description",
+			flags:   []string{"--description", ""},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a fresh command with the same flags as entriesUpdateCmd.
+			cmd := &cobra.Command{Use: "test"}
+			var pID, tID int64
+			var date, desc string
+			var hours float64
+			cmd.Flags().Int64Var(&pID, "project-id", 0, "")
+			cmd.Flags().Int64Var(&tID, "task-id", 0, "")
+			cmd.Flags().StringVar(&date, "date", "", "")
+			cmd.Flags().Float64Var(&hours, "hours", 0, "")
+			cmd.Flags().StringVar(&desc, "description", "", "")
+
+			err := cmd.ParseFlags(tt.flags)
+			if err != nil {
+				t.Fatalf("parsing flags: %v", err)
+			}
+
+			// Point the package-level vars at the parsed values.
+			updateProjectID = pID
+			updateTaskID = tID
+			updateDate = date
+			updateHours = hours
+			updateDescription = desc
+
+			fields, err := buildUpdateFields(cmd)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(fields) != len(tt.wantFields) {
+				t.Fatalf("got %d fields, want %d", len(fields), len(tt.wantFields))
+			}
+			for _, key := range tt.wantFields {
+				if _, ok := fields[key]; !ok {
+					t.Errorf("missing expected field %q", key)
+				}
+			}
+		})
+	}
+}
+
+func TestParseEntryID(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    int64
+		wantErr bool
+	}{
+		{name: "valid", input: "42", want: 42},
+		{name: "zero", input: "0", wantErr: true},
+		{name: "negative", input: "-1", wantErr: true},
+		{name: "non-numeric", input: "abc", wantErr: true},
+		{name: "empty", input: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseEntryID(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("parseEntryID(%q) = %d, want %d", tt.input, got, tt.want)
 			}
 		})
 	}

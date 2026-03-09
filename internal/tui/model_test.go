@@ -24,7 +24,7 @@ func (c *mockClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, erro
 	return c.entries, c.err
 }
 func (c *mockClient) CreateTimesheet(odoo.TimesheetWriteParams) (int64, error) { return 0, nil }
-func (c *mockClient) UpdateTimesheet(int64, odoo.TimesheetWriteParams) error   { return nil }
+func (c *mockClient) UpdateTimesheet(int64, map[string]interface{}) error      { return nil }
 func (c *mockClient) DeleteTimesheet(int64) error                              { return nil }
 
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {

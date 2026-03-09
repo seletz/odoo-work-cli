@@ -180,19 +180,25 @@ func TestUpdateTimesheet(t *testing.T) {
 		name    string
 		client  *mockClient
 		id      int64
-		params  TimesheetWriteParams
+		fields  map[string]interface{}
 		wantErr bool
 		wantMsg string
 	}{
 		{
-			name:   "success updates entry",
+			name:   "success updates single field",
 			client: &mockClient{},
 			id:     42,
-			params: TimesheetWriteParams{
-				ProjectID: 1,
-				Date:      "2026-03-09",
-				Name:      "Updated description",
-				Hours:     3.0,
+			fields: map[string]interface{}{"name": "Updated description"},
+		},
+		{
+			name:   "success updates multiple fields",
+			client: &mockClient{},
+			id:     42,
+			fields: map[string]interface{}{
+				"project_id":  int64(1),
+				"date":        "2026-03-09",
+				"name":        "Updated description",
+				"unit_amount": 3.0,
 			},
 		},
 		{
@@ -200,13 +206,8 @@ func TestUpdateTimesheet(t *testing.T) {
 			client: &mockClient{
 				updateErr: errors.New("record locked"),
 			},
-			id: 42,
-			params: TimesheetWriteParams{
-				ProjectID: 1,
-				Date:      "2026-03-09",
-				Name:      "Should fail",
-				Hours:     1.0,
-			},
+			id:      42,
+			fields:  map[string]interface{}{"name": "Should fail"},
 			wantErr: true,
 			wantMsg: "record locked",
 		},
@@ -214,7 +215,7 @@ func TestUpdateTimesheet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.client.UpdateTimesheet(tt.id, tt.params)
+			err := tt.client.UpdateTimesheet(tt.id, tt.fields)
 
 			if tt.wantErr {
 				if err == nil {

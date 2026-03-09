@@ -58,6 +58,15 @@ func init() {
 	entriesAddCmd.Flags().StringVar(&addDescription, "description", "", "work description (required)")
 	_ = entriesAddCmd.MarkFlagRequired("hours")
 	_ = entriesAddCmd.MarkFlagRequired("description")
+
+	entriesCmd.AddCommand(entriesUpdateCmd)
+	entriesUpdateCmd.Flags().Int64Var(&updateProjectID, "project-id", 0, "Odoo project ID")
+	entriesUpdateCmd.Flags().Int64Var(&updateTaskID, "task-id", 0, "Odoo task ID")
+	entriesUpdateCmd.Flags().StringVar(&updateDate, "date", "", "entry date YYYY-MM-DD")
+	entriesUpdateCmd.Flags().Float64Var(&updateHours, "hours", 0, "hours worked (> 0)")
+	entriesUpdateCmd.Flags().StringVar(&updateDescription, "description", "", "work description")
+
+	entriesCmd.AddCommand(entriesDeleteCmd)
 }
 
 // loadConfig loads and merges config using file discovery and env vars.
@@ -204,12 +213,12 @@ var timesheetsCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Week: %s to %s\n\n", dateFrom, dateTo)
-		fmt.Printf("%-8s %-12s %-25s %-25s %-30s %s\n", "ID", "Date", "Project", "Task", "Description", "Hours")
-		fmt.Printf("%-8s %-12s %-25s %-25s %-30s %s\n",
-			"--------", "------------", "-------------------------", "-------------------------", "------------------------------", "-----")
+		fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-30s %s\n", "ID", "Date", "ProjID", "Project", "TaskID", "Task", "Description", "Hours")
+		fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-30s %s\n",
+			"--------", "------------", "--------", "-------------------------", "--------", "-------------------------", "------------------------------", "-----")
 		var total float64
 		for _, e := range entries {
-			fmt.Printf("%-8d %-12s %-25s %-25s %-30s %.2f\n", e.ID, e.Date, e.Project, e.Task, e.Name, e.Hours)
+			fmt.Printf("%-8d %-12s %-8d %-25s %-8d %-25s %-30s %.2f\n", e.ID, e.Date, e.ProjectID, e.Project, e.TaskID, e.Task, e.Name, e.Hours)
 			total += e.Hours
 		}
 		fmt.Printf("\nTotal: %.2f hours\n", total)
@@ -297,15 +306,15 @@ var entriesCmd = &cobra.Command{
 			fmt.Printf("Week: %s to %s\n\n", dateFrom, dateTo)
 		}
 
-		fmt.Printf("%-8s %-12s %-25s %-25s %-6s %-10s %s\n",
-			"ID", "Date", "Project", "Task", "Hours", "Status", "Description")
-		fmt.Printf("%-8s %-12s %-25s %-25s %-6s %-10s %s\n",
-			"--------", "------------", "-------------------------", "-------------------------", "------", "----------", "------------------------------")
+		fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
+			"ID", "Date", "ProjID", "Project", "TaskID", "Task", "Hours", "Status", "Description")
+		fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
+			"--------", "------------", "--------", "-------------------------", "--------", "-------------------------", "------", "----------", "------------------------------")
 
 		var total float64
 		for _, e := range entries {
-			fmt.Printf("%-8d %-12s %-25s %-25s %-6s %-10s %s\n",
-				e.ID, e.Date, e.Project, e.Task, tui.FormatHours(e.Hours), e.ValidatedStatus, e.Name)
+			fmt.Printf("%-8d %-12s %-8d %-25s %-8d %-25s %-6s %-10s %s\n",
+				e.ID, e.Date, e.ProjectID, e.Project, e.TaskID, e.Task, tui.FormatHours(e.Hours), e.ValidatedStatus, e.Name)
 			total += e.Hours
 		}
 
@@ -370,6 +379,123 @@ var entriesAddCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Created entry %d\n", id)
+		return nil
+	},
+}
+
+// parseEntryID parses and validates a timesheet entry ID from a string.
+func parseEntryID(s string) (int64, error) {
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid entry ID %q: must be a positive integer", s)
+	}
+	if id <= 0 {
+		return 0, fmt.Errorf("invalid entry ID %q: must be a positive integer", s)
+	}
+	return id, nil
+}
+
+var (
+	updateProjectID   int64
+	updateTaskID      int64
+	updateDate        string
+	updateHours       float64
+	updateDescription string
+)
+
+// buildUpdateFields builds a partial Odoo field map from the flags that were
+// explicitly set on the command. Returns an error if a set flag has an invalid value.
+func buildUpdateFields(cmd *cobra.Command) (map[string]interface{}, error) {
+	fields := make(map[string]interface{})
+	if cmd.Flags().Changed("project-id") {
+		fields["project_id"] = updateProjectID
+	}
+	if cmd.Flags().Changed("task-id") {
+		fields["task_id"] = updateTaskID
+	}
+	if cmd.Flags().Changed("date") {
+		if _, err := time.Parse("2006-01-02", updateDate); err != nil {
+			return nil, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", updateDate)
+		}
+		fields["date"] = updateDate
+	}
+	if cmd.Flags().Changed("hours") {
+		if updateHours <= 0 {
+			return nil, fmt.Errorf("hours must be greater than zero")
+		}
+		fields["unit_amount"] = updateHours
+	}
+	if cmd.Flags().Changed("description") {
+		if updateDescription == "" {
+			return nil, fmt.Errorf("description must not be empty")
+		}
+		fields["name"] = updateDescription
+	}
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("at least one flag is required (--project-id, --task-id, --date, --hours, --description)")
+	}
+	return fields, nil
+}
+
+var entriesUpdateCmd = &cobra.Command{
+	Use:   "update ID",
+	Short: "Update an existing timesheet entry",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := parseEntryID(args[0])
+		if err != nil {
+			return err
+		}
+
+		fields, err := buildUpdateFields(cmd)
+		if err != nil {
+			return err
+		}
+
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		if err := client.UpdateTimesheet(id, fields); err != nil {
+			return err
+		}
+
+		fmt.Printf("Updated entry %d\n", id)
+		return nil
+	},
+}
+
+var entriesDeleteCmd = &cobra.Command{
+	Use:   "delete ID",
+	Short: "Delete a timesheet entry",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := parseEntryID(args[0])
+		if err != nil {
+			return err
+		}
+
+		cfg, err := loadConfig()
+		if err != nil {
+			return err
+		}
+		client, err := newClient(cfg)
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+
+		if err := client.DeleteTimesheet(id); err != nil {
+			return err
+		}
+
+		fmt.Printf("Deleted entry %d\n", id)
 		return nil
 	},
 }
