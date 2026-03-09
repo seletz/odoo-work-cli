@@ -4,6 +4,7 @@ env_file = '.env'
 go = "latest"
 op = "latest"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
+gh = "latest"
 
 [tasks.build]
 description = "Build the CLI binary"
