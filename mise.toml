@@ -8,7 +8,14 @@ gh = "latest"
 
 [tasks.build]
 description = "Build the CLI binary"
-run = "go build -o odoo-work-cli ./cmd/odoo-work-cli"
+run = """
+VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+go build -ldflags "-X github.com/seletz/odoo-work-cli/internal/version.Version=${VERSION}" -o odoo-work-cli ./cmd/odoo-work-cli
+"""
+
+[tasks.release]
+description = "Create a new release (interactive semver bump)"
+run = "scripts/release.sh"
 
 [tasks.test]
 description = "Run all tests"

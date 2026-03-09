@@ -167,3 +167,39 @@ mise run test
 # Lint
 mise run lint
 ```
+
+## Releasing
+
+Releases are managed via `mise run release` and built automatically by GitHub Actions.
+
+### Creating a release
+
+```bash
+mise run release
+```
+
+This will:
+
+1. Show the current version (latest `v*` tag, or `v0.0.0` if none)
+2. Prompt for bump type (patch / minor / major)
+3. Create an annotated git tag
+4. Push the tag to origin
+5. Create a GitHub prerelease with auto-generated notes
+
+### CI build
+
+When a release is created, GitHub Actions automatically:
+
+- Cross-compiles for macOS (amd64, arm64), Linux (amd64, arm64), and Windows (amd64)
+- Packages binaries as `.tar.gz` (Unix) or `.zip` (Windows)
+- Uploads all artifacts to the release
+- Generates a `checksums-<tag>.txt` with SHA-256 hashes
+
+### Version embedding
+
+The build injects the version via `-ldflags`:
+
+```bash
+mise run build
+./odoo-work-cli --version
+```

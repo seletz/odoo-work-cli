@@ -13,6 +13,7 @@ import (
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/tui"
+	"github.com/seletz/odoo-work-cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +26,9 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "odoo-work-cli",
-	Short: "CLI for managing Odoo 17 timesheets",
+	Use:     "odoo-work-cli",
+	Short:   "CLI for managing Odoo 17 timesheets",
+	Version: version.Version,
 }
 
 func init() {
