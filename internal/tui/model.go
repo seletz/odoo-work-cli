@@ -232,6 +232,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.cursor[0] < len(m.grid.Rows) {
 					m.state = stateDetail
 					m.detailCursor = 0
+					m.loading = true
+					return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
 				}
 				return m, nil
 			case key.Matches(msg, m.keys.Up):

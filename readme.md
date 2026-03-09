@@ -29,23 +29,23 @@ mise run lint
 
 ## Commands
 
-| Command                                                  | Description                                                                                |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `whoami`                                                 | Show current Odoo user info (ID, name, login, email, company)                              |
-| `projects`                                               | List Odoo projects (with customer, company, phase, project manager)                        |
-| `tasks [project-id]`                                     | List Odoo tasks, optionally filtered by project ID                                         |
-| `timesheets [--week YYYY-Www]`                           | List timesheets for a week (defaults to current week)                                      |
-| `entries [--week\|--date] [--project\|--task\|--status]` | List individual timesheet entries with full detail (description, hours, validation status) |
-| `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (date defaults to today, task-id optional)                    |
-| `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (only set flags are sent)                               |
-| `entries delete ID`                                      | Delete a timesheet entry by ID                                                             |
-| `clock in`                                               | Clock in (start attendance period)                                                         |
-| `clock out`                                              | Clock out (end attendance period, shows duration)                                          |
-| `clock status`                                           | Show current attendance state and today's periods                                          |
-| `tui`                                                    | Weekly timesheet TUI with detail view, inline editing/adding, and live clock-in/out status  |
-| `fields <model>`                                         | Inspect field metadata for any Odoo model                                                  |
-| `config`                                                 | Show discovered config file paths (merge order)                                            |
-| `config --merged`                                        | Print the fully merged TOML config (password omitted)                                      |
+| Command                                                  | Description                                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `whoami`                                                 | Show current Odoo user info (ID, name, login, email, company)                                                       |
+| `projects`                                               | List Odoo projects (with customer, company, phase, project manager)                                                 |
+| `tasks [project-id]`                                     | List Odoo tasks, optionally filtered by project ID                                                                  |
+| `timesheets [--week YYYY-Www]`                           | List timesheets for a week (defaults to current week)                                                               |
+| `entries [--week\|--date] [--project\|--task\|--status]` | List individual timesheet entries with full detail (description, hours, validation status)                          |
+| `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (date defaults to today, task-id optional)                                             |
+| `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (only set flags are sent)                                                        |
+| `entries delete ID`                                      | Delete a timesheet entry by ID                                                                                      |
+| `clock in`                                               | Clock in (start attendance period)                                                                                  |
+| `clock out`                                              | Clock out (end attendance period, shows duration)                                                                   |
+| `clock status`                                           | Show current attendance state and today's periods                                                                   |
+| `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
+| `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
+| `config`                                                 | Show discovered config file paths (merge order)                                                                     |
+| `config --merged`                                        | Print the fully merged TOML config (password omitted)                                                               |
 
 ## Configuration
 

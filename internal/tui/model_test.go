@@ -23,10 +23,10 @@ type mockClient struct {
 	createParams odoo.TimesheetWriteParams // capture last create call
 }
 
-func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)              { return nil, nil }
-func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error)    { return nil, nil }
-func (c *mockClient) ListTasks(int64) ([]odoo.TaskInfo, error)     { return nil, nil }
-func (c *mockClient) GetFields(string) ([]odoo.FieldInfo, error)   { return nil, nil }
+func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
+func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error)  { return nil, nil }
+func (c *mockClient) ListTasks(int64) ([]odoo.TaskInfo, error)   { return nil, nil }
+func (c *mockClient) GetFields(string) ([]odoo.FieldInfo, error) { return nil, nil }
 func (c *mockClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, error) {
 	return c.entries, c.err
 }
@@ -39,10 +39,10 @@ func (c *mockClient) UpdateTimesheet(id int64, fields map[string]interface{}) er
 	c.updated = fields
 	return c.updateErr
 }
-func (c *mockClient) DeleteTimesheet(int64) error                              { return nil }
-func (c *mockClient) ClockIn() (int64, error)                                  { return 0, nil }
-func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error)                { return nil, nil }
-func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error)        { return nil, nil }
+func (c *mockClient) DeleteTimesheet(int64) error                       { return nil }
+func (c *mockClient) ClockIn() (int64, error)                           { return 0, nil }
+func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error)         { return nil, nil }
+func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) { return nil, nil }
 
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
 	client := &mockClient{entries: entries, err: err}
@@ -611,7 +611,7 @@ func TestGridRow_ProjectTaskIDs(t *testing.T) {
 	row := GridRow{
 		Label: "Acme / Dev",
 		Entries: [7][]odoo.TimesheetEntry{
-			{}, // Mon: empty
+			{},                                   // Mon: empty
 			{{ID: 1, ProjectID: 10, TaskID: 20}}, // Tue: has entry
 			{}, {}, {}, {}, {},
 		},
@@ -787,5 +787,62 @@ func TestModel_AddSubmitValidation(t *testing.T) {
 	}
 	if cmd != nil {
 		t.Fatal("expected no command on validation error")
+	}
+}
+
+func TestModel_EnterDetailTriggersReload(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 8.0},
+	}
+	m := newTestModel(entries, nil)
+
+	// Simulate initial load.
+	updated, _ := m.Update(timesheetsLoadedMsg{entries: entries})
+	um := updated.(Model)
+
+	// Press Enter to go to detail view.
+	updated, cmd := um.Update(tea.KeyPressMsg{Code: '\r'})
+	um = updated.(Model)
+
+	if um.state != stateDetail {
+		t.Fatalf("expected stateDetail, got %v", um.state)
+	}
+	if !um.loading {
+		t.Fatal("expected loading=true when entering detail view")
+	}
+	if cmd == nil {
+		t.Fatal("expected reload command when entering detail view")
+	}
+}
+
+func TestModel_EnterDetailReloadPreservesState(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 8.0},
+	}
+	m := newTestModel(entries, nil)
+
+	// Simulate initial load + enter detail.
+	updated, _ := m.Update(timesheetsLoadedMsg{entries: entries})
+	um := updated.(Model)
+	updated, _ = um.Update(tea.KeyPressMsg{Code: '\r'})
+	um = updated.(Model)
+
+	// Simulate reload completing while in detail view.
+	newEntries := []odoo.TimesheetEntry{
+		{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 4.0},
+		{ID: 2, Date: "2026-03-02", Project: "Acme", Task: "Review", Hours: 2.0},
+	}
+	updated, _ = um.Update(timesheetsLoadedMsg{entries: newEntries})
+	um = updated.(Model)
+
+	if um.state != stateDetail {
+		t.Fatalf("expected stateDetail preserved after reload, got %v", um.state)
+	}
+	if um.loading {
+		t.Fatal("expected loading=false after reload completes")
+	}
+	// Grid should be rebuilt with new data.
+	if len(um.grid.Rows) == 0 {
+		t.Fatal("expected grid rows after reload")
 	}
 }
