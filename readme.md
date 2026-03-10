@@ -19,6 +19,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Company-based color coding for project/task labels via `[company_colors]` config
 - Add, edit and delete time entries
 - Hours input accepts both `H:MM` (e.g. `1:30`) and decimal (e.g. `1.5`) formats
+- Help overlay (`?` key) showing all key bindings grouped by context
 - It's pretty fast
 
 ## Usage

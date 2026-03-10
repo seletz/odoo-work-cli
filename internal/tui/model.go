@@ -25,6 +25,7 @@ const (
 	stateError
 	stateEdit
 	stateSearch
+	stateHelp
 )
 
 type searchSubState int
@@ -103,6 +104,8 @@ type Model struct {
 	editFocus    int             // 0=hours, 1=description
 	editErr      error           // last edit error
 	editIsNew    bool            // true = creating new entry, false = editing existing
+
+	helpPrevState uiState // state to return to when exiting help
 
 	companyColors map[string]string // company name → lipgloss color
 
@@ -272,6 +275,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		// In help state, only Esc/q/? dismiss the overlay.
+		if m.state == stateHelp {
+			switch {
+			case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit), key.Matches(msg, m.keys.Help):
+				m.state = m.helpPrevState
+			}
+			return m, nil
+		}
 		// In search state, forward keys to search handler.
 		if m.state == stateSearch {
 			return m.updateSearch(msg)
@@ -286,7 +297,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case key.Matches(msg, m.keys.Help):
-			m.help.ShowAll = !m.help.ShowAll
+			m.helpPrevState = m.state
+			m.state = stateHelp
 			return m, nil
 
 		case key.Matches(msg, m.keys.Refresh):
@@ -748,7 +760,7 @@ func (m Model) View() tea.View {
 	case stateError:
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
-	case stateGrid, stateDetail, stateEdit, stateSearch:
+	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp:
 		sunday := m.monday.AddDate(0, 0, 6)
 		loadingIndicator := ""
 		if m.loading {
@@ -781,6 +793,9 @@ func (m Model) View() tea.View {
 		} else if m.state == stateSearch {
 			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height, m.companyColors)
 			s = RenderDetailOverlay(s, search, m.width, m.height)
+		} else if m.state == stateHelp {
+			helpContent := renderHelpOverlay(m.keys, m.width, m.height)
+			s = RenderDetailOverlay(s, helpContent, m.width, m.height)
 		}
 	}
 
