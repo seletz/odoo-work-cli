@@ -17,6 +17,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Configurable key bindings via `[keys]` section in config file
 - Company-based color coding for project/task labels via `[company_colors]` config
 - Add, edit and delete time entries
+- Hours input accepts both `H:MM` (e.g. `1:30`) and decimal (e.g. `1.5`) formats
 - It's pretty fast
 
 ## Usage
@@ -40,8 +41,8 @@ Commands:
 | `tasks [project-id]`                                     | List Odoo tasks, optionally filtered by project ID                                                                  |
 | `timesheets [--week YYYY-Www]`                           | List timesheets for a week (defaults to current week)                                                               |
 | `entries [--week\|--date] [--project\|--task\|--status]` | List individual timesheet entries with full detail (description, hours, validation status)                          |
-| `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (date defaults to today, task-id optional)                                             |
-| `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (only set flags are sent)                                                        |
+| `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (hours: `2.5` or `2:30`, date defaults to today, task-id optional)                     |
+| `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (hours: `2.5` or `2:30`, only set flags are sent)                                |
 | `entries delete ID`                                      | Delete a timesheet entry by ID                                                                                      |
 | `clock in`                                               | Clock in (start attendance period)                                                                                  |
 | `clock out`                                              | Clock out (end attendance period, shows duration)                                                                   |
@@ -65,9 +66,9 @@ Examples:
 ./odoo-work-cli entries --week 2026-W10
 ./odoo-work-cli entries --date 2026-03-02
 ./odoo-work-cli entries --project "Acme" --status draft
-./odoo-work-cli entries add --project-id 42 --hours 2.5 --description "Dev work"
+./odoo-work-cli entries add --project-id 42 --hours 2:30 --description "Dev work"
 ./odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-03-09 --hours 1.5 --description "Code review"
-./odoo-work-cli entries update 100 --hours 3.0
+./odoo-work-cli entries update 100 --hours 1:15
 ./odoo-work-cli entries update 100 --description "Updated description" --hours 2.5
 ./odoo-work-cli entries delete 100
 ./odoo-work-cli clock in

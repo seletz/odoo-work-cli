@@ -405,7 +405,7 @@ func (m Model) enterEdit() (tea.Model, tea.Cmd) {
 	m.editHours = textinput.New()
 	m.editHours.SetValue(formatDecimalHours(entry.Hours))
 	m.editHours.SetWidth(10)
-	m.editHours.Placeholder = "0.0"
+	m.editHours.Placeholder = "1.5 or 1:30"
 	cmd := m.editHours.Focus()
 
 	m.editDesc = textinput.New()
@@ -427,7 +427,7 @@ func (m Model) enterAdd() (tea.Model, tea.Cmd) {
 
 	m.editHours = textinput.New()
 	m.editHours.SetWidth(10)
-	m.editHours.Placeholder = "0.0"
+	m.editHours.Placeholder = "1.5 or 1:30"
 	cmd := m.editHours.Focus()
 
 	m.editDesc = textinput.New()
@@ -476,9 +476,9 @@ func (m Model) updateEdit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // submitEdit validates and saves the edit.
 func (m Model) submitEdit() (tea.Model, tea.Cmd) {
-	hours, err := strconv.ParseFloat(strings.TrimSpace(m.editHours.Value()), 64)
-	if err != nil || hours <= 0 {
-		m.editErr = fmt.Errorf("hours must be a positive number")
+	hours, err := ParseHours(m.editHours.Value())
+	if err != nil {
+		m.editErr = err
 		return m, nil
 	}
 	desc := strings.TrimSpace(m.editDesc.Value())
