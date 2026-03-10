@@ -1399,3 +1399,125 @@ func TestModel_DeleteEntryError(t *testing.T) {
 		t.Fatalf("expected stateError on delete failure, got %v", um.state)
 	}
 }
+
+func TestHelpOverlayStateTransitions(t *testing.T) {
+	mon := MondayTime{time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)}
+	client := &mockClient{}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.grid = BuildWeekGrid(nil, mon.Time)
+	m.width = 120
+	m.height = 40
+
+	tests := []struct {
+		name          string
+		startState    uiState
+		key           tea.KeyPressMsg
+		wantState     uiState
+		wantPrevState uiState
+	}{
+		{
+			name:          "? from grid enters help",
+			startState:    stateGrid,
+			key:           tea.KeyPressMsg{Code: '?'},
+			wantState:     stateHelp,
+			wantPrevState: stateGrid,
+		},
+		{
+			name:          "? from detail enters help",
+			startState:    stateDetail,
+			key:           tea.KeyPressMsg{Code: '?'},
+			wantState:     stateHelp,
+			wantPrevState: stateDetail,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m.state = tt.startState
+			updated, _ := m.Update(tt.key)
+			um := updated.(Model)
+			if um.state != tt.wantState {
+				t.Errorf("state = %v, want %v", um.state, tt.wantState)
+			}
+			if um.helpPrevState != tt.wantPrevState {
+				t.Errorf("helpPrevState = %v, want %v", um.helpPrevState, tt.wantPrevState)
+			}
+		})
+	}
+}
+
+func TestHelpOverlayDismiss(t *testing.T) {
+	mon := MondayTime{time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)}
+	client := &mockClient{}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.grid = BuildWeekGrid(nil, mon.Time)
+	m.width = 120
+	m.height = 40
+
+	tests := []struct {
+		name       string
+		prevState  uiState
+		key        tea.KeyPressMsg
+		wantReturn uiState
+	}{
+		{
+			name:       "Esc returns to grid",
+			prevState:  stateGrid,
+			key:        tea.KeyPressMsg{Code: tea.KeyEscape},
+			wantReturn: stateGrid,
+		},
+		{
+			name:       "Esc returns to detail",
+			prevState:  stateDetail,
+			key:        tea.KeyPressMsg{Code: tea.KeyEscape},
+			wantReturn: stateDetail,
+		},
+		{
+			name:       "? toggles back to grid",
+			prevState:  stateGrid,
+			key:        tea.KeyPressMsg{Code: '?'},
+			wantReturn: stateGrid,
+		},
+		{
+			name:       "q returns to previous state",
+			prevState:  stateGrid,
+			key:        tea.KeyPressMsg{Code: 'q'},
+			wantReturn: stateGrid,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m.state = stateHelp
+			m.helpPrevState = tt.prevState
+			updated, _ := m.Update(tt.key)
+			um := updated.(Model)
+			if um.state != tt.wantReturn {
+				t.Errorf("state = %v, want %v", um.state, tt.wantReturn)
+			}
+		})
+	}
+}
+
+func TestHelpOverlayRendered(t *testing.T) {
+	mon := MondayTime{time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC)}
+	client := &mockClient{}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.grid = BuildWeekGrid(nil, mon.Time)
+	m.width = 120
+	m.height = 40
+	m.state = stateHelp
+	m.helpPrevState = stateGrid
+
+	view := m.View()
+	// The help overlay should contain "Key Bindings" header and section headers.
+	if !strings.Contains(view.Content, "Key Bindings") {
+		t.Error("help overlay should contain 'Key Bindings' header")
+	}
+	if !strings.Contains(view.Content, "Navigation") {
+		t.Error("help overlay should contain 'Navigation' section")
+	}
+	if !strings.Contains(view.Content, "Global") {
+		t.Error("help overlay should contain 'Global' section")
+	}
+}

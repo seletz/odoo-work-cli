@@ -470,6 +470,84 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 	return b.String()
 }
 
+// renderHelpOverlay renders a help overlay with key bindings grouped by context.
+func renderHelpOverlay(km KeyMap, width, height int) string {
+	const outerPad = 8
+	innerWidth := width - 2*outerPad - 6
+	if innerWidth < 40 {
+		innerWidth = 40
+	}
+
+	padLine := func(s string) string {
+		runes := []rune(s)
+		if len(runes) < innerWidth {
+			return s + strings.Repeat(" ", innerWidth-len(runes))
+		}
+		return s
+	}
+
+	type binding struct {
+		key  string
+		desc string
+	}
+	type section struct {
+		name     string
+		bindings []binding
+	}
+
+	sections := []section{
+		{"Navigation", []binding{
+			{km.Up.Help().Key, km.Up.Help().Desc},
+			{km.Down.Help().Key, km.Down.Help().Desc},
+			{km.NextCol.Help().Key, km.NextCol.Help().Desc},
+			{km.PrevCol.Help().Key, km.PrevCol.Help().Desc},
+		}},
+		{"Grid View", []binding{
+			{km.Enter.Help().Key, km.Enter.Help().Desc},
+			{km.Search.Help().Key, km.Search.Help().Desc},
+		}},
+		{"Detail View", []binding{
+			{km.Edit.Help().Key, km.Edit.Help().Desc},
+			{km.Add.Help().Key, km.Add.Help().Desc},
+			{km.Delete.Help().Key, km.Delete.Help().Desc},
+		}},
+		{"Search", []binding{
+			{km.SearchToggle.Help().Key, km.SearchToggle.Help().Desc},
+		}},
+		{"Global", []binding{
+			{km.Left.Help().Key, km.Left.Help().Desc},
+			{km.Right.Help().Key, km.Right.Help().Desc},
+			{km.Back.Help().Key, km.Back.Help().Desc},
+			{km.Refresh.Help().Key, km.Refresh.Help().Desc},
+			{km.Help.Help().Key, km.Help.Help().Desc},
+			{km.Quit.Help().Key, km.Quit.Help().Desc},
+		}},
+	}
+
+	var b strings.Builder
+
+	b.WriteString(padLine("  " + detailHeaderStyle.Render("Key Bindings")))
+	b.WriteString("\n")
+
+	for _, sec := range sections {
+		b.WriteString(padLine(""))
+		b.WriteString("\n")
+		b.WriteString(padLine("  " + searchSectionStyle.Render(sec.name)))
+		b.WriteString("\n")
+		for _, bind := range sec.bindings {
+			line := fmt.Sprintf("    %-12s %s", bind.key, bind.desc)
+			b.WriteString(padLine(line))
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString(padLine(""))
+	b.WriteString("\n")
+	b.WriteString(detailHintStyle.Render("  Press Esc or ? to close"))
+
+	return b.String()
+}
+
 // lipglossWidth returns the visual width of the widest line.
 func lipglossWidth(lines []string) int {
 	max := 0
