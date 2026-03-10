@@ -4,8 +4,9 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 
 ## Features
 
-- **CLI:** ClI commands for scripting
+- **CLI:** CLI commands for scripting
 - **TUI:** Terminal UI for fast interactive usage
+- **Config bootstrapping:** `config install` creates a default config file
 
 ### TUI Features
 
@@ -51,6 +52,7 @@ Commands:
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
 | `config --merged`                                        | Print the fully merged TOML config (password omitted)                                                               |
+| `config install`                                         | Create a default config file at the platform config directory                                                       |
 
 Examples:
 
@@ -76,6 +78,7 @@ Examples:
 ./odoo-work-cli clock status
 ./odoo-work-cli config
 ./odoo-work-cli config --merged
+./odoo-work-cli config install
 ```
 
 ## Configuration
@@ -106,10 +109,22 @@ rejected.
 
 ### Config file example
 
+Run `odoo-work-cli config install` to create a default config file with all
+options documented. The generated file looks like:
+
 ```toml
 url = "https://odoo.example.com"
-database = "mydb"
-username = "admin"
+database = "odoo"
+username = "user@example.com"
+bundesland = "Baden-Württemberg"
+
+# NOTE: password/API key must be set via ODOO_PASSWORD env var, not here.
+
+[hours]
+daily_low = 6.0    # below this: yellow
+daily_high = 9.0   # above this: red
+weekly_low = 35.0  # below this: yellow
+weekly_high = 40.0 # above this: red
 
 [company_colors]
 "My Company" = "5"       # purple/magenta
