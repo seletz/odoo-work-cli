@@ -280,7 +280,7 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 		Add("user_id.login", "=", x.login)
 	x.applyCriteriaFilters(criteria, "timesheet")
 
-	fields := []string{"id", "date", "project_id", "task_id", "name", "unit_amount", "employee_id", "validated_status"}
+	fields := []string{"id", "date", "project_id", "task_id", "name", "unit_amount", "employee_id", "validated_status", "company_id"}
 	opts := goOdoo.NewOptions().FetchFields(fields...)
 
 	records, err := x.searchReadRaw("account.analytic.line", criteria, opts)
@@ -299,6 +299,7 @@ func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry
 			TaskID:    extractMany2OneID(r["task_id"]),
 			Task:      extractMany2OneName(r["task_id"]),
 			Employee:  extractMany2OneName(r["employee_id"]),
+			Company:   extractMany2OneName(r["company_id"]),
 		}
 		if id, ok := r["id"].(int64); ok {
 			entry.ID = id

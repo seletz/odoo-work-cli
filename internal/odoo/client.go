@@ -45,6 +45,7 @@ type TimesheetEntry struct {
 	Hours           float64
 	Employee        string
 	ValidatedStatus string
+	Company         string
 }
 
 // TimesheetWriteParams holds parameters for creating or updating a timesheet entry.

@@ -15,6 +15,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Shows attendance state prominently
 - Color coded work hour day and week summaries with configurable limits
 - Configurable key bindings via `[keys]` section in config file
+- Company-based color coding for project/task labels via `[company_colors]` config
 - Add, edit and delete time entries
 - It's pretty fast
 
@@ -109,6 +110,10 @@ url = "https://odoo.example.com"
 database = "mydb"
 username = "admin"
 
+[company_colors]
+"My Company" = "5"       # purple/magenta
+"Partner Corp" = "2"     # green
+
 [models.project]
 extra_fields = [
   { name = "product_owner", field = "x_studio_productowner", type = "many2one" },
@@ -122,6 +127,18 @@ filters = [
   { field = "project_id.name", op = "=", value = "My Project" },
   { field = "stage_id.name", op = "=", value = "In Progress" },
 ]
+```
+
+### Company-based row colors
+
+Project/task labels in the TUI can be colored by company name using the
+`[company_colors]` section. Values are ANSI 256-color codes (as strings).
+Companies not listed use the default terminal color.
+
+```toml
+[company_colors]
+"digitalgedacht GmbH" = "5"    # purple/magenta
+"nexiles GmbH" = "2"           # green
 ```
 
 ### Custom fields per model

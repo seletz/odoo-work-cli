@@ -92,14 +92,15 @@ func DefaultHoursLimits() HoursLimits {
 
 // Config holds the application configuration.
 type Config struct {
-	URL        string                 `toml:"url"`
-	Database   string                 `toml:"database"`
-	Username   string                 `toml:"username"`
-	Password   string                 `toml:"-"`
-	Models     map[string]ModelConfig `toml:"models"`
-	Hours      HoursLimits            `toml:"hours"`
-	Keys       KeysConfig             `toml:"keys"`
-	Bundesland string                 `toml:"bundesland"` // German federal state for holidays (e.g. "Bayern")
+	URL           string                 `toml:"url"`
+	Database      string                 `toml:"database"`
+	Username      string                 `toml:"username"`
+	Password      string                 `toml:"-"`
+	Models        map[string]ModelConfig `toml:"models"`
+	Hours         HoursLimits            `toml:"hours"`
+	Keys          KeysConfig             `toml:"keys"`
+	Bundesland    string                 `toml:"bundesland"`     // German federal state for holidays (e.g. "Bayern")
+	CompanyColors map[string]string      `toml:"company_colors"` // company name → lipgloss color string
 }
 
 func (c *Config) OdooURL() string      { return c.URL }
@@ -216,6 +217,14 @@ func (c *Config) Merge(other *Config) {
 		}
 		for action, keys := range other.Keys {
 			c.Keys[action] = keys
+		}
+	}
+	if other.CompanyColors != nil {
+		if c.CompanyColors == nil {
+			c.CompanyColors = make(map[string]string)
+		}
+		for name, color := range other.CompanyColors {
+			c.CompanyColors[name] = color
 		}
 	}
 	if other.Models != nil {

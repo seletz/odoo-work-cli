@@ -34,6 +34,11 @@ var (
 	searchSectionStyle  = lipgloss.NewStyle().Bold(true).Faint(true)
 )
 
+// companyLabelStyle returns a style with the given lipgloss color as foreground.
+func companyLabelStyle(color string) lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+}
+
 // hoursStyle returns the appropriate style based on daily total hours.
 func hoursStyle(total float64, limits config.HoursLimits) lipgloss.Style {
 	switch {
