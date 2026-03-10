@@ -14,7 +14,7 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 		{Date: "2026-03-03", Project: "Beta", Task: "QA", Hours: 2.5},
 	}
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{})
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
 
 	if !strings.Contains(out, "Acme / Dev") {
 		t.Error("output should contain 'Acme / Dev'")
@@ -32,7 +32,7 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 
 func TestRenderGrid_EmptyGrid(t *testing.T) {
 	g := BuildWeekGrid(nil, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{})
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
 
 	if !strings.Contains(out, "Project / Task") {
 		t.Error("output should contain header")
@@ -58,7 +58,7 @@ func TestRenderDetail_ShowsEntries(t *testing.T) {
 	row.Hours[0] = 3.5
 
 	mon := monday(2026, 3, 2)
-	out := RenderDetail(row, 0, mon, 0, 80)
+	out := RenderDetail(row, 0, mon, 0, 80, nil)
 
 	checks := []struct {
 		substr string
@@ -86,7 +86,7 @@ func TestRenderDetail_ShowsEntries(t *testing.T) {
 func TestRenderDetail_EmptyCell(t *testing.T) {
 	row := GridRow{Label: "Acme / Dev"}
 	mon := monday(2026, 3, 2)
-	out := RenderDetail(row, 0, mon, 0, 80)
+	out := RenderDetail(row, 0, mon, 0, 80, nil)
 
 	if !strings.Contains(out, "No entries") {
 		t.Error("output should indicate no entries")
@@ -107,7 +107,7 @@ func TestRenderDetailOverlay_CentersBox(t *testing.T) {
 	}
 	row.Hours[0] = 1.0
 
-	detail := RenderDetail(row, 0, monday(2026, 3, 2), 0, 60)
+	detail := RenderDetail(row, 0, monday(2026, 3, 2), 0, 60, nil)
 	result := RenderDetailOverlay(bg, detail, 60, 20)
 
 	// The overlay should contain the box border characters.
@@ -130,7 +130,7 @@ func TestRenderGrid_CorrectLineCount(t *testing.T) {
 		{Date: "2026-03-02", Project: "C", Task: "T3", Hours: 3.0},
 	}
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{})
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
 
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	// header + sep + 3 data rows + sep + totals = 7

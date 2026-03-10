@@ -708,6 +708,105 @@ func TestMerge_Keys_NilBase(t *testing.T) {
 	}
 }
 
+func TestLoadFromTOML_CompanyColors(t *testing.T) {
+	content := `
+url = "https://odoo.example.com"
+
+[company_colors]
+"digitalgedacht GmbH" = "5"
+"nexiles GmbH" = "2"
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.CompanyColors == nil {
+		t.Fatal("CompanyColors is nil")
+	}
+	if got := cfg.CompanyColors["digitalgedacht GmbH"]; got != "5" {
+		t.Errorf("CompanyColors[digitalgedacht GmbH] = %q, want %q", got, "5")
+	}
+	if got := cfg.CompanyColors["nexiles GmbH"]; got != "2" {
+		t.Errorf("CompanyColors[nexiles GmbH] = %q, want %q", got, "2")
+	}
+}
+
+func TestLoadFromTOML_NoCompanyColors(t *testing.T) {
+	content := `url = "https://odoo.example.com"`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromTOML(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.CompanyColors != nil {
+		t.Errorf("CompanyColors = %v, want nil when section absent", cfg.CompanyColors)
+	}
+}
+
+func TestMerge_CompanyColors(t *testing.T) {
+	base := &Config{
+		CompanyColors: map[string]string{
+			"Company A": "1",
+			"Company B": "2",
+		},
+	}
+	overlay := &Config{
+		CompanyColors: map[string]string{
+			"Company B": "5",
+			"Company C": "3",
+		},
+	}
+
+	base.Merge(overlay)
+
+	if got := base.CompanyColors["Company A"]; got != "1" {
+		t.Errorf("CompanyColors[Company A] = %q, want %q (base preserved)", got, "1")
+	}
+	if got := base.CompanyColors["Company B"]; got != "5" {
+		t.Errorf("CompanyColors[Company B] = %q, want %q (overlay replaces)", got, "5")
+	}
+	if got := base.CompanyColors["Company C"]; got != "3" {
+		t.Errorf("CompanyColors[Company C] = %q, want %q (overlay adds)", got, "3")
+	}
+}
+
+func TestMerge_CompanyColors_NilOverlay(t *testing.T) {
+	base := &Config{
+		CompanyColors: map[string]string{"Company A": "1"},
+	}
+	overlay := &Config{}
+
+	base.Merge(overlay)
+
+	if got := base.CompanyColors["Company A"]; got != "1" {
+		t.Errorf("CompanyColors[Company A] = %q, want %q (nil overlay preserves base)", got, "1")
+	}
+}
+
+func TestMerge_CompanyColors_NilBase(t *testing.T) {
+	base := &Config{}
+	overlay := &Config{
+		CompanyColors: map[string]string{"Company A": "1"},
+	}
+
+	base.Merge(overlay)
+
+	if got := base.CompanyColors["Company A"]; got != "1" {
+		t.Errorf("CompanyColors[Company A] = %q, want %q", got, "1")
+	}
+}
+
 func TestMerge_FiltersSameFieldOverride(t *testing.T) {
 	base := &Config{
 		Models: map[string]ModelConfig{

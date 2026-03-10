@@ -12,6 +12,7 @@ import (
 // GridRow represents a single project/task row in the weekly grid.
 type GridRow struct {
 	Label         string
+	Company       string                   // company name from first entry
 	Hours         [7]float64               // Mon=0 .. Sun=6
 	Entries       [7][]odoo.TimesheetEntry // individual entries per day
 	HintProjectID int64                    // from previous week, used when row has no entries
@@ -62,7 +63,7 @@ func BuildWeekGrid(entries []odoo.TimesheetEntry, monday time.Time) WeekGrid {
 		if !ok {
 			idx = len(g.Rows)
 			rowIndex[label] = idx
-			g.Rows = append(g.Rows, GridRow{Label: label})
+			g.Rows = append(g.Rows, GridRow{Label: label, Company: e.Company})
 		}
 		g.Rows[idx].Hours[dayOffset] += e.Hours
 		g.Rows[idx].Entries[dayOffset] = append(g.Rows[idx].Entries[dayOffset], e)
@@ -85,6 +86,7 @@ func BuildWeekGrid(entries []odoo.TimesheetEntry, monday time.Time) WeekGrid {
 // HintRow carries label and IDs from a previous week's entries to seed empty rows.
 type HintRow struct {
 	Label     string
+	Company   string
 	ProjectID int64
 	TaskID    int64
 }
@@ -104,6 +106,7 @@ func HintLabelsFromEntries(entries []odoo.TimesheetEntry) []HintRow {
 		seen[label] = true
 		hints = append(hints, HintRow{
 			Label:     label,
+			Company:   e.Company,
 			ProjectID: e.ProjectID,
 			TaskID:    e.TaskID,
 		})
@@ -136,7 +139,7 @@ func BuildWeekGridWithHints(entries []odoo.TimesheetEntry, monday time.Time, hin
 		if !ok {
 			idx = len(g.Rows)
 			rowIndex[label] = idx
-			g.Rows = append(g.Rows, GridRow{Label: label})
+			g.Rows = append(g.Rows, GridRow{Label: label, Company: e.Company})
 		}
 		g.Rows[idx].Hours[dayOffset] += e.Hours
 		g.Rows[idx].Entries[dayOffset] = append(g.Rows[idx].Entries[dayOffset], e)
@@ -151,6 +154,7 @@ func BuildWeekGridWithHints(entries []odoo.TimesheetEntry, monday time.Time, hin
 		rowIndex[h.Label] = idx
 		g.Rows = append(g.Rows, GridRow{
 			Label:         h.Label,
+			Company:       h.Company,
 			HintProjectID: h.ProjectID,
 			HintTaskID:    h.TaskID,
 		})

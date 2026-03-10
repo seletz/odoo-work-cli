@@ -17,7 +17,8 @@ var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
 // RenderGrid renders the weekly grid as a styled string.
 // holidays is a [7]string with holiday names per day (empty = no holiday).
-func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string) string {
+// companyColors maps company name to lipgloss color string for row label coloring.
+func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string) string {
 	minColWidth := 7
 	minLabelWidth := 20
 	maxLabelWidth := 40
@@ -91,7 +92,11 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		if len(label) > labelWidth {
 			label = label[:labelWidth-1] + "…"
 		}
-		line := fmt.Sprintf("%-*s  ", labelWidth, label)
+		styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
+		if color, ok := companyColors[row.Company]; ok {
+			styledLabel = companyLabelStyle(color).Render(styledLabel)
+		}
+		line := styledLabel + "  "
 
 		var rowTotal float64
 		for d := 0; d < 7; d++ {
@@ -140,7 +145,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 // Uses the bubbles table widget for the entries listing. The returned string is the
 // inner content (no border); use RenderDetailOverlay to composite it as a centered
 // overlay box on top of a background. detailCursor highlights the selected entry row.
-func RenderDetail(row GridRow, col int, monday time.Time, detailCursor int, width int) string {
+func RenderDetail(row GridRow, col int, monday time.Time, detailCursor int, width int, companyColors map[string]string) string {
 	// Inner content width is reduced by border (2) + padding (4).
 	innerWidth := width - 8
 	if innerWidth < 40 {
@@ -150,7 +155,11 @@ func RenderDetail(row GridRow, col int, monday time.Time, detailCursor int, widt
 	var b strings.Builder
 
 	day := monday.AddDate(0, 0, col)
-	header := fmt.Sprintf("%s — %s", row.Label, day.Format("Mon 02 Jan 2006"))
+	labelStr := row.Label
+	if color, ok := companyColors[row.Company]; ok {
+		labelStr = companyLabelStyle(color).Render(labelStr)
+	}
+	header := fmt.Sprintf("%s — %s", labelStr, day.Format("Mon 02 Jan 2006"))
 	b.WriteString(detailHeaderStyle.Render(header))
 	b.WriteString("\n")
 
@@ -326,7 +335,7 @@ func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.
 
 // renderSearchOverlay renders the search overlay content with a fixed size
 // derived from terminal dimensions so the overlay does not jump while typing.
-func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, sub searchSubState, useFilter bool, searchErr error, spin spinner.Model, width, height int) string {
+func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, sub searchSubState, useFilter bool, searchErr error, spin spinner.Model, width, height int, companyColors map[string]string) string {
 	// Fixed inner width: full terminal minus outer padding (8 each side),
 	// border (2), and box padding (4).
 	const outerPad = 8
@@ -428,7 +437,13 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 
 			label := fmt.Sprintf("    [%s] %s", strings.ToUpper(item.Kind[:1]), item.Name)
 			if item.Extra != "" {
-				label += " — " + item.Extra
+				extra := item.Extra
+				if item.Kind == "project" {
+					if color, ok := companyColors[extra]; ok {
+						extra = companyLabelStyle(color).Render(extra)
+					}
+				}
+				label += " — " + extra
 			}
 
 			if i == cursor {

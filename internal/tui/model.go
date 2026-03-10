@@ -104,6 +104,8 @@ type Model struct {
 	editErr      error           // last edit error
 	editIsNew    bool            // true = creating new entry, false = editing existing
 
+	companyColors map[string]string // company name → lipgloss color
+
 	searchSub       searchSubState
 	searchInput     textinput.Model
 	searchItems     []searchItem // full combined list
@@ -119,7 +121,7 @@ type MondayTime struct {
 }
 
 // NewModel creates a new TUI model with the given client and starting Monday.
-func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, bundesland string, keys config.KeysConfig) Model {
+func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, bundesland string, keys config.KeysConfig, companyColors map[string]string) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	km := DefaultKeyMap()
@@ -127,15 +129,16 @@ func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, 
 		km = ApplyKeysConfig(km, keys)
 	}
 	return Model{
-		state:      stateLoading,
-		client:     client,
-		monday:     monday,
-		limits:     limits,
-		bundesland: bundesland,
-		holidays:   BuildHolidayMap(monday.Year(), bundesland),
-		spinner:    s,
-		help:       help.New(),
-		keys:       km,
+		state:         stateLoading,
+		client:        client,
+		monday:        monday,
+		limits:        limits,
+		bundesland:    bundesland,
+		holidays:      BuildHolidayMap(monday.Year(), bundesland),
+		companyColors: companyColors,
+		spinner:       s,
+		help:          help.New(),
+		keys:          km,
 	}
 }
 
@@ -762,7 +765,7 @@ func (m Model) View() tea.View {
 			sunday.Format("Mon 02 Jan 2006"),
 			loadingIndicator,
 			clockStatus)
-		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols)
+		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors)
 
 		helpView := m.help.View(m.keys)
 		s = "\n" + title + grid + "\n  " + helpView + "\n"
@@ -773,10 +776,10 @@ func (m Model) View() tea.View {
 			edit := renderEditForm(row, day, m.editHours, m.editDesc, m.editFocus, m.editErr, m.width, m.editIsNew)
 			s = RenderDetailOverlay(s, edit, m.width, m.height)
 		} else if m.state == stateDetail && m.cursor[0] < len(m.grid.Rows) {
-			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.detailCursor, m.width)
+			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.detailCursor, m.width, m.companyColors)
 			s = RenderDetailOverlay(s, detail, m.width, m.height)
 		} else if m.state == stateSearch {
-			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height)
+			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height, m.companyColors)
 			s = RenderDetailOverlay(s, search, m.width, m.height)
 		}
 	}
