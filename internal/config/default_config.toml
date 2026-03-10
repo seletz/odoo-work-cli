@@ -1,0 +1,46 @@
+# odoo-work-cli configuration
+# See: https://github.com/seletz/odoo-work-cli
+
+# Odoo server URL
+url = "https://odoo.example.com"
+
+# Odoo database name
+database = "odoo"
+
+# Odoo username (login email)
+username = "user@example.com"
+
+# NOTE: password/API key must be set via ODOO_PASSWORD env var, not here.
+
+# German federal state for public holiday detection.
+# Valid values: Baden-Württemberg, Bayern, Berlin, Brandenburg, Bremen,
+#   Hamburg, Hessen, Mecklenburg-Vorpommern, Niedersachsen,
+#   Nordrhein-Westfalen, Rheinland-Pfalz, Saarland, Sachsen,
+#   Sachsen-Anhalt, Schleswig-Holstein, Thüringen
+bundesland = "Baden-Württemberg"
+
+# Work-hour thresholds for TUI color coding.
+[hours]
+daily_low = 6.0    # below this: yellow
+daily_high = 9.0   # above this: red
+weekly_low = 35.0  # below this: yellow
+weekly_high = 40.0 # above this: red
+
+# TUI key bindings (action = "key" or action = ["key1", "key2"]).
+# [keys]
+# quit = ["q", "ctrl+c"]
+# help = "?"
+
+# Company-name to color mapping for TUI labels.
+# [company_colors]
+# "My Company" = "#ff8800"
+
+# Per-model extra fields and default filters.
+# [models.timesheet]
+# extra_fields = [
+#   { name = "product_owner", field = "x_studio_productowner", type = "many2one" },
+# ]
+# [[models.timesheet.filters]]
+# field = "company_id.name"
+# op    = "="
+# value = "My Company"
