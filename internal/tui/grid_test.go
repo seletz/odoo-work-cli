@@ -316,6 +316,51 @@ func TestGridRow_ProjectTaskIDs_EntriesOverrideHint(t *testing.T) {
 	}
 }
 
+func TestParseHours(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    float64
+		wantErr bool
+	}{
+		// H:MM format
+		{"2:30", 2.5, false},
+		{"1:00", 1.0, false},
+		{"0:45", 0.75, false},
+		{"8:15", 8.25, false},
+		// decimal format
+		{"2.5", 2.5, false},
+		{"0.75", 0.75, false},
+		{"1", 1.0, false},
+		// error cases
+		{"", 0, true},
+		{"abc", 0, true},
+		{"-1", 0, true},
+		{"-1:30", 0, true},
+		{"2:60", 0, true},
+		{":30", 0, true},
+		{"2:", 0, true},
+		{"0", 0, true},
+		{"0:00", 0, true},
+		{"0.0", 0, true},
+	}
+	for _, tt := range tests {
+		got, err := ParseHours(tt.input)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("ParseHours(%q) = %v, want error", tt.input, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("ParseHours(%q) unexpected error: %v", tt.input, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("ParseHours(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestFormatHours(t *testing.T) {
 	tests := []struct {
 		input float64

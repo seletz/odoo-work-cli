@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/odoo"
@@ -195,6 +197,43 @@ func ParseWeekMonday(week string) (time.Time, error) {
 	}
 	monday1 := jan4.AddDate(0, 0, -int(weekday-1))
 	return monday1.AddDate(0, 0, (isoWeek-1)*7), nil
+}
+
+// ParseHours parses a duration string in either H:MM or decimal format.
+// Returns an error for empty strings, negative values, zero, and invalid formats.
+func ParseHours(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("hours must be a positive number (e.g. 1.5 or 1:30)")
+	}
+
+	var hours float64
+	if strings.Contains(s, ":") {
+		parts := strings.SplitN(s, ":", 2)
+		if parts[0] == "" || parts[1] == "" {
+			return 0, fmt.Errorf("invalid time format %q: expected H:MM", s)
+		}
+		h, err := strconv.Atoi(parts[0])
+		if err != nil || h < 0 {
+			return 0, fmt.Errorf("invalid time format %q: expected H:MM", s)
+		}
+		m, err := strconv.Atoi(parts[1])
+		if err != nil || m < 0 || m > 59 {
+			return 0, fmt.Errorf("invalid time format %q: minutes must be 0-59", s)
+		}
+		hours = float64(h) + float64(m)/60.0
+	} else {
+		var err error
+		hours, err = strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, fmt.Errorf("hours must be a positive number (e.g. 1.5 or 1:30)")
+		}
+	}
+
+	if hours <= 0 {
+		return 0, fmt.Errorf("hours must be greater than zero")
+	}
+	return hours, nil
 }
 
 // FormatHours formats a duration in decimal hours as "H:MM".

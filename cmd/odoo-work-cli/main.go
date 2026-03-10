@@ -61,7 +61,7 @@ func init() {
 	entriesAddCmd.Flags().Int64Var(&addProjectID, "project-id", 0, "Odoo project ID (required)")
 	entriesAddCmd.Flags().Int64Var(&addTaskID, "task-id", 0, "Odoo task ID (optional)")
 	entriesAddCmd.Flags().StringVar(&addDate, "date", "", "entry date YYYY-MM-DD (defaults to today)")
-	entriesAddCmd.Flags().Float64Var(&addHours, "hours", 0, "hours worked (required, > 0)")
+	entriesAddCmd.Flags().StringVar(&addHours, "hours", "", "hours worked (e.g. 2.5 or 2:30)")
 	entriesAddCmd.Flags().StringVar(&addDescription, "description", "", "work description (required)")
 	_ = entriesAddCmd.MarkFlagRequired("hours")
 	_ = entriesAddCmd.MarkFlagRequired("description")
@@ -70,7 +70,7 @@ func init() {
 	entriesUpdateCmd.Flags().Int64Var(&updateProjectID, "project-id", 0, "Odoo project ID")
 	entriesUpdateCmd.Flags().Int64Var(&updateTaskID, "task-id", 0, "Odoo task ID")
 	entriesUpdateCmd.Flags().StringVar(&updateDate, "date", "", "entry date YYYY-MM-DD")
-	entriesUpdateCmd.Flags().Float64Var(&updateHours, "hours", 0, "hours worked (> 0)")
+	entriesUpdateCmd.Flags().StringVar(&updateHours, "hours", "", "hours worked (e.g. 2.5 or 2:30)")
 	entriesUpdateCmd.Flags().StringVar(&updateDescription, "description", "", "work description")
 
 	entriesCmd.AddCommand(entriesDeleteCmd)
@@ -331,14 +331,18 @@ var entriesCmd = &cobra.Command{
 }
 
 // buildTimesheetWriteParams constructs and validates TimesheetWriteParams from CLI flag values.
-// An empty date defaults to today.
-func buildTimesheetWriteParams(projectID, taskID int64, date, description string, hours float64) (odoo.TimesheetWriteParams, error) {
+// An empty date defaults to today. Hours accepts both decimal ("2.5") and H:MM ("2:30") formats.
+func buildTimesheetWriteParams(projectID, taskID int64, date, description, hoursStr string) (odoo.TimesheetWriteParams, error) {
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
 	} else {
 		if _, err := time.Parse("2006-01-02", date); err != nil {
 			return odoo.TimesheetWriteParams{}, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", date)
 		}
+	}
+	hours, err := tui.ParseHours(hoursStr)
+	if err != nil {
+		return odoo.TimesheetWriteParams{}, err
 	}
 	p := odoo.TimesheetWriteParams{
 		ProjectID: projectID,
@@ -357,7 +361,7 @@ var (
 	addProjectID   int64
 	addTaskID      int64
 	addDate        string
-	addHours       float64
+	addHours       string
 	addDescription string
 )
 
@@ -406,7 +410,7 @@ var (
 	updateProjectID   int64
 	updateTaskID      int64
 	updateDate        string
-	updateHours       float64
+	updateHours       string
 	updateDescription string
 )
 
@@ -427,10 +431,11 @@ func buildUpdateFields(cmd *cobra.Command) (map[string]interface{}, error) {
 		fields["date"] = updateDate
 	}
 	if cmd.Flags().Changed("hours") {
-		if updateHours <= 0 {
-			return nil, fmt.Errorf("hours must be greater than zero")
+		h, err := tui.ParseHours(updateHours)
+		if err != nil {
+			return nil, err
 		}
-		fields["unit_amount"] = updateHours
+		fields["unit_amount"] = h
 	}
 	if cmd.Flags().Changed("description") {
 		if updateDescription == "" {

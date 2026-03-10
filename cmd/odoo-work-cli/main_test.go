@@ -120,37 +120,49 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 		taskID      int64
 		date        string
 		description string
-		hours       float64
+		hours       string
+		wantHours   float64
 		wantErr     bool
 		wantMsg     string
 	}{
 		{
-			name:        "valid all fields",
+			name:        "valid all fields decimal",
 			projectID:   42,
 			taskID:      7,
 			date:        "2026-03-09",
 			description: "coding",
-			hours:       2.5,
+			hours:       "2.5",
+			wantHours:   2.5,
+		},
+		{
+			name:        "valid H:MM format",
+			projectID:   42,
+			date:        "2026-03-09",
+			description: "coding",
+			hours:       "2:30",
+			wantHours:   2.5,
 		},
 		{
 			name:        "valid without task",
 			projectID:   42,
 			date:        "2026-03-09",
 			description: "coding",
-			hours:       2.5,
+			hours:       "2.5",
+			wantHours:   2.5,
 		},
 		{
 			name:        "valid with only task ID",
 			taskID:      10,
 			date:        "2026-03-09",
 			description: "coding",
-			hours:       1.0,
+			hours:       "1",
+			wantHours:   1.0,
 		},
 		{
 			name:        "missing both project and task ID",
 			date:        "2026-03-09",
 			description: "coding",
-			hours:       1.0,
+			hours:       "1",
 			wantErr:     true,
 			wantMsg:     "project ID or task ID is required",
 		},
@@ -158,14 +170,15 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 			name:        "empty date defaults to today",
 			projectID:   42,
 			description: "coding",
-			hours:       1.0,
+			hours:       "1",
+			wantHours:   1.0,
 		},
 		{
 			name:        "invalid date format",
 			projectID:   42,
 			date:        "09/03/2026",
 			description: "coding",
-			hours:       1.0,
+			hours:       "1",
 			wantErr:     true,
 			wantMsg:     `invalid date "09/03/2026": expected YYYY-MM-DD`,
 		},
@@ -173,7 +186,7 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 			name:      "missing description",
 			projectID: 42,
 			date:      "2026-03-09",
-			hours:     1.0,
+			hours:     "1",
 			wantErr:   true,
 			wantMsg:   "description is required",
 		},
@@ -182,7 +195,7 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 			projectID:   42,
 			date:        "2026-03-09",
 			description: "coding",
-			hours:       0,
+			hours:       "0",
 			wantErr:     true,
 			wantMsg:     "hours must be greater than zero",
 		},
@@ -191,7 +204,7 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 			projectID:   42,
 			date:        "2026-03-09",
 			description: "coding",
-			hours:       -1.0,
+			hours:       "-1",
 			wantErr:     true,
 			wantMsg:     "hours must be greater than zero",
 		},
@@ -230,8 +243,8 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 			if params.Name != tt.description {
 				t.Errorf("Name = %q, want %q", params.Name, tt.description)
 			}
-			if params.Hours != tt.hours {
-				t.Errorf("Hours = %f, want %f", params.Hours, tt.hours)
+			if params.Hours != tt.wantHours {
+				t.Errorf("Hours = %f, want %f", params.Hours, tt.wantHours)
 			}
 		})
 	}
@@ -263,6 +276,11 @@ func TestBuildUpdateFields(t *testing.T) {
 			name:       "single field project-id",
 			flags:      []string{"--project-id", "42"},
 			wantFields: []string{"project_id"},
+		},
+		{
+			name:       "hours H:MM format",
+			flags:      []string{"--hours", "1:30"},
+			wantFields: []string{"unit_amount"},
 		},
 		{
 			name:       "multiple fields",
@@ -301,12 +319,11 @@ func TestBuildUpdateFields(t *testing.T) {
 			// Create a fresh command with the same flags as entriesUpdateCmd.
 			cmd := &cobra.Command{Use: "test"}
 			var pID, tID int64
-			var date, desc string
-			var hours float64
+			var date, desc, hours string
 			cmd.Flags().Int64Var(&pID, "project-id", 0, "")
 			cmd.Flags().Int64Var(&tID, "task-id", 0, "")
 			cmd.Flags().StringVar(&date, "date", "", "")
-			cmd.Flags().Float64Var(&hours, "hours", 0, "")
+			cmd.Flags().StringVar(&hours, "hours", "", "")
 			cmd.Flags().StringVar(&desc, "description", "", "")
 
 			err := cmd.ParseFlags(tt.flags)
