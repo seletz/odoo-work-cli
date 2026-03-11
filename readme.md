@@ -23,6 +23,26 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Cursor starts on today's column when viewing the current week
 - It's pretty fast
 
+## Installation
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew install seletz/tap/odoo-work-cli
+```
+
+### From GitHub Releases
+
+Download the latest binary from
+[Releases](https://github.com/seletz/odoo-work-cli/releases) and place it on
+your `PATH`.
+
+### From Source
+
+```bash
+go install github.com/seletz/odoo-work-cli/cmd/odoo-work-cli@latest
+```
+
 ## Usage
 
 ### TUI
@@ -241,7 +261,8 @@ mise run lint
 
 ## Releasing
 
-Releases are managed via `mise run release` and built automatically by GitHub Actions.
+Releases are managed via `mise run release` and built by
+[GoReleaser](https://goreleaser.com/) in GitHub Actions.
 
 ### Creating a release
 
@@ -255,16 +276,20 @@ This will:
 2. Prompt for bump type (patch / minor / major)
 3. Create an annotated git tag
 4. Push the tag to origin
-5. Create a GitHub prerelease with auto-generated notes
 
-### CI build
-
-When a release is created, GitHub Actions automatically:
+GoReleaser then automatically:
 
 - Cross-compiles for macOS (amd64, arm64), Linux (amd64, arm64), and Windows (amd64)
 - Packages binaries as `.tar.gz` (Unix) or `.zip` (Windows)
-- Uploads all artifacts to the release
-- Generates a `checksums-<tag>.txt` with SHA-256 hashes
+- Creates a GitHub Release with all artifacts and SHA-256 checksums
+- Updates the [Homebrew tap](https://github.com/seletz/homebrew-tap) so `brew upgrade` picks up the new version
+
+### Local testing
+
+```bash
+mise run goreleaser-check       # validate .goreleaser.yml
+mise run goreleaser-snapshot    # full build without publishing
+```
 
 ### Version embedding
 
