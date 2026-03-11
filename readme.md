@@ -20,6 +20,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Add, edit and delete time entries
 - Hours input accepts both `H:MM` (e.g. `1:30`) and decimal (e.g. `1.5`) formats
 - Help overlay (`?` key) showing all key bindings grouped by context
+- Cursor starts on today's column when viewing the current week
 - It's pretty fast
 
 ## Usage

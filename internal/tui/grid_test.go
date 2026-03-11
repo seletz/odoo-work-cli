@@ -361,6 +361,35 @@ func TestParseHours(t *testing.T) {
 	}
 }
 
+func TestTodayColumn(t *testing.T) {
+	// Monday 2026-03-02
+	mon := monday(2026, 3, 2)
+
+	tests := []struct {
+		name string
+		now  time.Time
+		want int
+	}{
+		{"monday", time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC), 0},
+		{"tuesday", time.Date(2026, 3, 3, 10, 0, 0, 0, time.UTC), 1},
+		{"wednesday", time.Date(2026, 3, 4, 10, 0, 0, 0, time.UTC), 2},
+		{"thursday", time.Date(2026, 3, 5, 10, 0, 0, 0, time.UTC), 3},
+		{"friday", time.Date(2026, 3, 6, 10, 0, 0, 0, time.UTC), 4},
+		{"saturday", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC), 5},
+		{"sunday", time.Date(2026, 3, 8, 10, 0, 0, 0, time.UTC), 6},
+		{"previous week", time.Date(2026, 2, 28, 10, 0, 0, 0, time.UTC), 0},
+		{"next week", time.Date(2026, 3, 9, 10, 0, 0, 0, time.UTC), 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TodayColumn(mon, tt.now)
+			if got != tt.want {
+				t.Errorf("TodayColumn(%v, %v) = %d, want %d", mon, tt.now, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFormatHours(t *testing.T) {
 	tests := []struct {
 		input float64
