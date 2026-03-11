@@ -518,6 +518,7 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 			{km.Left.Help().Key, km.Left.Help().Desc},
 			{km.Right.Help().Key, km.Right.Help().Desc},
 			{km.Back.Help().Key, km.Back.Help().Desc},
+			{km.ClockToggle.Help().Key, km.ClockToggle.Help().Desc},
 			{km.Refresh.Help().Key, km.Refresh.Help().Desc},
 			{km.Help.Help().Key, km.Help.Help().Desc},
 			{km.Quit.Help().Key, km.Quit.Help().Desc},

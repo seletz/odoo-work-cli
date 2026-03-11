@@ -19,6 +19,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Company-based color coding for project/task labels via `[company_colors]` config
 - Add, edit and delete time entries
 - Hours input accepts both `H:MM` (e.g. `1:30`) and decimal (e.g. `1.5`) formats
+- Clock in/out toggle directly from TUI (`c` key)
 - Help overlay (`?` key) showing all key bindings grouped by context
 - Cursor starts on today's column when viewing the current week
 - It's pretty fast
@@ -222,6 +223,7 @@ search_toggle = ["ctrl+a"]
 global_prev_week = ["left", "h"]
 global_next_week = ["right", "l"]
 global_back = ["esc"]
+global_clock_toggle = ["c"]
 global_refresh = ["r"]
 global_help = ["?"]
 global_quit = ["q", "ctrl+c"]
