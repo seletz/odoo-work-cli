@@ -33,6 +33,17 @@ brew tap seletz/tap
 brew install odoo-work-cli
 ```
 
+> [!IMPORTANT]
+> **Upgrading from v0.2.1 or earlier?** The distribution changed from a
+> Homebrew cask to a formula. You need to untap and re-tap to pick up the new
+> format:
+>
+> ```bash
+> brew untap seletz/tap
+> brew tap seletz/tap
+> brew install odoo-work-cli
+> ```
+
 ### From GitHub Releases
 
 Download the latest binary from
