@@ -47,10 +47,8 @@ changelog:
 release:
   prerelease: auto
 
-homebrew_casks:
+brews:
   - name: odoo-work-cli
-    binaries:
-      - odoo-work-cli
     repository:
       owner: seletz
       name: homebrew-tap
@@ -60,7 +58,7 @@ homebrew_casks:
       name: goreleaserbot
       email: bot@goreleaser.com
     commit_msg_template: "Update {{ .ProjectName }} to {{ .Tag }}"
-    directory: Casks
+    directory: Formula
     homepage: "https://github.com/seletz/odoo-work-cli"
     description: "CLI tool for managing Odoo 17 timesheets"
     license: "MIT"

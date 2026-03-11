@@ -284,7 +284,7 @@ GoReleaser then automatically:
 - Cross-compiles for macOS (amd64, arm64), Linux (amd64, arm64), and Windows (amd64)
 - Packages binaries as `.tar.gz` (Unix) or `.zip` (Windows)
 - Creates a GitHub Release with all artifacts and SHA-256 checksums
-- Updates the [Homebrew tap](https://github.com/seletz/homebrew-tap) so `brew upgrade` picks up the new version
+- Updates the [Homebrew tap](https://github.com/seletz/homebrew-tap) formula so `brew upgrade` picks up the new version
 
 ### Local testing
 
