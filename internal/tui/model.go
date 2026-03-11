@@ -75,6 +75,12 @@ type searchDataLoadedMsg struct {
 	err      error
 }
 
+// clockToggleMsg is sent when a clock in or out operation completes.
+type clockToggleMsg struct {
+	status *odoo.AttendanceStatus
+	err    error
+}
+
 // attendanceTickMsg triggers a re-render to update elapsed clock-in time.
 type attendanceTickMsg time.Time
 
@@ -183,6 +189,27 @@ func (m Model) loadAttendance() tea.Cmd {
 	}
 }
 
+// toggleClock clocks in or out depending on the current attendance state.
+func (m Model) toggleClock() tea.Cmd {
+	client := m.client
+	clockedIn := m.attendance != nil && m.attendance.ClockedIn
+	return func() tea.Msg {
+		if clockedIn {
+			_, err := client.ClockOut()
+			if err != nil {
+				return clockToggleMsg{err: err}
+			}
+		} else {
+			_, err := client.ClockIn()
+			if err != nil {
+				return clockToggleMsg{err: err}
+			}
+		}
+		status, err := client.AttendanceStatus()
+		return clockToggleMsg{status: status, err: err}
+	}
+}
+
 func attendanceTick() tea.Cmd {
 	return tea.Tick(time.Minute, func(t time.Time) tea.Msg {
 		return attendanceTickMsg(t)
@@ -221,6 +248,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case attendanceTickMsg:
+		if m.attendance != nil && m.attendance.ClockedIn {
+			return m, attendanceTick()
+		}
+		return m, nil
+
+	case clockToggleMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.attendance = msg.status
 		if m.attendance != nil && m.attendance.ClockedIn {
 			return m, attendanceTick()
 		}
@@ -304,6 +343,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Refresh):
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
+
+		case key.Matches(msg, m.keys.ClockToggle):
+			m.loading = true
+			return m, tea.Batch(m.spinner.Tick, m.toggleClock())
 
 		case key.Matches(msg, m.keys.Back):
 			if m.state == stateDetail {

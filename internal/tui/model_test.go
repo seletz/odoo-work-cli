@@ -16,24 +16,30 @@ import (
 
 // mockClient implements odoo.Client for testing.
 type mockClient struct {
-	entries      []odoo.TimesheetEntry
-	err          error
-	updateErr    error
-	updatedID    int64
-	updated      map[string]interface{} // capture last update call
-	createErr    error
-	createdID    int64
-	createParams odoo.TimesheetWriteParams // capture last create call
-	deleteErr    error
-	deletedID    int64
-	projects     []odoo.ProjectInfo
-	projectsErr  error
-	allProjects  []odoo.ProjectInfo
-	allProjErr   error
-	tasks        []odoo.TaskInfo
-	tasksErr     error
-	allTasks     []odoo.TaskInfo
-	allTasksErr  error
+	entries         []odoo.TimesheetEntry
+	err             error
+	updateErr       error
+	updatedID       int64
+	updated         map[string]interface{} // capture last update call
+	createErr       error
+	createdID       int64
+	createParams    odoo.TimesheetWriteParams // capture last create call
+	deleteErr       error
+	deletedID       int64
+	projects        []odoo.ProjectInfo
+	projectsErr     error
+	allProjects     []odoo.ProjectInfo
+	allProjErr      error
+	tasks           []odoo.TaskInfo
+	tasksErr        error
+	allTasks        []odoo.TaskInfo
+	allTasksErr     error
+	clockInCalled   bool
+	clockInErr      error
+	clockOutCalled  bool
+	clockOutErr     error
+	attendStatus    *odoo.AttendanceStatus
+	attendStatusErr error
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
@@ -72,9 +78,17 @@ func (c *mockClient) DeleteTimesheet(id int64) error {
 	c.deletedID = id
 	return c.deleteErr
 }
-func (c *mockClient) ClockIn() (int64, error)                           { return 0, nil }
-func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error)         { return nil, nil }
-func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) { return nil, nil }
+func (c *mockClient) ClockIn() (int64, error) {
+	c.clockInCalled = true
+	return 1, c.clockInErr
+}
+func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error) {
+	c.clockOutCalled = true
+	return nil, c.clockOutErr
+}
+func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) {
+	return c.attendStatus, c.attendStatusErr
+}
 
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
 	client := &mockClient{entries: entries, err: err}
@@ -1561,5 +1575,177 @@ func TestHelpOverlayRendered(t *testing.T) {
 	}
 	if !strings.Contains(view.Content, "Global") {
 		t.Error("help overlay should contain 'Global' section")
+	}
+}
+
+func TestModel_ClockToggleKeyClockIn(t *testing.T) {
+	// When not clocked in, pressing 'c' should trigger clock in.
+	checkIn := time.Now()
+	client := &mockClient{
+		attendStatus: &odoo.AttendanceStatus{
+			ClockedIn: true,
+			CheckIn:   &checkIn,
+		},
+	}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.state = stateGrid
+	m.attendance = &odoo.AttendanceStatus{ClockedIn: false} // not clocked in
+
+	msg := tea.KeyPressMsg{Code: 'c'}
+	updated, cmd := m.Update(msg)
+	um := updated.(Model)
+
+	if !um.loading {
+		t.Error("expected loading=true after clock toggle key")
+	}
+	if cmd == nil {
+		t.Fatal("expected command after clock toggle key")
+	}
+
+	// Execute the command to verify it calls ClockIn (not ClockOut).
+	// The cmd is a tea.Batch; we can't easily extract sub-cmds in tests,
+	// but we can run toggleClock directly.
+	toggleCmd := m.toggleClock()
+	result := toggleCmd()
+	toggleMsg, ok := result.(clockToggleMsg)
+	if !ok {
+		t.Fatalf("expected clockToggleMsg, got %T", result)
+	}
+	if toggleMsg.err != nil {
+		t.Fatalf("unexpected error: %v", toggleMsg.err)
+	}
+	if !client.clockInCalled {
+		t.Error("expected ClockIn to be called")
+	}
+	if client.clockOutCalled {
+		t.Error("ClockOut should not be called when not clocked in")
+	}
+}
+
+func TestModel_ClockToggleKeyClockOut(t *testing.T) {
+	// When clocked in, pressing 'c' should trigger clock out.
+	client := &mockClient{
+		attendStatus: &odoo.AttendanceStatus{ClockedIn: false},
+	}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.state = stateGrid
+	checkIn := time.Now().Add(-time.Hour)
+	m.attendance = &odoo.AttendanceStatus{ClockedIn: true, CheckIn: &checkIn}
+
+	toggleCmd := m.toggleClock()
+	result := toggleCmd()
+	toggleMsg, ok := result.(clockToggleMsg)
+	if !ok {
+		t.Fatalf("expected clockToggleMsg, got %T", result)
+	}
+	if toggleMsg.err != nil {
+		t.Fatalf("unexpected error: %v", toggleMsg.err)
+	}
+	if !client.clockOutCalled {
+		t.Error("expected ClockOut to be called")
+	}
+	if client.clockInCalled {
+		t.Error("ClockIn should not be called when already clocked in")
+	}
+}
+
+func TestModel_ClockToggleMsgUpdatesClockedIn(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+
+	checkIn := time.Now()
+	msg := clockToggleMsg{
+		status: &odoo.AttendanceStatus{
+			ClockedIn: true,
+			CheckIn:   &checkIn,
+		},
+	}
+	updated, cmd := m.Update(msg)
+	um := updated.(Model)
+
+	if um.attendance == nil {
+		t.Fatal("expected attendance to be set")
+	}
+	if !um.attendance.ClockedIn {
+		t.Error("expected ClockedIn=true")
+	}
+	if um.loading {
+		t.Error("expected loading=false after clockToggleMsg")
+	}
+	// Should start tick when clocked in.
+	if cmd == nil {
+		t.Error("expected tick command when clocked in")
+	}
+}
+
+func TestModel_ClockToggleMsgUpdatesClockedOut(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+	checkIn := time.Now()
+	m.attendance = &odoo.AttendanceStatus{ClockedIn: true, CheckIn: &checkIn}
+
+	msg := clockToggleMsg{
+		status: &odoo.AttendanceStatus{ClockedIn: false},
+	}
+	updated, cmd := m.Update(msg)
+	um := updated.(Model)
+
+	if um.attendance == nil {
+		t.Fatal("expected attendance to be set")
+	}
+	if um.attendance.ClockedIn {
+		t.Error("expected ClockedIn=false")
+	}
+	// Should not start tick when clocked out.
+	if cmd != nil {
+		t.Error("expected no tick command when clocked out")
+	}
+}
+
+func TestModel_ClockToggleMsgError(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+
+	msg := clockToggleMsg{err: errors.New("network error")}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	if um.err == nil {
+		t.Error("expected error to be set")
+	}
+	if um.loading {
+		t.Error("expected loading=false after error")
+	}
+}
+
+func TestModel_ClockToggleNotInEditState(t *testing.T) {
+	// Clock toggle should not work in edit or search states.
+	m := newTestModel(nil, nil)
+	m.state = stateEdit
+
+	msg := tea.KeyPressMsg{Code: 'c'}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	// In edit state, 'c' goes to the text input, not clock toggle.
+	if um.loading {
+		t.Error("clock toggle should not trigger in edit state")
+	}
+}
+
+func TestModel_HelpOverlayShowsClockToggle(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateGrid
+	m.grid = BuildWeekGrid(nil, time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC))
+	m.width = 120
+	m.height = 40
+	m.state = stateHelp
+	m.helpPrevState = stateGrid
+
+	view := m.View()
+	if !strings.Contains(view.Content, "clock in/out") {
+		t.Error("help overlay should contain 'clock in/out' binding")
 	}
 }

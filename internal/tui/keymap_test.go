@@ -106,7 +106,7 @@ func TestApplyKeysConfig_AllActions(t *testing.T) {
 		"detail_edit", "detail_add", "detail_delete",
 		"search_toggle",
 		"global_quit", "global_help", "global_refresh", "global_back",
-		"global_prev_week", "global_next_week",
+		"global_prev_week", "global_next_week", "global_clock_toggle",
 	}
 	for _, action := range allActions {
 		km := DefaultKeyMap()

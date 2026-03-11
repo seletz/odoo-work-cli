@@ -25,6 +25,7 @@ type KeyMap struct {
 	Delete       key.Binding
 	Search       key.Binding
 	SearchToggle key.Binding
+	ClockToggle  key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -94,6 +95,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("ctrl+a"),
 			key.WithHelp("C-a", "toggle filter"),
 		),
+		ClockToggle: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "clock in/out"),
+		),
 	}
 }
 
@@ -105,22 +110,23 @@ func DefaultKeyMap() KeyMap {
 //   - search_  : search view actions
 //   - global_  : actions available in all non-modal views
 var actionHelpDesc = map[string]string{
-	"cursor_up":        "up",
-	"cursor_down":      "down",
-	"grid_next_col":    "next day",
-	"grid_prev_col":    "prev day",
-	"grid_enter":       "detail",
-	"grid_search":      "search",
-	"detail_edit":      "edit",
-	"detail_add":       "add",
-	"detail_delete":    "delete",
-	"search_toggle":    "toggle filter",
-	"global_quit":      "quit",
-	"global_help":      "help",
-	"global_refresh":   "refresh",
-	"global_back":      "back",
-	"global_prev_week": "prev week",
-	"global_next_week": "next week",
+	"cursor_up":           "up",
+	"cursor_down":         "down",
+	"grid_next_col":       "next day",
+	"grid_prev_col":       "prev day",
+	"grid_enter":          "detail",
+	"grid_search":         "search",
+	"detail_edit":         "edit",
+	"detail_add":          "add",
+	"detail_delete":       "delete",
+	"search_toggle":       "toggle filter",
+	"global_quit":         "quit",
+	"global_help":         "help",
+	"global_refresh":      "refresh",
+	"global_back":         "back",
+	"global_prev_week":    "prev week",
+	"global_next_week":    "next week",
+	"global_clock_toggle": "clock in/out",
 }
 
 // ApplyKeysConfig overrides key bindings in km from the given config.
@@ -171,6 +177,8 @@ func ApplyKeysConfig(km KeyMap, cfg config.KeysConfig) KeyMap {
 			km.Left = binding
 		case "global_next_week":
 			km.Right = binding
+		case "global_clock_toggle":
+			km.ClockToggle = binding
 		}
 	}
 	return km
@@ -178,7 +186,7 @@ func ApplyKeysConfig(km KeyMap, cfg config.KeysConfig) KeyMap {
 
 // ShortHelp returns key bindings for the short help view.
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.NextCol, k.Left, k.Right, k.Enter, k.Edit, k.Add, k.Delete, k.Search, k.Refresh, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.NextCol, k.Left, k.Right, k.Enter, k.Edit, k.Add, k.Delete, k.Search, k.ClockToggle, k.Refresh, k.Help, k.Quit}
 }
 
 // FullHelp returns key bindings for the full help view.
@@ -188,6 +196,6 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.NextCol, k.PrevCol},
 		{k.Left, k.Right},
 		{k.Enter, k.Back, k.Edit, k.Add, k.Delete, k.Search},
-		{k.Refresh, k.Help, k.Quit},
+		{k.ClockToggle, k.Refresh, k.Help, k.Quit},
 	}
 }
