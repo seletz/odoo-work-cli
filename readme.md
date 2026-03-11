@@ -122,23 +122,30 @@ Configuration is loaded in layers, with later layers overriding earlier ones:
 
 1. **Global config**: `$XDG_CONFIG_HOME/odoo-work-cli/config.toml` (defaults to `~/.config/odoo-work-cli/config.toml`)
 2. **Directory walk**: `.odoo-work-cli.toml` files from filesystem root down to cwd (root-most first, like `.editorconfig`)
-3. **Environment variables**: `ODOO_URL`, `ODOO_DATABASE`, `ODOO_USERNAME`, `ODOO_PASSWORD` (highest priority)
-4. **`--config` flag**: Skip discovery entirely, load only the specified file + env vars
+3. **`[op_secrets]`**: resolved via 1Password CLI at runtime (see below)
+4. **Environment variables**: `ODOO_URL`, `ODOO_DATABASE`, `ODOO_USERNAME`, `ODOO_PASSWORD` (highest priority)
+5. **`--config` flag**: Skip discovery entirely, load only the specified file + op_secrets + env vars
 
 ### Secrets (via 1Password)
 
-Copy `.env.1p` and fill in your 1Password references:
+Add an `[op_secrets]` section to your config file with `op://` vault references.
+At startup, if the `op` CLI is installed and authenticated, the CLI resolves each
+reference automatically. No manual injection step needed.
 
-```
-ODOO_URL={{ op://your-vault/odoo/url }}
-ODOO_DATABASE={{ op://your-vault/odoo/database }}
-ODOO_USERNAME={{ op://your-vault/odoo/username }}
-ODOO_PASSWORD={{ op://your-vault/odoo/password }}
+```toml
+[op_secrets]
+url      = "op://Employee/odoo/url"
+database = "op://Employee/odoo/database"
+username = "op://Employee/odoo/username"
+password = "op://Employee/odoo/api-key"
 ```
 
-Then run `mise run inject-env` to generate `.env`. Passwords must come from the
-`ODOO_PASSWORD` env var -- config files that contain a `password` field are
-rejected.
+Values without the `op://` prefix are used as-is (useful for non-secret fields
+like database name). If `op` is not installed or the `[op_secrets]` section is
+absent, the CLI falls back to environment variables.
+
+Plain-text passwords in config files are still rejected — passwords must come
+from `[op_secrets]` or the `ODOO_PASSWORD` env var.
 
 ### Config file example
 
@@ -151,7 +158,14 @@ database = "odoo"
 username = "user@example.com"
 bundesland = "Baden-Württemberg"
 
-# NOTE: password/API key must be set via ODOO_PASSWORD env var, not here.
+# NOTE: password/API key must NOT be stored as plain text here.
+# Use [op_secrets] below for 1Password, or set ODOO_PASSWORD env var.
+
+# [op_secrets]
+# url      = "op://vault/item/url"
+# database = "op://vault/item/database"
+# username = "op://vault/item/username"
+# password = "op://vault/item/api-key"
 
 [hours]
 daily_low = 6.0    # below this: yellow
@@ -250,16 +264,13 @@ project-specific filters in subdirectories.
 
 - [Go](https://go.dev/) 1.21+
 - [mise](https://mise.jdx.dev/) for task running and tool management
-- [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) for secrets injection
+- [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) — optional, for `[op_secrets]` resolution
 
 ### Mise Tasks
 
 ```bash
 # Install tools via mise
 mise install
-
-# Inject secrets from 1Password (edit .env.1p with your vault/item references first)
-mise run inject-env
 
 # Build
 mise run build

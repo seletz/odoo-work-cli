@@ -1,5 +1,11 @@
 bundesland = "Baden-Württemberg"
 
+[op_secrets]
+url      = "op://Employee/Digitalgedacht Odoo/url"
+database = "op://Employee/Digitalgedacht Odoo/database-name"
+username = "op://Employee/Digitalgedacht Odoo/login"
+password = "op://Employee/Digitalgedacht Odoo/api-key"
+
 [hours]
 daily_low = 6.0
 daily_high = 9.0
