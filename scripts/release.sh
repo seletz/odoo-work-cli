@@ -54,9 +54,6 @@ git tag -a "$NEXT" -m "Release $NEXT"
 echo "Pushing tag to origin..."
 git push origin "$NEXT"
 
-echo "Creating GitHub prerelease..."
-gh release create "$NEXT" --title "$NEXT" --generate-notes --prerelease
-
 echo ""
-echo "Done! Release $NEXT created as prerelease."
-echo "GitHub Actions will build and attach artifacts."
+echo "Done! Tag $NEXT pushed."
+echo "GoReleaser will build artifacts, create the GitHub release, and update the Homebrew tap."

@@ -1,0 +1,66 @@
+version: 2
+
+project_name: odoo-work-cli
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: odoo-work-cli
+    main: ./cmd/odoo-work-cli
+    binary: odoo-work-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/seletz/odoo-work-cli/internal/version.Version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums-{{ .Tag }}.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  prerelease: auto
+
+homebrew_casks:
+  - name: odoo-work-cli
+    binaries:
+      - odoo-work-cli
+    repository:
+      owner: seletz
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Update {{ .ProjectName }} to {{ .Tag }}"
+    directory: Casks
+    homepage: "https://github.com/seletz/odoo-work-cli"
+    description: "CLI tool for managing Odoo 17 timesheets"
+    license: "MIT"

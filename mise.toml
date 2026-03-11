@@ -5,6 +5,7 @@ go = "latest"
 op = "latest"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
 gh = "latest"
+goreleaser = "latest"
 
 [tasks.build]
 description = "Build the CLI binary"
@@ -32,3 +33,11 @@ run = "gofmt -w ."
 [tasks.inject-env]
 description = "Inject secrets from 1Password into .env"
 run = "op inject -f -i .env.1p -o .env"
+
+[tasks.goreleaser-check]
+description = "Validate GoReleaser config"
+run = "goreleaser check"
+
+[tasks.goreleaser-snapshot]
+description = "Test GoReleaser build locally (no publish)"
+run = "goreleaser release --snapshot --clean"
