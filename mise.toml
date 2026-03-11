@@ -1,5 +1,3 @@
-env_file = '.env'
-
 [tools]
 go = "latest"
 op = "latest"
@@ -29,10 +27,6 @@ run = "golangci-lint run ./..."
 [tasks.fmt]
 description = "Format Go code"
 run = "gofmt -w ."
-
-[tasks.inject-env]
-description = "Inject secrets from 1Password into .env"
-run = "op inject -f -i .env.1p -o .env"
 
 [tasks.goreleaser-check]
 description = "Validate GoReleaser config"

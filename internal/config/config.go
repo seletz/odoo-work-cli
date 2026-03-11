@@ -96,6 +96,7 @@ type Config struct {
 	Database      string                 `toml:"database"`
 	Username      string                 `toml:"username"`
 	Password      string                 `toml:"-"`
+	OPSecrets     *OPSecrets             `toml:"op_secrets"`
 	Models        map[string]ModelConfig `toml:"models"`
 	Hours         HoursLimits            `toml:"hours"`
 	Keys          KeysConfig             `toml:"keys"`
@@ -198,6 +199,23 @@ func (c *Config) Merge(other *Config) {
 	}
 	if other.Bundesland != "" {
 		c.Bundesland = other.Bundesland
+	}
+	if other.OPSecrets != nil {
+		if c.OPSecrets == nil {
+			c.OPSecrets = &OPSecrets{}
+		}
+		if other.OPSecrets.URL != "" {
+			c.OPSecrets.URL = other.OPSecrets.URL
+		}
+		if other.OPSecrets.Database != "" {
+			c.OPSecrets.Database = other.OPSecrets.Database
+		}
+		if other.OPSecrets.Username != "" {
+			c.OPSecrets.Username = other.OPSecrets.Username
+		}
+		if other.OPSecrets.Password != "" {
+			c.OPSecrets.Password = other.OPSecrets.Password
+		}
 	}
 	if other.Hours.DailyLow != 0 {
 		c.Hours.DailyLow = other.Hours.DailyLow

@@ -10,7 +10,16 @@ database = "odoo"
 # Odoo username (login email)
 username = "user@example.com"
 
-# NOTE: password/API key must be set via ODOO_PASSWORD env var, not here.
+# NOTE: password/API key must NOT be stored as plain text here.
+# Use [op_secrets] below for 1Password, or set ODOO_PASSWORD env var.
+
+# 1Password secret references (requires `op` CLI installed and signed in).
+# Values are op:// URIs resolved at runtime via `op read`.
+# [op_secrets]
+# url      = "op://vault/item/url"
+# database = "op://vault/item/database"
+# username = "op://vault/item/username"
+# password = "op://vault/item/api-key"
 
 # German federal state for public holiday detection.
 # Valid values: Baden-Württemberg, Bayern, Berlin, Brandenburg, Bremen,

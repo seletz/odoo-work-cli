@@ -106,6 +106,13 @@ func Discover(configFlag string) (*DiscoverResult, error) {
 		}
 	}
 
+	// Resolve op:// secrets if [op_secrets] is present and op CLI is available.
+	if result.Config.OPSecrets != nil && opAvailable() {
+		if err := resolveOPSecrets(result.Config, defaultOPInjectRunner); err != nil {
+			return nil, fmt.Errorf("resolving 1Password secrets: %w", err)
+		}
+	}
+
 	// Env vars always overlay last (highest priority).
 	envCfg := LoadFromEnv()
 	result.Config.Merge(envCfg)
