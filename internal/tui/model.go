@@ -203,7 +203,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Preserve detail state when reloading after edit save.
 		if m.state != stateDetail {
 			m.state = stateGrid
-			m.cursor = [2]int{0, 0}
+			m.cursor = [2]int{0, TodayColumn(m.monday.Time, time.Now())}
 		}
 		hints := HintLabelsFromEntries(msg.prevEntries)
 		m.grid = BuildWeekGridWithHints(msg.entries, m.monday.Time, hints)

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -99,6 +100,47 @@ func TestModel_LoadedTransitionsToGrid(t *testing.T) {
 	}
 	if len(um.grid.Rows) != 1 {
 		t.Fatalf("expected 1 grid row, got %d", len(um.grid.Rows))
+	}
+}
+
+func TestModel_CursorOnTodayColumn(t *testing.T) {
+	// Use the current week so TodayColumn returns the real day offset.
+	now := time.Now()
+	year, week := now.ISOWeek()
+	mon, _ := ParseWeekMonday(fmt.Sprintf("%d-W%02d", year, week))
+	client := &mockClient{}
+	m := NewModel(client, MondayTime{Time: mon}, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+
+	msg := timesheetsLoadedMsg{
+		entries: []odoo.TimesheetEntry{
+			{Date: mon.Format("2006-01-02"), Project: "Acme", Task: "Dev", Hours: 1.0},
+		},
+	}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	wantCol := TodayColumn(mon, now)
+	if um.cursor[1] != wantCol {
+		t.Fatalf("expected cursor column %d (today), got %d", wantCol, um.cursor[1])
+	}
+}
+
+func TestModel_CursorResetToPastWeek(t *testing.T) {
+	// For a past week, TodayColumn returns 0 (today not in that week).
+	mon := time.Date(2025, 1, 6, 0, 0, 0, 0, time.UTC) // a past Monday
+	client := &mockClient{}
+	m := NewModel(client, MondayTime{Time: mon}, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+
+	msg := timesheetsLoadedMsg{
+		entries: []odoo.TimesheetEntry{
+			{Date: "2025-01-06", Project: "Acme", Task: "Dev", Hours: 1.0},
+		},
+	}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	if um.cursor[1] != 0 {
+		t.Fatalf("expected cursor column 0 for past week, got %d", um.cursor[1])
 	}
 }
 

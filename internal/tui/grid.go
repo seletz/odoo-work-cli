@@ -199,6 +199,20 @@ func ParseWeekMonday(week string) (time.Time, error) {
 	return monday1.AddDate(0, 0, (isoWeek-1)*7), nil
 }
 
+// TodayColumn returns the column index (0=Mon .. 6=Sun) for the given time
+// relative to the week starting at monday. Returns 0 if now falls outside the
+// displayed week.
+func TodayColumn(monday, now time.Time) int {
+	// Truncate to date-only for comparison.
+	monDate := time.Date(monday.Year(), monday.Month(), monday.Day(), 0, 0, 0, 0, monday.Location())
+	nowDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	offset := int(nowDate.Sub(monDate).Hours() / 24)
+	if offset < 0 || offset > 6 {
+		return 0
+	}
+	return offset
+}
+
 // ParseHours parses a duration string in either H:MM or decimal format.
 // Returns an error for empty strings, negative values, zero, and invalid formats.
 func ParseHours(s string) (float64, error) {
