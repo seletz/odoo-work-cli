@@ -29,7 +29,8 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew install seletz/tap/odoo-work-cli
+brew tap seletz/tap
+brew install odoo-work-cli
 ```
 
 ### From GitHub Releases
