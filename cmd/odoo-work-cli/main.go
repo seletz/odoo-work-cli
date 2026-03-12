@@ -6,13 +6,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/BurntSushi/toml"
 	"github.com/seletz/odoo-work-cli/cmd/clock"
+	"github.com/seletz/odoo-work-cli/cmd/entries"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/parsing"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/seletz/odoo-work-cli/internal/version"
 	"github.com/spf13/cobra"
@@ -54,10 +55,10 @@ func main() {
 	rootCmd.AddCommand(whoamiCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(tuiCmd)
-	rootCmd.AddCommand(entriesCmd)
-	rootCmd.AddCommand(clock.ClockCMD(client))
+	rootCmd.AddCommand(entries.CMD(client))
+	rootCmd.AddCommand(clock.Cmd(client))
 
-	if err := rootCmd.Execute(); err != nil {
+	if err = rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -65,32 +66,10 @@ func main() {
 func init() {
 
 	timesheetsCmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
-	entriesCmd.Flags().StringVar(&entriesWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
-	entriesCmd.Flags().StringVar(&entriesDate, "date", "", "specific date (YYYY-MM-DD), overrides --week")
-	entriesCmd.Flags().StringVar(&entriesProject, "project", "", "filter by project name (substring, case-insensitive)")
-	entriesCmd.Flags().StringVar(&entriesTask, "task", "", "filter by task name (substring, case-insensitive)")
-	entriesCmd.Flags().StringVar(&entriesStatus, "status", "", "filter by validation status (e.g. draft, validated)")
+
 	tuiCmd.Flags().StringVar(&tuiWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
 	configCmd.Flags().BoolVar(&configMerged, "merged", false, "print merged TOML config (password redacted)")
 	configCmd.AddCommand(configInstallCmd)
-
-	entriesCmd.AddCommand(entriesAddCmd)
-	entriesAddCmd.Flags().Int64Var(&addProjectID, "project-id", 0, "Odoo project ID (required)")
-	entriesAddCmd.Flags().Int64Var(&addTaskID, "task-id", 0, "Odoo task ID (optional)")
-	entriesAddCmd.Flags().StringVar(&addDate, "date", "", "entry date YYYY-MM-DD (defaults to today)")
-	entriesAddCmd.Flags().StringVar(&addHours, "hours", "", "hours worked (e.g. 2.5 or 2:30)")
-	entriesAddCmd.Flags().StringVar(&addDescription, "description", "", "work description (required)")
-	_ = entriesAddCmd.MarkFlagRequired("hours")
-	_ = entriesAddCmd.MarkFlagRequired("description")
-
-	entriesCmd.AddCommand(entriesUpdateCmd)
-	entriesUpdateCmd.Flags().Int64Var(&updateProjectID, "project-id", 0, "Odoo project ID")
-	entriesUpdateCmd.Flags().Int64Var(&updateTaskID, "task-id", 0, "Odoo task ID")
-	entriesUpdateCmd.Flags().StringVar(&updateDate, "date", "", "entry date YYYY-MM-DD")
-	entriesUpdateCmd.Flags().StringVar(&updateHours, "hours", "", "hours worked (e.g. 2.5 or 2:30)")
-	entriesUpdateCmd.Flags().StringVar(&updateDescription, "description", "", "work description")
-
-	entriesCmd.AddCommand(entriesDeleteCmd)
 }
 
 // loadConfig loads and merges config using file discovery and env vars.
@@ -200,17 +179,6 @@ var tasksCmd = &cobra.Command{
 	},
 }
 
-// weekDateRange returns the Monday and Sunday of the ISO week specified
-// as "2006-W02" format, or the current week if empty.
-func weekDateRange(week string) (string, string, error) {
-	monday, err := tui.ParseWeekMonday(week)
-	if err != nil {
-		return "", "", err
-	}
-	sunday := monday.AddDate(0, 0, 6)
-	return monday.Format("2006-01-02"), sunday.Format("2006-01-02"), nil
-}
-
 var tsWeek string
 
 var timesheetsCmd = &cobra.Command{
@@ -227,7 +195,7 @@ var timesheetsCmd = &cobra.Command{
 		}
 		defer client.Close()
 
-		dateFrom, dateTo, err := weekDateRange(tsWeek)
+		dateFrom, dateTo, err := parsing.WeekDateRange(tsWeek)
 		if err != nil {
 			return err
 		}
@@ -246,285 +214,6 @@ var timesheetsCmd = &cobra.Command{
 			total += e.Hours
 		}
 		fmt.Printf("\nTotal: %.2f hours\n", total)
-		return nil
-	},
-}
-
-// parseDateRange returns a single-day date range for the given YYYY-MM-DD string.
-func parseDateRange(date string) (string, string, error) {
-	d, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return "", "", fmt.Errorf("invalid date %q: expected YYYY-MM-DD", date)
-	}
-	s := d.Format("2006-01-02")
-	return s, s, nil
-}
-
-// filterEntries returns entries matching the project, task, and status filters.
-// Project and task use case-insensitive substring match. Status uses exact match.
-// Empty filter matches all.
-func filterEntries(entries []odoo.TimesheetEntry, project, task, status string) []odoo.TimesheetEntry {
-	if project == "" && task == "" && status == "" {
-		return entries
-	}
-	projectLower := strings.ToLower(project)
-	taskLower := strings.ToLower(task)
-	var result []odoo.TimesheetEntry
-	for _, e := range entries {
-		if project != "" && !strings.Contains(strings.ToLower(e.Project), projectLower) {
-			continue
-		}
-		if task != "" && !strings.Contains(strings.ToLower(e.Task), taskLower) {
-			continue
-		}
-		if status != "" && e.ValidatedStatus != status {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-var (
-	entriesWeek    string
-	entriesDate    string
-	entriesProject string
-	entriesTask    string
-	entriesStatus  string
-)
-
-var entriesCmd = &cobra.Command{
-	Use:   "entries",
-	Short: "List individual timesheet entries with full detail",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := loadConfig()
-		if err != nil {
-			return err
-		}
-		client, err := newClient(cfg)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-
-		var dateFrom, dateTo string
-		if entriesDate != "" {
-			dateFrom, dateTo, err = parseDateRange(entriesDate)
-		} else {
-			dateFrom, dateTo, err = weekDateRange(entriesWeek)
-		}
-		if err != nil {
-			return err
-		}
-
-		entries, err := client.ListTimesheets(dateFrom, dateTo)
-		if err != nil {
-			return err
-		}
-
-		entries = filterEntries(entries, entriesProject, entriesTask, entriesStatus)
-
-		if entriesDate != "" {
-			fmt.Printf("Date: %s\n\n", dateFrom)
-		} else {
-			fmt.Printf("Week: %s to %s\n\n", dateFrom, dateTo)
-		}
-
-		fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
-			"ID", "Date", "ProjID", "Project", "TaskID", "Task", "Hours", "Status", "Description")
-		fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
-			"--------", "------------", "--------", "-------------------------", "--------", "-------------------------", "------", "----------", "------------------------------")
-
-		var total float64
-		for _, e := range entries {
-			fmt.Printf("%-8d %-12s %-8d %-25s %-8d %-25s %-6s %-10s %s\n",
-				e.ID, e.Date, e.ProjectID, e.Project, e.TaskID, e.Task, tui.FormatHours(e.Hours), e.ValidatedStatus, e.Name)
-			total += e.Hours
-		}
-
-		fmt.Printf("\nTotal: %s (%d entries)\n", tui.FormatHours(total), len(entries))
-		return nil
-	},
-}
-
-// buildTimesheetWriteParams constructs and validates TimesheetWriteParams from CLI flag values.
-// An empty date defaults to today. Hours accepts both decimal ("2.5") and H:MM ("2:30") formats.
-func buildTimesheetWriteParams(projectID, taskID int64, date, description, hoursStr string) (odoo.TimesheetWriteParams, error) {
-	if date == "" {
-		date = time.Now().Format("2006-01-02")
-	} else {
-		if _, err := time.Parse("2006-01-02", date); err != nil {
-			return odoo.TimesheetWriteParams{}, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", date)
-		}
-	}
-	hours, err := tui.ParseHours(hoursStr)
-	if err != nil {
-		return odoo.TimesheetWriteParams{}, err
-	}
-	p := odoo.TimesheetWriteParams{
-		ProjectID: projectID,
-		TaskID:    taskID,
-		Date:      date,
-		Name:      description,
-		Hours:     hours,
-	}
-	if err := odoo.ValidateTimesheetParams(p); err != nil {
-		return odoo.TimesheetWriteParams{}, err
-	}
-	return p, nil
-}
-
-var (
-	addProjectID   int64
-	addTaskID      int64
-	addDate        string
-	addHours       string
-	addDescription string
-)
-
-var entriesAddCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Create a new timesheet entry",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		params, err := buildTimesheetWriteParams(addProjectID, addTaskID, addDate, addDescription, addHours)
-		if err != nil {
-			return err
-		}
-
-		cfg, err := loadConfig()
-		if err != nil {
-			return err
-		}
-		client, err := newClient(cfg)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-
-		id, err := client.CreateTimesheet(params)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Created entry %d\n", id)
-		return nil
-	},
-}
-
-// parseEntryID parses and validates a timesheet entry ID from a string.
-func parseEntryID(s string) (int64, error) {
-	id, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid entry ID %q: must be a positive integer", s)
-	}
-	if id <= 0 {
-		return 0, fmt.Errorf("invalid entry ID %q: must be a positive integer", s)
-	}
-	return id, nil
-}
-
-var (
-	updateProjectID   int64
-	updateTaskID      int64
-	updateDate        string
-	updateHours       string
-	updateDescription string
-)
-
-// buildUpdateFields builds a partial Odoo field map from the flags that were
-// explicitly set on the command. Returns an error if a set flag has an invalid value.
-func buildUpdateFields(cmd *cobra.Command) (map[string]interface{}, error) {
-	fields := make(map[string]interface{})
-	if cmd.Flags().Changed("project-id") {
-		fields["project_id"] = updateProjectID
-	}
-	if cmd.Flags().Changed("task-id") {
-		fields["task_id"] = updateTaskID
-	}
-	if cmd.Flags().Changed("date") {
-		if _, err := time.Parse("2006-01-02", updateDate); err != nil {
-			return nil, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", updateDate)
-		}
-		fields["date"] = updateDate
-	}
-	if cmd.Flags().Changed("hours") {
-		h, err := tui.ParseHours(updateHours)
-		if err != nil {
-			return nil, err
-		}
-		fields["unit_amount"] = h
-	}
-	if cmd.Flags().Changed("description") {
-		if updateDescription == "" {
-			return nil, fmt.Errorf("description must not be empty")
-		}
-		fields["name"] = updateDescription
-	}
-	if len(fields) == 0 {
-		return nil, fmt.Errorf("at least one flag is required (--project-id, --task-id, --date, --hours, --description)")
-	}
-	return fields, nil
-}
-
-var entriesUpdateCmd = &cobra.Command{
-	Use:   "update ID",
-	Short: "Update an existing timesheet entry",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := parseEntryID(args[0])
-		if err != nil {
-			return err
-		}
-
-		fields, err := buildUpdateFields(cmd)
-		if err != nil {
-			return err
-		}
-
-		cfg, err := loadConfig()
-		if err != nil {
-			return err
-		}
-		client, err := newClient(cfg)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-
-		if err := client.UpdateTimesheet(id, fields); err != nil {
-			return err
-		}
-
-		fmt.Printf("Updated entry %d\n", id)
-		return nil
-	},
-}
-
-var entriesDeleteCmd = &cobra.Command{
-	Use:   "delete ID",
-	Short: "Delete a timesheet entry",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := parseEntryID(args[0])
-		if err != nil {
-			return err
-		}
-
-		cfg, err := loadConfig()
-		if err != nil {
-			return err
-		}
-		client, err := newClient(cfg)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-
-		if err := client.DeleteTimesheet(id); err != nil {
-			return err
-		}
-
-		fmt.Printf("Deleted entry %d\n", id)
 		return nil
 	},
 }

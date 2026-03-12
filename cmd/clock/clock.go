@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func ClockCMD(client *odoo.XMLRPCClient) *cobra.Command {
+func Cmd(client *odoo.XMLRPCClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clock",
 		Short: "Clock in/out and attendance status",
