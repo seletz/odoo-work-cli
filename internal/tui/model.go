@@ -115,6 +115,8 @@ type Model struct {
 
 	companyColors map[string]string // company name → lipgloss color
 
+	pendingRows []GridRow // rows added via search that have no server entries yet
+
 	searchSub       searchSubState
 	searchInput     textinput.Model
 	searchItems     []searchItem // full combined list
@@ -236,6 +238,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.grid = BuildWeekGridWithHints(msg.entries, m.monday.Time, hints)
 		m.holidays = BuildHolidayMap(m.monday.Year(), m.bundesland)
 		m.weekHols = WeekHolidays(m.monday.Time, m.holidays)
+
+		// Re-inject pending rows from search that have no server entries yet,
+		// and prune those that now appear in the grid naturally.
+		gridLabels := make(map[string]bool, len(m.grid.Rows))
+		for _, row := range m.grid.Rows {
+			gridLabels[row.Label] = true
+		}
+		var remaining []GridRow
+		for _, pr := range m.pendingRows {
+			if gridLabels[pr.Label] {
+				continue // server now has entries for this row
+			}
+			m.grid.Rows = append(m.grid.Rows, pr)
+			remaining = append(remaining, pr)
+		}
+		m.pendingRows = remaining
+		if len(remaining) > 0 {
+			sort.Slice(m.grid.Rows, func(i, j int) bool {
+				return m.grid.Rows[i].Label < m.grid.Rows[j].Label
+			})
+		}
+
 		return m, nil
 
 	case attendanceLoadedMsg:
@@ -580,11 +604,31 @@ func (m Model) submitEdit() (tea.Model, tea.Cmd) {
 }
 
 // deleteEntry deletes the currently selected entry in the detail view.
+// If deleting the last entry for a row, the row is preserved as a pending row.
 func (m Model) deleteEntry() (tea.Model, tea.Cmd) {
 	entries := m.detailEntries()
 	if m.detailCursor >= len(entries) {
 		return m, nil
 	}
+
+	// Check if this is the last entry across all days for the current row.
+	if m.cursor[0] < len(m.grid.Rows) {
+		row := m.grid.Rows[m.cursor[0]]
+		totalEntries := 0
+		for d := 0; d < 7; d++ {
+			totalEntries += len(row.Entries[d])
+		}
+		if totalEntries <= 1 {
+			projectID, taskID := row.ProjectTaskIDs()
+			m.pendingRows = append(m.pendingRows, GridRow{
+				Label:         row.Label,
+				Company:       row.Company,
+				HintProjectID: projectID,
+				HintTaskID:    taskID,
+			})
+		}
+	}
+
 	client := m.client
 	id := entries[m.detailCursor].ID
 	return m, func() tea.Msg {
@@ -763,13 +807,14 @@ func (m Model) selectSearchItem(item searchItem) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Add new row.
+	// Add new row and track as pending so it survives reloads.
 	newRow := GridRow{
 		Label:         label,
 		HintProjectID: item.ProjectID,
 		HintTaskID:    item.TaskID,
 	}
 	m.grid.Rows = append(m.grid.Rows, newRow)
+	m.pendingRows = append(m.pendingRows, newRow)
 
 	// Re-sort and find the new row's index.
 	sort.Slice(m.grid.Rows, func(i, j int) bool {
