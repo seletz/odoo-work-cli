@@ -151,3 +151,25 @@ func TestRenderGrid_CorrectLineCount(t *testing.T) {
 		t.Errorf("expected 7 lines, got %d", len(lines))
 	}
 }
+
+func TestRenderGrid_WrapsLongLabels(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Infrastruktur und Betrieb", Task: "Infrastructure Management", Company: "Digital", Hours: 8.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := RenderGrid(g, 0, 0, 90, config.DefaultHoursLimits(), [7]string{}, nil)
+
+	if strings.Contains(out, "…") {
+		t.Fatal("output should wrap long labels instead of truncating with ellipsis")
+	}
+	if !strings.Contains(out, "[DIG] Infrastruktur") {
+		t.Fatal("output should contain first wrapped label line")
+	}
+	if !strings.Contains(out, "Betrieb /") {
+		t.Fatal("output should contain continuation line for wrapped label")
+	}
+	if !strings.Contains(out, "8:00") {
+		t.Fatal("output should still contain hours for wrapped row")
+	}
+}

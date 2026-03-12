@@ -203,37 +203,50 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 
 	// Data rows.
 	for ri, row := range grid.Rows {
-		label := row.Label
-		if len(label) > labelWidth {
-			label = label[:labelWidth-1] + "…"
-		}
-		styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
-		if color, ok := companyColors[row.Company]; ok {
-			styledLabel = companyLabelStyle(color).Render(styledLabel)
-		}
-		line := styledLabel + "  "
-
+		labelLines := wrapLabel(row.Label, labelWidth)
+		var rowLines []string
 		var rowTotal float64
 		for d := 0; d < 7; d++ {
 			rowTotal += row.Hours[d]
-			cell := fmt.Sprintf("%*s", colWidth-1, FormatHours(row.Hours[d]))
-			switch {
-			case ri == cursorRow && d == cursorCol:
-				cell = cursorStyle.Render(cell)
-			case isHoliday(d):
-				cell = holidayStyle.Render(cell)
-			case d >= 5:
-				cell = weekendStyle.Render(cell)
-			case row.Hours[d] > 0:
-				cell = hoursBgStyle(grid.DayTotals[d], limits).Render(cell)
-			case d == todayCol:
-				cell = todayCellStyle.Render(cell)
-			}
-			line += gridSepStyle.Render(boxV) + cell
 		}
-		totalCell := fmt.Sprintf("%*s", colWidth-1, FormatHours(rowTotal))
-		line += gridSepStyle.Render(boxV) + totalsStyle.Render(totalCell)
-		b.WriteString(line)
+
+		for li, label := range labelLines {
+			styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
+			if color, ok := companyColors[row.Company]; ok {
+				styledLabel = companyLabelStyle(color).Render(styledLabel)
+			}
+			line := styledLabel + "  "
+
+			for d := 0; d < 7; d++ {
+				cell := fmt.Sprintf("%*s", colWidth-1, "")
+				if li == 0 {
+					cell = fmt.Sprintf("%*s", colWidth-1, FormatHours(row.Hours[d]))
+					switch {
+					case ri == cursorRow && d == cursorCol:
+						cell = cursorStyle.Render(cell)
+					case isHoliday(d):
+						cell = holidayStyle.Render(cell)
+					case d >= 5:
+						cell = weekendStyle.Render(cell)
+					case row.Hours[d] > 0:
+						cell = hoursBgStyle(grid.DayTotals[d], limits).Render(cell)
+					case d == todayCol:
+						cell = todayCellStyle.Render(cell)
+					}
+				}
+				line += gridSepStyle.Render(boxV) + cell
+			}
+
+			totalCell := fmt.Sprintf("%*s", colWidth-1, "")
+			if li == 0 {
+				totalCell = fmt.Sprintf("%*s", colWidth-1, FormatHours(rowTotal))
+				totalCell = totalsStyle.Render(totalCell)
+			}
+			line += gridSepStyle.Render(boxV) + totalCell
+			rowLines = append(rowLines, line)
+		}
+
+		b.WriteString(strings.Join(rowLines, "\n"))
 		b.WriteString("\n")
 	}
 
@@ -259,6 +272,66 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	b.WriteString("\n")
 
 	return b.String()
+}
+
+func wrapLabel(label string, width int) []string {
+	if width <= 0 {
+		return []string{label}
+	}
+	if runeLen(label) <= width {
+		return []string{label}
+	}
+
+	words := strings.Fields(label)
+	if len(words) == 0 {
+		return []string{""}
+	}
+
+	lines := make([]string, 0, 2)
+	current := ""
+	for _, word := range words {
+		if runeLen(word) > width {
+			if current != "" {
+				lines = append(lines, current)
+				current = ""
+			}
+			lines = append(lines, breakLongWord(word, width)...)
+			continue
+		}
+
+		next := word
+		if current != "" {
+			next = current + " " + word
+		}
+		if runeLen(next) <= width {
+			current = next
+			continue
+		}
+
+		lines = append(lines, current)
+		current = word
+	}
+	if current != "" {
+		lines = append(lines, current)
+	}
+	return lines
+}
+
+func breakLongWord(word string, width int) []string {
+	runes := []rune(word)
+	lines := make([]string, 0, (len(runes)+width-1)/width)
+	for len(runes) > width {
+		lines = append(lines, string(runes[:width]))
+		runes = runes[width:]
+	}
+	if len(runes) > 0 {
+		lines = append(lines, string(runes))
+	}
+	return lines
+}
+
+func runeLen(s string) int {
+	return len([]rune(s))
 }
 
 // RenderDetail renders a detail panel for a specific cell showing individual entries.
