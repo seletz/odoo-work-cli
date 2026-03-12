@@ -1,117 +1,12 @@
-package main
+package entries
 
 import (
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/spf13/cobra"
 )
-
-func TestWeekDateRange(t *testing.T) {
-	tests := []struct {
-		name     string
-		week     string
-		wantFrom string
-		wantTo   string
-		wantErr  bool
-	}{
-		{
-			name:     "2026-W10",
-			week:     "2026-W10",
-			wantFrom: "2026-03-02",
-			wantTo:   "2026-03-08",
-		},
-		{
-			name:     "2026-W01",
-			week:     "2026-W01",
-			wantFrom: "2025-12-29",
-			wantTo:   "2026-01-04",
-		},
-		{
-			name:     "2025-W52",
-			week:     "2025-W52",
-			wantFrom: "2025-12-22",
-			wantTo:   "2025-12-28",
-		},
-		{
-			name:    "invalid format",
-			week:    "not-a-week",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			from, to, err := weekDateRange(tt.week)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if from != tt.wantFrom {
-				t.Errorf("from = %q, want %q", from, tt.wantFrom)
-			}
-			if to != tt.wantTo {
-				t.Errorf("to = %q, want %q", to, tt.wantTo)
-			}
-		})
-	}
-}
-
-func TestParseDateRange(t *testing.T) {
-	tests := []struct {
-		name     string
-		date     string
-		wantFrom string
-		wantTo   string
-		wantErr  bool
-	}{
-		{
-			name:     "valid date",
-			date:     "2026-03-05",
-			wantFrom: "2026-03-05",
-			wantTo:   "2026-03-05",
-		},
-		{
-			name:    "invalid date",
-			date:    "not-a-date",
-			wantErr: true,
-		},
-		{
-			name:    "wrong format",
-			date:    "05/03/2026",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			from, to, err := parseDateRange(tt.date)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if from != tt.wantFrom {
-				t.Errorf("from = %q, want %q", from, tt.wantFrom)
-			}
-			if to != tt.wantTo {
-				t.Errorf("to = %q, want %q", to, tt.wantTo)
-			}
-		})
-	}
-}
 
 func TestBuildTimesheetWriteParams(t *testing.T) {
 	tests := []struct {
@@ -252,96 +147,119 @@ func TestBuildTimesheetWriteParams(t *testing.T) {
 
 func TestBuildUpdateFields(t *testing.T) {
 	tests := []struct {
-		name       string
-		flags      []string
-		wantFields []string
-		wantErr    bool
+		name          string
+		flags         []string
+		ops           subOps
+		wantFields    []string
+		wantValues    map[string]interface{}
+		wantErr       bool
+		wantErrSubstr string
 	}{
 		{
 			name:       "single field hours",
 			flags:      []string{"--hours", "2.5"},
+			ops:        subOps{hours: "2.5"},
 			wantFields: []string{"unit_amount"},
+			wantValues: map[string]interface{}{"unit_amount": 2.5},
 		},
 		{
 			name:       "single field description",
 			flags:      []string{"--description", "new desc"},
+			ops:        subOps{description: "new desc"},
 			wantFields: []string{"name"},
+			wantValues: map[string]interface{}{"name": "new desc"},
 		},
 		{
 			name:       "single field date",
 			flags:      []string{"--date", "2026-03-09"},
+			ops:        subOps{date: "2026-03-09"},
 			wantFields: []string{"date"},
+			wantValues: map[string]interface{}{"date": "2026-03-09"},
 		},
 		{
 			name:       "single field project-id",
 			flags:      []string{"--project-id", "42"},
+			ops:        subOps{projectID: 42},
 			wantFields: []string{"project_id"},
+			wantValues: map[string]interface{}{"project_id": int64(42)},
+		},
+		{
+			name:       "single field task-id",
+			flags:      []string{"--task-id", "7"},
+			ops:        subOps{taskID: 7},
+			wantFields: []string{"task_id"},
+			wantValues: map[string]interface{}{"task_id": int64(7)},
 		},
 		{
 			name:       "hours H:MM format",
 			flags:      []string{"--hours", "1:30"},
+			ops:        subOps{hours: "1:30"},
 			wantFields: []string{"unit_amount"},
+			wantValues: map[string]interface{}{"unit_amount": 1.5},
 		},
 		{
 			name:       "multiple fields",
 			flags:      []string{"--hours", "3.0", "--description", "updated"},
+			ops:        subOps{hours: "3.0", description: "updated"},
 			wantFields: []string{"unit_amount", "name"},
+			wantValues: map[string]interface{}{"unit_amount": 3.0, "name": "updated"},
 		},
 		{
-			name:    "no flags errors",
-			flags:   []string{},
-			wantErr: true,
+			name:          "no flags errors",
+			flags:         []string{},
+			wantErr:       true,
+			wantErrSubstr: "at least one flag is required",
 		},
 		{
-			name:    "invalid date",
-			flags:   []string{"--date", "not-a-date"},
-			wantErr: true,
+			name:          "invalid date",
+			flags:         []string{"--date", "not-a-date"},
+			ops:           subOps{date: "not-a-date"},
+			wantErr:       true,
+			wantErrSubstr: `invalid date "not-a-date": expected YYYY-MM-DD`,
 		},
 		{
-			name:    "zero hours",
-			flags:   []string{"--hours", "0"},
-			wantErr: true,
+			name:          "zero hours",
+			flags:         []string{"--hours", "0"},
+			ops:           subOps{hours: "0"},
+			wantErr:       true,
+			wantErrSubstr: "hours must be greater than zero",
 		},
 		{
-			name:    "negative hours",
-			flags:   []string{"--hours", "-1"},
-			wantErr: true,
+			name:          "negative hours",
+			flags:         []string{"--hours", "-1"},
+			ops:           subOps{hours: "-1"},
+			wantErr:       true,
+			wantErrSubstr: "hours must be greater than zero",
 		},
 		{
-			name:    "empty description",
-			flags:   []string{"--description", ""},
-			wantErr: true,
+			name:          "empty description",
+			flags:         []string{"--description", ""},
+			ops:           subOps{description: ""},
+			wantErr:       true,
+			wantErrSubstr: "description must not be empty",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a fresh command with the same flags as entriesUpdateCmd.
 			cmd := &cobra.Command{Use: "test"}
-			var pID, tID int64
-			var date, desc, hours string
-			cmd.Flags().Int64Var(&pID, "project-id", 0, "")
-			cmd.Flags().Int64Var(&tID, "task-id", 0, "")
-			cmd.Flags().StringVar(&date, "date", "", "")
-			cmd.Flags().StringVar(&hours, "hours", "", "")
-			cmd.Flags().StringVar(&desc, "description", "", "")
+			cmd.Flags().Int64("project-id", 0, "")
+			cmd.Flags().Int64("task-id", 0, "")
+			cmd.Flags().String("date", "", "")
+			cmd.Flags().String("hours", "", "")
+			cmd.Flags().String("description", "", "")
 
-			err := cmd.ParseFlags(tt.flags)
-			if err != nil {
+			if err := cmd.ParseFlags(tt.flags); err != nil {
 				t.Fatalf("parsing flags: %v", err)
 			}
 
-			// Point the package-level vars at the parsed values.
-			updateProjectID = pID
-			updateTaskID = tID
-			updateDate = date
-			updateHours = hours
-			updateDescription = desc
-
-			fields, err := buildUpdateFields(cmd)
+			fields, err := buildUpdateFields(cmd, &tt.ops)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
+				}
+				if tt.wantErrSubstr != "" && !strings.Contains(err.Error(), tt.wantErrSubstr) {
+					t.Errorf("error = %q, want substring %q", err.Error(), tt.wantErrSubstr)
 				}
 				return
 			}
@@ -352,8 +270,13 @@ func TestBuildUpdateFields(t *testing.T) {
 				t.Fatalf("got %d fields, want %d", len(fields), len(tt.wantFields))
 			}
 			for _, key := range tt.wantFields {
-				if _, ok := fields[key]; !ok {
+				got, ok := fields[key]
+				if !ok {
 					t.Errorf("missing expected field %q", key)
+					continue
+				}
+				if want, ok := tt.wantValues[key]; ok && got != want {
+					t.Errorf("field %q = %#v, want %#v", key, got, want)
 				}
 			}
 		})
@@ -388,78 +311,6 @@ func TestParseEntryID(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("parseEntryID(%q) = %d, want %d", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFilterEntries(t *testing.T) {
-	entries := []odoo.TimesheetEntry{
-		{ID: 1, Date: "2026-03-02", Project: "Acme Corp", Task: "Backend Dev", Name: "Auth endpoint", Hours: 2.0, ValidatedStatus: "draft"},
-		{ID: 2, Date: "2026-03-02", Project: "Acme Corp", Task: "QA Testing", Name: "Review PR", Hours: 1.5, ValidatedStatus: "validated"},
-		{ID: 3, Date: "2026-03-03", Project: "Beta Project", Task: "Frontend Dev", Name: "Dashboard", Hours: 4.0, ValidatedStatus: "draft"},
-	}
-
-	tests := []struct {
-		name    string
-		project string
-		task    string
-		status  string
-		wantIDs []int64
-	}{
-		{
-			name:    "no filter",
-			wantIDs: []int64{1, 2, 3},
-		},
-		{
-			name:    "filter by project",
-			project: "acme",
-			wantIDs: []int64{1, 2},
-		},
-		{
-			name:    "filter by task",
-			task:    "dev",
-			wantIDs: []int64{1, 3},
-		},
-		{
-			name:    "filter by both",
-			project: "acme",
-			task:    "qa",
-			wantIDs: []int64{2},
-		},
-		{
-			name:    "no match",
-			project: "nonexistent",
-			wantIDs: nil,
-		},
-		{
-			name:    "filter by status draft",
-			status:  "draft",
-			wantIDs: []int64{1, 3},
-		},
-		{
-			name:    "filter by status validated",
-			status:  "validated",
-			wantIDs: []int64{2},
-		},
-		{
-			name:    "filter by status and project",
-			project: "acme",
-			status:  "draft",
-			wantIDs: []int64{1},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := filterEntries(entries, tt.project, tt.task, tt.status)
-			if len(got) != len(tt.wantIDs) {
-				t.Fatalf("got %d entries, want %d", len(got), len(tt.wantIDs))
-			}
-			for i, e := range got {
-				if e.ID != tt.wantIDs[i] {
-					t.Errorf("entry[%d].ID = %d, want %d", i, e.ID, tt.wantIDs[i])
-				}
 			}
 		})
 	}
