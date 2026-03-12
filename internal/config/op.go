@@ -10,10 +10,12 @@ import (
 // OPSecrets holds 1Password vault references (op:// URIs) for config fields.
 // When present in the config file, these are resolved at runtime via the op CLI.
 type OPSecrets struct {
-	URL      string `toml:"url"`
-	Database string `toml:"database"`
-	Username string `toml:"username"`
-	Password string `toml:"password"`
+	URL        string `toml:"url"`
+	Database   string `toml:"database"`
+	Username   string `toml:"username"`
+	APIKey     string `toml:"api-key"`
+	Password   string `toml:"password"`
+	TOTPSecret string `toml:"totp_secret"`
 }
 
 // opInjectRunner abstracts the op inject call for testability.
@@ -56,7 +58,9 @@ func resolveOPSecrets(cfg *Config, runner opInjectRunner) error {
 		{"url", cfg.OPSecrets.URL, &cfg.URL},
 		{"database", cfg.OPSecrets.Database, &cfg.Database},
 		{"username", cfg.OPSecrets.Username, &cfg.Username},
-		{"password", cfg.OPSecrets.Password, &cfg.Password},
+		{"api-key", cfg.OPSecrets.APIKey, &cfg.Password},
+		{"password", cfg.OPSecrets.Password, &cfg.WebPassword},
+		{"totp_secret", cfg.OPSecrets.TOTPSecret, &cfg.TOTPSecret},
 	}
 
 	// Apply plain values directly; collect op:// refs for batch resolve.

@@ -35,101 +35,63 @@ func (x *XMLRPCClient) findEmployeeID() (int64, error) {
 	}
 }
 
-// findOpenAttendance searches for an open attendance record (check_out = False)
-// for the given employee. Returns nil if none found.
-func (x *XMLRPCClient) findOpenAttendance(employeeID int64) (map[string]interface{}, error) {
-	criteria := goOdoo.NewCriteria().
-		Add("employee_id", "=", employeeID).
-		Add("check_out", "=", false)
-	opts := goOdoo.NewOptions().
-		FetchFields("id", "employee_id", "check_in", "check_out", "worked_hours").
-		Limit(1)
-
-	records, err := x.searchReadRaw("hr.attendance", criteria, opts)
-	if IsNotFound(err) {
-		return nil, nil
-	}
+// attendanceToggle calls the Odoo systray attendance toggle via JSON-RPC.
+// This controller endpoint internally uses sudo() to bypass hr.attendance
+// ACLs, so it works for non-admin users. Requires an authenticated web
+// session (WebPassword), since Odoo rejects API keys for session auth.
+func (x *XMLRPCClient) attendanceToggle() error {
+	session, err := x.jsonSession()
 	if err != nil {
-		return nil, fmt.Errorf("searching open attendance: %w", err)
+		return err
 	}
-	if len(records) == 0 {
-		return nil, nil
+	_, err = session.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
+	if err != nil {
+		return fmt.Errorf("toggling attendance: %w", err)
 	}
-	return records[0], nil
+	return nil
 }
 
-// ClockIn creates an attendance record with check_in = now.
-// Returns an error if already clocked in.
+// ClockIn toggles attendance state to clocked-in via the Odoo web controller.
+// Returns the new attendance record ID. Returns an error if already clocked in.
 func (x *XMLRPCClient) ClockIn() (int64, error) {
-	empID, err := x.findEmployeeID()
+	status, err := x.AttendanceStatus()
 	if err != nil {
 		return 0, err
 	}
-
-	open, err := x.findOpenAttendance(empID)
-	if err != nil {
-		return 0, err
-	}
-	if open != nil {
+	if status.ClockedIn {
 		return 0, errors.New("already clocked in")
 	}
 
-	now := time.Now().UTC().Format(odooDatetimeFormat)
-	vals := map[string]interface{}{
-		"employee_id": empID,
-		"check_in":    now,
+	if err := x.attendanceToggle(); err != nil {
+		return 0, err
 	}
 
-	resp, err := x.client.ExecuteKw("create", "hr.attendance",
-		[]interface{}{vals}, goOdoo.NewOptions())
+	// Re-read to get the new record ID.
+	updated, err := x.AttendanceStatus()
 	if err != nil {
-		return 0, fmt.Errorf("creating attendance record: %w", err)
+		return 0, fmt.Errorf("reading status after clock in: %w", err)
 	}
-
-	switch id := resp.(type) {
-	case int64:
-		return id, nil
-	case float64:
-		return int64(id), nil
-	default:
-		return 0, fmt.Errorf("unexpected create response type %T", resp)
-	}
+	return updated.CurrentID, nil
 }
 
-// ClockOut writes check_out = now on the open attendance record.
+// ClockOut toggles attendance state to clocked-out via the Odoo web controller.
 // Returns the completed record with worked_hours.
 func (x *XMLRPCClient) ClockOut() (*AttendanceRecord, error) {
-	empID, err := x.findEmployeeID()
+	status, err := x.AttendanceStatus()
 	if err != nil {
 		return nil, err
 	}
-
-	open, err := x.findOpenAttendance(empID)
-	if err != nil {
-		return nil, err
-	}
-	if open == nil {
+	if !status.ClockedIn {
 		return nil, errors.New("not clocked in")
 	}
 
-	var recordID int64
-	switch id := open["id"].(type) {
-	case int64:
-		recordID = id
-	case float64:
-		recordID = int64(id)
+	recordID := status.CurrentID
+
+	if err := x.attendanceToggle(); err != nil {
+		return nil, err
 	}
 
-	now := time.Now().UTC().Format(odooDatetimeFormat)
-	_, err = x.client.ExecuteKw("write", "hr.attendance",
-		[]interface{}{[]int64{recordID}, map[string]interface{}{
-			"check_out": now,
-		}}, goOdoo.NewOptions())
-	if err != nil {
-		return nil, fmt.Errorf("writing check_out: %w", err)
-	}
-
-	// Re-read the record to get computed worked_hours.
+	// Re-read the closed record to get computed worked_hours.
 	criteria := goOdoo.NewCriteria().Add("id", "=", recordID)
 	opts := goOdoo.NewOptions().
 		FetchFields("id", "employee_id", "check_in", "check_out", "worked_hours")
