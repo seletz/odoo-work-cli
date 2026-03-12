@@ -30,11 +30,24 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 	}
 }
 
+func TestRenderGrid_ShowsCompanyPrefix(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Acme", Task: "Dev", Company: "Digital Team", Hours: 8.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
+
+	if !strings.Contains(out, "[DIG] Acme / Dev") {
+		t.Error("output should contain prefixed company label '[DIG] Acme / Dev'")
+	}
+}
+
 func TestRenderGrid_EmptyGrid(t *testing.T) {
 	g := BuildWeekGrid(nil, monday(2026, 3, 2))
 	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
 
-	if !strings.Contains(out, "Project / Task") {
+	if !strings.Contains(out, "Company Prefix / Project / Task") {
 		t.Error("output should contain header")
 	}
 	if !strings.Contains(out, "Total") {

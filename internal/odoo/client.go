@@ -29,6 +29,7 @@ type TaskInfo struct {
 	Name      string
 	Project   string
 	ProjectID int64
+	Company   string
 	Stage     string
 	Active    bool
 }

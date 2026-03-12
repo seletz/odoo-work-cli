@@ -7,12 +7,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
 
 // GridRow represents a single project/task row in the weekly grid.
 type GridRow struct {
+	Key           string
 	Label         string
 	Company       string                   // company name from first entry
 	Hours         [7]float64               // Mon=0 .. Sun=6
@@ -56,22 +58,23 @@ func BuildWeekGrid(entries []odoo.TimesheetEntry, monday time.Time) WeekGrid {
 			continue
 		}
 
-		label := e.Project
-		if e.Task != "" {
-			label += " / " + e.Task
-		}
+		key := gridRowKey(e.Company, e.ProjectID, e.TaskID, e.Project, e.Task)
+		label := gridRowLabel(e.Company, e.Project, e.Task)
 
-		idx, ok := rowIndex[label]
+		idx, ok := rowIndex[key]
 		if !ok {
 			idx = len(g.Rows)
-			rowIndex[label] = idx
-			g.Rows = append(g.Rows, GridRow{Label: label, Company: e.Company})
+			rowIndex[key] = idx
+			g.Rows = append(g.Rows, GridRow{Key: key, Label: label, Company: e.Company})
 		}
 		g.Rows[idx].Hours[dayOffset] += e.Hours
 		g.Rows[idx].Entries[dayOffset] = append(g.Rows[idx].Entries[dayOffset], e)
 	}
 
 	sort.Slice(g.Rows, func(i, j int) bool {
+		if g.Rows[i].Label == g.Rows[j].Label {
+			return g.Rows[i].Key < g.Rows[j].Key
+		}
 		return g.Rows[i].Label < g.Rows[j].Label
 	})
 
@@ -87,6 +90,7 @@ func BuildWeekGrid(entries []odoo.TimesheetEntry, monday time.Time) WeekGrid {
 
 // HintRow carries label and IDs from a previous week's entries to seed empty rows.
 type HintRow struct {
+	Key       string
 	Label     string
 	Company   string
 	ProjectID int64
@@ -98,16 +102,14 @@ func HintLabelsFromEntries(entries []odoo.TimesheetEntry) []HintRow {
 	seen := make(map[string]bool)
 	var hints []HintRow
 	for _, e := range entries {
-		label := e.Project
-		if e.Task != "" {
-			label += " / " + e.Task
-		}
-		if seen[label] {
+		key := gridRowKey(e.Company, e.ProjectID, e.TaskID, e.Project, e.Task)
+		if seen[key] {
 			continue
 		}
-		seen[label] = true
+		seen[key] = true
 		hints = append(hints, HintRow{
-			Label:     label,
+			Key:       key,
+			Label:     gridRowLabel(e.Company, e.Project, e.Task),
 			Company:   e.Company,
 			ProjectID: e.ProjectID,
 			TaskID:    e.TaskID,
@@ -132,16 +134,14 @@ func BuildWeekGridWithHints(entries []odoo.TimesheetEntry, monday time.Time, hin
 			continue
 		}
 
-		label := e.Project
-		if e.Task != "" {
-			label += " / " + e.Task
-		}
+		key := gridRowKey(e.Company, e.ProjectID, e.TaskID, e.Project, e.Task)
+		label := gridRowLabel(e.Company, e.Project, e.Task)
 
-		idx, ok := rowIndex[label]
+		idx, ok := rowIndex[key]
 		if !ok {
 			idx = len(g.Rows)
-			rowIndex[label] = idx
-			g.Rows = append(g.Rows, GridRow{Label: label, Company: e.Company})
+			rowIndex[key] = idx
+			g.Rows = append(g.Rows, GridRow{Key: key, Label: label, Company: e.Company})
 		}
 		g.Rows[idx].Hours[dayOffset] += e.Hours
 		g.Rows[idx].Entries[dayOffset] = append(g.Rows[idx].Entries[dayOffset], e)
@@ -149,12 +149,14 @@ func BuildWeekGridWithHints(entries []odoo.TimesheetEntry, monday time.Time, hin
 
 	// Add hint rows for labels not already present.
 	for _, h := range hints {
-		if _, ok := rowIndex[h.Label]; ok {
+		hintKey := hintIdentity(h)
+		if _, ok := rowIndex[hintKey]; ok {
 			continue
 		}
 		idx := len(g.Rows)
-		rowIndex[h.Label] = idx
+		rowIndex[hintKey] = idx
 		g.Rows = append(g.Rows, GridRow{
+			Key:           hintKey,
 			Label:         h.Label,
 			Company:       h.Company,
 			HintProjectID: h.ProjectID,
@@ -163,6 +165,9 @@ func BuildWeekGridWithHints(entries []odoo.TimesheetEntry, monday time.Time, hin
 	}
 
 	sort.Slice(g.Rows, func(i, j int) bool {
+		if g.Rows[i].Label == g.Rows[j].Label {
+			return g.Rows[i].Key < g.Rows[j].Key
+		}
 		return g.Rows[i].Label < g.Rows[j].Label
 	})
 
@@ -174,6 +179,64 @@ func BuildWeekGridWithHints(entries []odoo.TimesheetEntry, monday time.Time, hin
 	}
 
 	return g
+}
+
+func gridRowKey(company string, projectID, taskID int64, project, task string) string {
+	if projectID != 0 || taskID != 0 {
+		return fmt.Sprintf("%s|%d|%d", company, projectID, taskID)
+	}
+	return fmt.Sprintf("%s|%s|%s", company, project, task)
+}
+
+func gridRowLabel(company, project, task string) string {
+	label := project
+	if task != "" {
+		label += " / " + task
+	}
+	prefix := companyPrefix(company)
+	if prefix == "" {
+		return label
+	}
+	return fmt.Sprintf("[%s] %s", prefix, label)
+}
+
+func companyPrefix(company string) string {
+	company = strings.TrimSpace(company)
+	if company == "" {
+		return ""
+	}
+
+	var runes []rune
+	for _, r := range company {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			runes = append(runes, unicode.ToUpper(r))
+			if len(runes) == 3 {
+				return string(runes)
+			}
+		}
+	}
+	if len(runes) > 0 {
+		return string(runes)
+	}
+
+	raw := []rune(company)
+	if len(raw) > 3 {
+		raw = raw[:3]
+	}
+	for i, r := range raw {
+		raw[i] = unicode.ToUpper(r)
+	}
+	return string(raw)
+}
+
+func hintIdentity(h HintRow) string {
+	if h.Key != "" {
+		return h.Key
+	}
+	if h.ProjectID != 0 || h.TaskID != 0 {
+		return gridRowKey(h.Company, h.ProjectID, h.TaskID, "", "")
+	}
+	return h.Label
 }
 
 // ParseWeekMonday parses an ISO week string (e.g. "2026-W10") and returns

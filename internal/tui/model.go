@@ -41,8 +41,10 @@ type searchItem struct {
 	ID        int64
 	Name      string
 	Extra     string // company for projects, project name for tasks
-	ProjectID int64  // for tasks: the parent project ID
-	TaskID    int64  // 0 for projects, task ID for tasks
+	Company   string
+	Project   string
+	ProjectID int64 // for tasks: the parent project ID
+	TaskID    int64 // 0 for projects, task ID for tasks
 }
 
 // timesheetsLoadedMsg is sent when timesheets finish loading.
@@ -243,11 +245,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// and prune those that now appear in the grid naturally.
 		gridLabels := make(map[string]bool, len(m.grid.Rows))
 		for _, row := range m.grid.Rows {
-			gridLabels[row.Label] = true
+			gridLabels[rowIdentity(row)] = true
 		}
 		var remaining []GridRow
 		for _, pr := range m.pendingRows {
-			if gridLabels[pr.Label] {
+			if gridLabels[rowIdentity(pr)] {
 				continue // server now has entries for this row
 			}
 			m.grid.Rows = append(m.grid.Rows, pr)
@@ -256,6 +258,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pendingRows = remaining
 		if len(remaining) > 0 {
 			sort.Slice(m.grid.Rows, func(i, j int) bool {
+				if m.grid.Rows[i].Label == m.grid.Rows[j].Label {
+					return m.grid.Rows[i].Key < m.grid.Rows[j].Key
+				}
 				return m.grid.Rows[i].Label < m.grid.Rows[j].Label
 			})
 		}
@@ -621,6 +626,7 @@ func (m Model) deleteEntry() (tea.Model, tea.Cmd) {
 		if totalEntries <= 1 {
 			projectID, taskID := row.ProjectTaskIDs()
 			m.pendingRows = append(m.pendingRows, GridRow{
+				Key:           rowIdentity(row),
 				Label:         row.Label,
 				Company:       row.Company,
 				HintProjectID: projectID,
@@ -703,6 +709,8 @@ func buildSearchItems(projects []odoo.ProjectInfo, tasks []odoo.TaskInfo) []sear
 			ID:        p.ID,
 			Name:      p.Name,
 			Extra:     p.Company,
+			Company:   p.Company,
+			Project:   p.Name,
 			ProjectID: p.ID,
 			TaskID:    0,
 		})
@@ -713,6 +721,8 @@ func buildSearchItems(projects []odoo.ProjectInfo, tasks []odoo.TaskInfo) []sear
 			ID:        t.ID,
 			Name:      t.Name,
 			Extra:     t.Project,
+			Company:   t.Company,
+			Project:   t.Project,
 			ProjectID: t.ProjectID,
 			TaskID:    t.ID,
 		})
@@ -729,7 +739,8 @@ func filterSearchItems(items []searchItem, query string) []searchItem {
 	var result []searchItem
 	for _, item := range items {
 		if strings.Contains(strings.ToLower(item.Name), q) ||
-			strings.Contains(strings.ToLower(item.Extra), q) {
+			strings.Contains(strings.ToLower(item.Extra), q) ||
+			strings.Contains(strings.ToLower(item.Company), q) {
 			result = append(result, item)
 		}
 	}
@@ -791,16 +802,12 @@ func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // selectSearchItem adds the selected project/task as a grid row or moves cursor to existing.
 func (m Model) selectSearchItem(item searchItem) (tea.Model, tea.Cmd) {
-	var label string
-	if item.Kind == "project" {
-		label = item.Name
-	} else {
-		label = item.Extra + " / " + item.Name
-	}
+	label := gridRowLabel(item.Company, item.Project, taskNameForItem(item))
+	key := gridRowKey(item.Company, item.ProjectID, item.TaskID, item.Project, taskNameForItem(item))
 
 	// Check for duplicate label.
 	for i, row := range m.grid.Rows {
-		if row.Label == label {
+		if row.Key == key {
 			m.cursor[0] = i
 			m.state = stateGrid
 			return m, nil
@@ -809,7 +816,9 @@ func (m Model) selectSearchItem(item searchItem) (tea.Model, tea.Cmd) {
 
 	// Add new row and track as pending so it survives reloads.
 	newRow := GridRow{
+		Key:           key,
 		Label:         label,
+		Company:       item.Company,
 		HintProjectID: item.ProjectID,
 		HintTaskID:    item.TaskID,
 	}
@@ -818,10 +827,13 @@ func (m Model) selectSearchItem(item searchItem) (tea.Model, tea.Cmd) {
 
 	// Re-sort and find the new row's index.
 	sort.Slice(m.grid.Rows, func(i, j int) bool {
+		if m.grid.Rows[i].Label == m.grid.Rows[j].Label {
+			return m.grid.Rows[i].Key < m.grid.Rows[j].Key
+		}
 		return m.grid.Rows[i].Label < m.grid.Rows[j].Label
 	})
 	for i, row := range m.grid.Rows {
-		if row.Label == label {
+		if row.Key == key {
 			m.cursor[0] = i
 			break
 		}
@@ -829,6 +841,20 @@ func (m Model) selectSearchItem(item searchItem) (tea.Model, tea.Cmd) {
 
 	m.state = stateGrid
 	return m, nil
+}
+
+func taskNameForItem(item searchItem) string {
+	if item.Kind != "task" {
+		return ""
+	}
+	return item.Name
+}
+
+func rowIdentity(row GridRow) string {
+	if row.Key != "" {
+		return row.Key
+	}
+	return row.Label
 }
 
 // formatDecimalHours formats hours as a decimal string (e.g. "2.5").

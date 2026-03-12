@@ -153,8 +153,8 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 
 	var b strings.Builder
 
-	// Header row with vertical separators.
-	header := fmt.Sprintf("%-*s  ", labelWidth, "Project / Task")
+	// Header row.
+	header := fmt.Sprintf("%-*s  ", labelWidth, "Company Prefix / Project / Task")
 	for i, name := range dayNames {
 		cell := fmt.Sprintf("%*s", colWidth-1, name)
 		switch {
@@ -556,14 +556,21 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 				lastKind = item.Kind
 			}
 
-			// Colored badge for kind.
+			// Colored badge for kind plus optional company prefix.
 			var badge string
 			if item.Kind == "project" {
 				badge = searchProjectBadge.Render("[P]")
 			} else {
 				badge = searchTaskBadge.Render("[T]")
 			}
-			label := fmt.Sprintf("    %s %s", badge, item.Name)
+			labelPrefix := ""
+			if prefix := companyPrefix(item.Company); prefix != "" {
+				labelPrefix = "[" + prefix + "] "
+				if color, ok := companyColors[item.Company]; ok {
+					labelPrefix = companyLabelStyle(color).Render(labelPrefix)
+				}
+			}
+			label := fmt.Sprintf("    %s %s%s", badge, labelPrefix, item.Name)
 			if item.Extra != "" {
 				extra := item.Extra
 				if item.Kind == "project" {

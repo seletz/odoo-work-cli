@@ -276,7 +276,11 @@ func (x *XMLRPCClient) listTasks(projectID int64, filtered bool) ([]TaskInfo, er
 	if projectID > 0 {
 		criteria.Add("project_id", "=", projectID)
 	}
-	tasks, err := x.client.FindProjectTasks(criteria, goOdoo.NewOptions())
+
+	fields := []string{"id", "name", "active", "project_id", "stage_id", "company_id"}
+	opts := goOdoo.NewOptions().FetchFields(fields...)
+
+	records, err := x.searchReadRaw("project.task", criteria, opts)
 	if IsNotFound(err) {
 		return []TaskInfo{}, nil
 	}
@@ -284,19 +288,24 @@ func (x *XMLRPCClient) listTasks(projectID int64, filtered bool) ([]TaskInfo, er
 		return nil, fmt.Errorf("fetching tasks: %w", err)
 	}
 
-	result := make([]TaskInfo, 0, len(*tasks))
-	for _, t := range *tasks {
+	result := make([]TaskInfo, 0, len(records))
+	for _, r := range records {
 		info := TaskInfo{
-			ID:     t.Id.Get(),
-			Name:   t.Name.Get(),
-			Active: t.Active.Get(),
+			Project:   extractMany2OneName(r["project_id"]),
+			ProjectID: extractMany2OneID(r["project_id"]),
+			Company:   extractMany2OneName(r["company_id"]),
+			Stage:     extractMany2OneName(r["stage_id"]),
 		}
-		if t.ProjectId != nil {
-			info.Project = t.ProjectId.Name
-			info.ProjectID = t.ProjectId.ID
+		if id, ok := r["id"].(int64); ok {
+			info.ID = id
+		} else if id, ok := r["id"].(float64); ok {
+			info.ID = int64(id)
 		}
-		if t.StageId != nil {
-			info.Stage = t.StageId.Name
+		if name, ok := r["name"].(string); ok {
+			info.Name = name
+		}
+		if active, ok := r["active"].(bool); ok {
+			info.Active = active
 		}
 		result = append(result, info)
 	}

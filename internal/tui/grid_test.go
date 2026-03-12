@@ -113,6 +113,31 @@ func TestBuildWeekGrid_WeekendEntries(t *testing.T) {
 	}
 }
 
+func TestBuildWeekGrid_SameNamesDifferentCompaniesStaySeparate(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Shared", Task: "Dev", Company: "Alpha Org", ProjectID: 10, TaskID: 20, Hours: 2.0},
+		{Date: "2026-03-02", Project: "Shared", Task: "Dev", Company: "Beta Org", ProjectID: 30, TaskID: 40, Hours: 3.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+
+	if len(g.Rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(g.Rows))
+	}
+	if g.Rows[0].Label != "[ALP] Shared / Dev" {
+		t.Fatalf("expected first prefixed row, got %q", g.Rows[0].Label)
+	}
+	if g.Rows[1].Label != "[BET] Shared / Dev" {
+		t.Fatalf("expected second prefixed row, got %q", g.Rows[1].Label)
+	}
+	if g.Rows[0].Hours[0] != 2.0 {
+		t.Fatalf("expected first row Mon=2.0, got %f", g.Rows[0].Hours[0])
+	}
+	if g.Rows[1].Hours[0] != 3.0 {
+		t.Fatalf("expected second row Mon=3.0, got %f", g.Rows[1].Hours[0])
+	}
+}
+
 func TestBuildWeekGrid_PreservesEntries(t *testing.T) {
 	entries := []odoo.TimesheetEntry{
 		{ID: 100, Date: "2026-03-03", Project: "Acme", Task: "Dev", Hours: 1.0, Name: "auth endpoint", ValidatedStatus: "draft"},
@@ -200,6 +225,25 @@ func TestHintLabelsFromEntries_EmptyTask(t *testing.T) {
 	}
 	if hints[0].Label != "Acme" {
 		t.Fatalf("expected label 'Acme', got %q", hints[0].Label)
+	}
+}
+
+func TestHintLabelsFromEntries_SameNamesDifferentCompanies(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-02-23", Project: "Shared", Task: "Dev", Company: "Alpha Org", ProjectID: 10, TaskID: 20, Hours: 1.0},
+		{Date: "2026-02-24", Project: "Shared", Task: "Dev", Company: "Beta Org", ProjectID: 30, TaskID: 40, Hours: 1.0},
+	}
+
+	hints := HintLabelsFromEntries(entries)
+
+	if len(hints) != 2 {
+		t.Fatalf("expected 2 hints, got %d", len(hints))
+	}
+	if hints[0].Label != "[ALP] Shared / Dev" {
+		t.Fatalf("expected first prefixed hint, got %q", hints[0].Label)
+	}
+	if hints[1].Label != "[BET] Shared / Dev" {
+		t.Fatalf("expected second prefixed hint, got %q", hints[1].Label)
 	}
 }
 
