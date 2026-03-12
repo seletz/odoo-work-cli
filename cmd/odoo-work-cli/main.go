@@ -91,7 +91,7 @@ func loadConfig() (*config.Config, error) {
 
 // newClient creates a new Odoo client from the merged config.
 func newClient(cfg *config.Config) (*odoo.XMLRPCClient, error) {
-	return odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password, cfg.Models)
+	return odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password, cfg.WebPassword, cfg.TOTPSecret, cfg.Models)
 }
 
 var projectsCmd = &cobra.Command{

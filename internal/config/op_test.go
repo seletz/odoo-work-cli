@@ -27,7 +27,8 @@ func TestResolveOPSecrets_AllFields(t *testing.T) {
 		"op://Work/odoo/url":      "https://odoo.example.com",
 		"op://Work/odoo/database": "mydb",
 		"op://Work/odoo/username": "admin@example.com",
-		"op://Work/odoo/api-key":  "secret-key",
+		"op://Work/odoo/api-key":  "secret-api-key",
+		"op://Work/odoo/password": "secret-password",
 	})
 
 	cfg := &Config{
@@ -35,7 +36,8 @@ func TestResolveOPSecrets_AllFields(t *testing.T) {
 			URL:      "op://Work/odoo/url",
 			Database: "op://Work/odoo/database",
 			Username: "op://Work/odoo/username",
-			Password: "op://Work/odoo/api-key",
+			APIKey:   "op://Work/odoo/api-key",
+			Password: "op://Work/odoo/password",
 		},
 	}
 
@@ -53,14 +55,17 @@ func TestResolveOPSecrets_AllFields(t *testing.T) {
 	if cfg.Username != "admin@example.com" {
 		t.Errorf("Username = %q, want %q", cfg.Username, "admin@example.com")
 	}
-	if cfg.Password != "secret-key" {
-		t.Errorf("Password = %q, want %q", cfg.Password, "secret-key")
+	if cfg.Password != "secret-api-key" {
+		t.Errorf("Password (API key) = %q, want %q", cfg.Password, "secret-api-key")
+	}
+	if cfg.WebPassword != "secret-password" {
+		t.Errorf("WebPassword = %q, want %q", cfg.WebPassword, "secret-password")
 	}
 }
 
-func TestResolveOPSecrets_PartialFields(t *testing.T) {
+func TestResolveOPSecrets_APIKeyOnly(t *testing.T) {
 	runner := fakeOPInjectRunner(map[string]string{
-		"op://Work/odoo/api-key": "secret-key",
+		"op://Work/odoo/api-key": "secret-api-key",
 	})
 
 	cfg := &Config{
@@ -68,7 +73,7 @@ func TestResolveOPSecrets_PartialFields(t *testing.T) {
 		Database: "existing-db",
 		Username: "existing-user",
 		OPSecrets: &OPSecrets{
-			Password: "op://Work/odoo/api-key",
+			APIKey: "op://Work/odoo/api-key",
 		},
 	}
 
@@ -80,8 +85,11 @@ func TestResolveOPSecrets_PartialFields(t *testing.T) {
 	if cfg.URL != "https://already-set.example.com" {
 		t.Errorf("URL = %q, want existing value", cfg.URL)
 	}
-	if cfg.Password != "secret-key" {
-		t.Errorf("Password = %q, want %q", cfg.Password, "secret-key")
+	if cfg.Password != "secret-api-key" {
+		t.Errorf("Password (API key) = %q, want %q", cfg.Password, "secret-api-key")
+	}
+	if cfg.WebPassword != "" {
+		t.Errorf("WebPassword = %q, want empty", cfg.WebPassword)
 	}
 }
 
@@ -107,7 +115,7 @@ func TestResolveOPSecrets_RunnerError(t *testing.T) {
 
 	cfg := &Config{
 		OPSecrets: &OPSecrets{
-			Password: "op://Work/odoo/api-key",
+			APIKey: "op://Work/odoo/api-key",
 		},
 	}
 
@@ -141,13 +149,13 @@ func TestResolveOPSecrets_OverwritesExistingFields(t *testing.T) {
 
 func TestResolveOPSecrets_PlainValues(t *testing.T) {
 	runner := fakeOPInjectRunner(map[string]string{
-		"op://Work/odoo/api-key": "secret-key",
+		"op://Work/odoo/api-key": "secret-api-key",
 	})
 
 	cfg := &Config{
 		OPSecrets: &OPSecrets{
 			Database: "odoo.170",
-			Password: "op://Work/odoo/api-key",
+			APIKey:   "op://Work/odoo/api-key",
 		},
 	}
 
@@ -159,8 +167,8 @@ func TestResolveOPSecrets_PlainValues(t *testing.T) {
 	if cfg.Database != "odoo.170" {
 		t.Errorf("Database = %q, want %q", cfg.Database, "odoo.170")
 	}
-	if cfg.Password != "secret-key" {
-		t.Errorf("Password = %q, want %q", cfg.Password, "secret-key")
+	if cfg.Password != "secret-api-key" {
+		t.Errorf("Password (API key) = %q, want %q", cfg.Password, "secret-api-key")
 	}
 }
 
@@ -191,6 +199,30 @@ func TestResolveOPSecrets_AllPlainValues(t *testing.T) {
 	}
 }
 
+func TestResolveOPSecrets_PasswordMapsToWebPassword(t *testing.T) {
+	runner := fakeOPInjectRunner(map[string]string{
+		"op://Work/odoo/password": "web-secret",
+	})
+
+	cfg := &Config{
+		OPSecrets: &OPSecrets{
+			Password: "op://Work/odoo/password",
+		},
+	}
+
+	err := resolveOPSecrets(cfg, runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.WebPassword != "web-secret" {
+		t.Errorf("WebPassword = %q, want %q", cfg.WebPassword, "web-secret")
+	}
+	if cfg.Password != "" {
+		t.Errorf("Password (API key) = %q, want empty", cfg.Password)
+	}
+}
+
 func TestLoadFromTOML_OPSecrets(t *testing.T) {
 	content := `
 url = "https://odoo.example.com"
@@ -198,7 +230,8 @@ database = "mydb"
 username = "admin"
 
 [op_secrets]
-password = "op://Work/odoo/api-key"
+api-key  = "op://Work/odoo/api-key"
+password = "op://Work/odoo/password"
 `
 	dir := t.TempDir()
 	path := dir + "/config.toml"
@@ -213,8 +246,11 @@ password = "op://Work/odoo/api-key"
 	if cfg.OPSecrets == nil {
 		t.Fatal("OPSecrets is nil")
 	}
-	if cfg.OPSecrets.Password != "op://Work/odoo/api-key" {
-		t.Errorf("OPSecrets.Password = %q, want %q", cfg.OPSecrets.Password, "op://Work/odoo/api-key")
+	if cfg.OPSecrets.APIKey != "op://Work/odoo/api-key" {
+		t.Errorf("OPSecrets.APIKey = %q, want %q", cfg.OPSecrets.APIKey, "op://Work/odoo/api-key")
+	}
+	if cfg.OPSecrets.Password != "op://Work/odoo/password" {
+		t.Errorf("OPSecrets.Password = %q, want %q", cfg.OPSecrets.Password, "op://Work/odoo/password")
 	}
 }
 
@@ -239,7 +275,8 @@ func TestMerge_OPSecrets(t *testing.T) {
 	base := &Config{}
 	overlay := &Config{
 		OPSecrets: &OPSecrets{
-			Password: "op://Work/odoo/api-key",
+			APIKey:   "op://Work/odoo/api-key",
+			Password: "op://Work/odoo/password",
 		},
 	}
 
@@ -248,28 +285,31 @@ func TestMerge_OPSecrets(t *testing.T) {
 	if base.OPSecrets == nil {
 		t.Fatal("OPSecrets is nil after merge")
 	}
-	if base.OPSecrets.Password != "op://Work/odoo/api-key" {
-		t.Errorf("OPSecrets.Password = %q, want %q", base.OPSecrets.Password, "op://Work/odoo/api-key")
+	if base.OPSecrets.APIKey != "op://Work/odoo/api-key" {
+		t.Errorf("OPSecrets.APIKey = %q, want %q", base.OPSecrets.APIKey, "op://Work/odoo/api-key")
+	}
+	if base.OPSecrets.Password != "op://Work/odoo/password" {
+		t.Errorf("OPSecrets.Password = %q, want %q", base.OPSecrets.Password, "op://Work/odoo/password")
 	}
 }
 
 func TestMerge_OPSecrets_OverlayReplacesBase(t *testing.T) {
 	base := &Config{
 		OPSecrets: &OPSecrets{
-			Password: "op://Old/odoo/key",
-			URL:      "op://Old/odoo/url",
+			APIKey: "op://Old/odoo/key",
+			URL:    "op://Old/odoo/url",
 		},
 	}
 	overlay := &Config{
 		OPSecrets: &OPSecrets{
-			Password: "op://New/odoo/key",
+			APIKey: "op://New/odoo/key",
 		},
 	}
 
 	base.Merge(overlay)
 
-	if base.OPSecrets.Password != "op://New/odoo/key" {
-		t.Errorf("Password = %q, want overlay value", base.OPSecrets.Password)
+	if base.OPSecrets.APIKey != "op://New/odoo/key" {
+		t.Errorf("APIKey = %q, want overlay value", base.OPSecrets.APIKey)
 	}
 	if base.OPSecrets.URL != "op://Old/odoo/url" {
 		t.Errorf("URL = %q, want base value preserved", base.OPSecrets.URL)
@@ -279,20 +319,20 @@ func TestMerge_OPSecrets_OverlayReplacesBase(t *testing.T) {
 func TestMerge_OPSecrets_NilOverlay(t *testing.T) {
 	base := &Config{
 		OPSecrets: &OPSecrets{
-			Password: "op://Work/odoo/key",
+			APIKey: "op://Work/odoo/key",
 		},
 	}
 	overlay := &Config{}
 
 	base.Merge(overlay)
 
-	if base.OPSecrets == nil || base.OPSecrets.Password != "op://Work/odoo/key" {
+	if base.OPSecrets == nil || base.OPSecrets.APIKey != "op://Work/odoo/key" {
 		t.Error("base OPSecrets should be preserved when overlay has none")
 	}
 }
 
 func TestParseKeyValues(t *testing.T) {
-	input := "url=https://odoo.example.com\ndatabase=mydb\npassword=secret\n"
+	input := "url=https://odoo.example.com\ndatabase=mydb\napi-key=secret\n"
 	got := parseKeyValues(input)
 
 	if got["url"] != "https://odoo.example.com" {
@@ -301,8 +341,8 @@ func TestParseKeyValues(t *testing.T) {
 	if got["database"] != "mydb" {
 		t.Errorf("database = %q", got["database"])
 	}
-	if got["password"] != "secret" {
-		t.Errorf("password = %q", got["password"])
+	if got["api-key"] != "secret" {
+		t.Errorf("api-key = %q", got["api-key"])
 	}
 }
 

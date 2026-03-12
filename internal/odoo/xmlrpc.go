@@ -9,15 +9,24 @@ import (
 )
 
 // XMLRPCClient implements Client using the Odoo XML-RPC API.
+// For operations that require an authenticated web session (e.g. attendance
+// toggle), it lazily initializes a JSON-RPC session using WebPassword.
 type XMLRPCClient struct {
-	client *goOdoo.Client
-	login  string
-	models map[string]config.ModelConfig
+	client      *goOdoo.Client
+	login       string
+	models      map[string]config.ModelConfig
+	url         string
+	database    string
+	webPassword string
+	totpSecret  string
+	jsonRPC     *jsonRPCSession
 }
 
-// NewXMLRPCClient creates a new Odoo client and authenticates.
-// The models parameter provides per-model extra field configuration.
-func NewXMLRPCClient(url, database, username, password string, models map[string]config.ModelConfig) (*XMLRPCClient, error) {
+// NewXMLRPCClient creates a new Odoo client and authenticates via XML-RPC.
+// The webPassword is the user's Odoo login password (not the API key) and
+// is used for JSON-RPC session auth when calling web controllers.
+// Pass empty string if not available (clock in/out will be unavailable).
+func NewXMLRPCClient(url, database, username, password, webPassword, totpSecret string, models map[string]config.ModelConfig) (*XMLRPCClient, error) {
 	c, err := goOdoo.NewClient(&goOdoo.ClientConfig{
 		Admin:    username,
 		Password: password,
@@ -27,12 +36,34 @@ func NewXMLRPCClient(url, database, username, password string, models map[string
 	if err != nil {
 		return nil, fmt.Errorf("connecting to odoo: %w", err)
 	}
-	return &XMLRPCClient{client: c, login: username, models: models}, nil
+	return &XMLRPCClient{
+		client:      c,
+		login:       username,
+		models:      models,
+		url:         url,
+		database:    database,
+		webPassword: webPassword,
+		totpSecret:  totpSecret,
+	}, nil
 }
 
 // Close closes the underlying XML-RPC connections.
 func (x *XMLRPCClient) Close() {
 	x.client.Close()
+}
+
+// jsonSession returns a lazily-initialized JSON-RPC session.
+// Uses WebPassword (the actual Odoo login password) for session auth,
+// since API keys are rejected by Odoo's web session authenticate
+// (it passes interactive: true which skips API key checking).
+func (x *XMLRPCClient) jsonSession() (*jsonRPCSession, error) {
+	if x.webPassword == "" {
+		return nil, fmt.Errorf("web_password not configured; required for clock in/out (set via [op_secrets] web_password or ODOO_WEB_PASSWORD env var)")
+	}
+	if x.jsonRPC == nil {
+		x.jsonRPC = newJSONRPCSession(x.url, x.database, x.login, x.webPassword, x.totpSecret)
+	}
+	return x.jsonRPC, nil
 }
 
 // searchReadRaw calls ExecuteKw("search_read", ...) and returns raw maps.

@@ -96,6 +96,8 @@ type Config struct {
 	Database      string                 `toml:"database"`
 	Username      string                 `toml:"username"`
 	Password      string                 `toml:"-"`
+	WebPassword   string                 `toml:"-"`
+	TOTPSecret    string                 `toml:"-"`
 	OPSecrets     *OPSecrets             `toml:"op_secrets"`
 	Models        map[string]ModelConfig `toml:"models"`
 	Hours         HoursLimits            `toml:"hours"`
@@ -104,22 +106,25 @@ type Config struct {
 	CompanyColors map[string]string      `toml:"company_colors"` // company name → lipgloss color string
 }
 
-func (c *Config) OdooURL() string      { return c.URL }
-func (c *Config) OdooDatabase() string { return c.Database }
-func (c *Config) OdooUsername() string { return c.Username }
-func (c *Config) OdooPassword() string { return c.Password }
+func (c *Config) OdooURL() string         { return c.URL }
+func (c *Config) OdooDatabase() string    { return c.Database }
+func (c *Config) OdooUsername() string    { return c.Username }
+func (c *Config) OdooPassword() string    { return c.Password }
+func (c *Config) OdooWebPassword() string { return c.WebPassword }
 
 // LoadFromEnv reads configuration from environment variables.
 // It reads whatever env vars are set without requiring any.
 // Use Validate to check that all required fields are present.
 func LoadFromEnv() *Config {
 	return &Config{
-		URL:        os.Getenv("ODOO_URL"),
-		Database:   os.Getenv("ODOO_DATABASE"),
-		Username:   os.Getenv("ODOO_USERNAME"),
-		Password:   os.Getenv("ODOO_PASSWORD"),
-		Hours:      DefaultHoursLimits(),
-		Bundesland: DefaultBundesland,
+		URL:         os.Getenv("ODOO_URL"),
+		Database:    os.Getenv("ODOO_DATABASE"),
+		Username:    os.Getenv("ODOO_USERNAME"),
+		Password:    os.Getenv("ODOO_PASSWORD"),
+		WebPassword: os.Getenv("ODOO_WEB_PASSWORD"),
+		TOTPSecret:  os.Getenv("ODOO_TOTP_SECRET"),
+		Hours:       DefaultHoursLimits(),
+		Bundesland:  DefaultBundesland,
 	}
 }
 
@@ -197,6 +202,12 @@ func (c *Config) Merge(other *Config) {
 	if other.Password != "" {
 		c.Password = other.Password
 	}
+	if other.WebPassword != "" {
+		c.WebPassword = other.WebPassword
+	}
+	if other.TOTPSecret != "" {
+		c.TOTPSecret = other.TOTPSecret
+	}
 	if other.Bundesland != "" {
 		c.Bundesland = other.Bundesland
 	}
@@ -213,8 +224,14 @@ func (c *Config) Merge(other *Config) {
 		if other.OPSecrets.Username != "" {
 			c.OPSecrets.Username = other.OPSecrets.Username
 		}
+		if other.OPSecrets.APIKey != "" {
+			c.OPSecrets.APIKey = other.OPSecrets.APIKey
+		}
 		if other.OPSecrets.Password != "" {
 			c.OPSecrets.Password = other.OPSecrets.Password
+		}
+		if other.OPSecrets.TOTPSecret != "" {
+			c.OPSecrets.TOTPSecret = other.OPSecrets.TOTPSecret
 		}
 	}
 	if other.Hours.DailyLow != 0 {

@@ -6,6 +6,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 
 - **CLI:** CLI commands for scripting
 - **TUI:** Terminal UI for fast interactive usage
+- **Clock in/out:** Works for non-admin users, including accounts with 2FA (TOTP) enabled
 - **Config bootstrapping:** `config install` creates a default config file
 
 ### TUI Features
@@ -78,8 +79,8 @@ Commands:
 | `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (hours: `2.5` or `2:30`, date defaults to today, task-id optional)                     |
 | `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (hours: `2.5` or `2:30`, only set flags are sent)                                |
 | `entries delete ID`                                      | Delete a timesheet entry by ID                                                                                      |
-| `clock in`                                               | Clock in (start attendance period)                                                                                  |
-| `clock out`                                              | Clock out (end attendance period, shows duration)                                                                   |
+| `clock in`                                               | Clock in (start attendance period). Works for non-admin users via JSON-RPC; supports 2FA (TOTP).                    |
+| `clock out`                                              | Clock out (end attendance period, shows duration). Works for non-admin users via JSON-RPC; supports 2FA (TOTP).     |
 | `clock status`                                           | Show current attendance state and today's periods                                                                   |
 | `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
@@ -123,7 +124,7 @@ Configuration is loaded in layers, with later layers overriding earlier ones:
 1. **Global config**: `$XDG_CONFIG_HOME/odoo-work-cli/config.toml` (defaults to `~/.config/odoo-work-cli/config.toml`)
 2. **Directory walk**: `.odoo-work-cli.toml` files from filesystem root down to cwd (root-most first, like `.editorconfig`)
 3. **`[op_secrets]`**: resolved via 1Password CLI at runtime (see below)
-4. **Environment variables**: `ODOO_URL`, `ODOO_DATABASE`, `ODOO_USERNAME`, `ODOO_PASSWORD` (highest priority)
+4. **Environment variables**: `ODOO_URL`, `ODOO_DATABASE`, `ODOO_USERNAME`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `ODOO_TOTP_SECRET` (highest priority)
 5. **`--config` flag**: Skip discovery entirely, load only the specified file + op_secrets + env vars
 
 ### Secrets (via 1Password)
@@ -134,18 +135,27 @@ reference automatically. No manual injection step needed.
 
 ```toml
 [op_secrets]
-url      = "op://Employee/odoo/url"
-database = "op://Employee/odoo/database"
-username = "op://Employee/odoo/username"
-password = "op://Employee/odoo/api-key"
+url         = "op://Employee/odoo/url"
+database    = "op://Employee/odoo/database"
+username    = "op://Employee/odoo/username"
+api-key     = "op://Employee/odoo/api-key"        # Odoo API key (for XML-RPC reads)
+password    = "op://Employee/odoo/password"        # Odoo login password (for clock in/out)
+totp_secret = "op://Employee/odoo/totp_secret"     # TOTP secret (for 2FA, if enabled)
 ```
+
+The CLI uses **two separate credentials**:
+
+- **`api-key`** — Odoo API key used for XML-RPC operations (timesheets, projects, tasks). Created in Odoo Settings > Users > API Keys.
+- **`password`** — Odoo login password used for JSON-RPC web session auth (clock in/out). Required because Odoo's web session authenticate rejects API keys.
+- **`totp_secret`** — Base32 TOTP secret for 2FA. Only needed if your Odoo account has two-factor authentication enabled. The value can be a raw base32 secret or a full `otpauth://` URL.
 
 Values without the `op://` prefix are used as-is (useful for non-secret fields
 like database name). If `op` is not installed or the `[op_secrets]` section is
-absent, the CLI falls back to environment variables.
+absent, the CLI falls back to environment variables (`ODOO_PASSWORD`,
+`ODOO_WEB_PASSWORD`, `ODOO_TOTP_SECRET`).
 
 Plain-text passwords in config files are still rejected — passwords must come
-from `[op_secrets]` or the `ODOO_PASSWORD` env var.
+from `[op_secrets]` or environment variables.
 
 ### Config file example
 
@@ -162,10 +172,12 @@ bundesland = "Baden-Württemberg"
 # Use [op_secrets] below for 1Password, or set ODOO_PASSWORD env var.
 
 # [op_secrets]
-# url      = "op://vault/item/url"
-# database = "op://vault/item/database"
-# username = "op://vault/item/username"
-# password = "op://vault/item/api-key"
+# url         = "op://vault/item/url"
+# database    = "op://vault/item/database"
+# username    = "op://vault/item/username"
+# api-key     = "op://vault/item/api-key"        # Odoo API key (for XML-RPC)
+# password    = "op://vault/item/password"        # Odoo login password (for clock in/out)
+# totp_secret = "op://vault/item/totp_secret"     # TOTP secret (if 2FA enabled)
 
 [hours]
 daily_low = 6.0    # below this: yellow

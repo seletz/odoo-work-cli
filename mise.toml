@@ -16,6 +16,11 @@ go build -ldflags "-X github.com/seletz/odoo-work-cli/internal/version.Version=$
 description = "Create a new release (interactive semver bump)"
 run = "scripts/release.sh"
 
+[tasks.run]
+description = "Build and run the CLI (pass args after --)"
+depends = ["build"]
+run = "./odoo-work-cli {{arg(i=0, var=true)}}"
+
 [tasks.test]
 description = "Run all tests"
 run = "go test ./..."

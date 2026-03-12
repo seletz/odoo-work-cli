@@ -19,7 +19,8 @@ username = "user@example.com"
 # url      = "op://vault/item/url"
 # database = "op://vault/item/database"
 # username = "op://vault/item/username"
-# password = "op://vault/item/api-key"
+# api-key  = "op://vault/item/api-key"       # Odoo API key (for XML-RPC)
+# password = "op://vault/item/password"       # Odoo login password (for clock in/out)
 
 # German federal state for public holiday detection.
 # Valid values: Baden-Württemberg, Bayern, Berlin, Brandenburg, Bremen,
