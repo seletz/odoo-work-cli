@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -171,5 +172,29 @@ func TestRenderGrid_WrapsLongLabels(t *testing.T) {
 	}
 	if !strings.Contains(out, "8:00") {
 		t.Fatal("output should still contain hours for wrapped row")
+	}
+}
+
+func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Alpha", Task: "Dev", Hours: 1.0},
+		{Date: "2026-03-02", Project: "Beta", Task: "QA", Hours: 2.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
+
+	selectedLabel := rowCursorStyle.Render(fmt.Sprintf("%-*s", 40, "Beta / QA"))
+	selectedCell := cursorStyle.Render(fmt.Sprintf("%*s", 9, "2:00"))
+	selectedTotal := rowCursorStyle.Render(totalsStyle.Render(fmt.Sprintf("%*s", 9, "2:00")))
+
+	if !strings.Contains(out, selectedLabel) {
+		t.Fatal("output should highlight the selected row label")
+	}
+	if !strings.Contains(out, selectedCell) {
+		t.Fatal("output should keep the selected cell highlighted")
+	}
+	if !strings.Contains(out, selectedTotal) {
+		t.Fatal("output should highlight the selected row total")
 	}
 }

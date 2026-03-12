@@ -203,6 +203,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 
 	// Data rows.
 	for ri, row := range grid.Rows {
+		rowSelected := ri == cursorRow
 		labelLines := wrapLabel(row.Label, labelWidth)
 		var rowLines []string
 		var rowTotal float64
@@ -214,6 +215,9 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 			styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
 			if color, ok := companyColors[row.Company]; ok {
 				styledLabel = companyLabelStyle(color).Render(styledLabel)
+			}
+			if rowSelected {
+				styledLabel = rowCursorStyle.Render(styledLabel)
 			}
 			line := styledLabel + "  "
 
@@ -234,6 +238,9 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 						cell = todayCellStyle.Render(cell)
 					}
 				}
+				if rowSelected && !(li == 0 && d == cursorCol) {
+					cell = rowCursorStyle.Render(cell)
+				}
 				line += gridSepStyle.Render(boxV) + cell
 			}
 
@@ -241,6 +248,9 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 			if li == 0 {
 				totalCell = fmt.Sprintf("%*s", colWidth-1, FormatHours(rowTotal))
 				totalCell = totalsStyle.Render(totalCell)
+			}
+			if rowSelected {
+				totalCell = rowCursorStyle.Render(totalCell)
 			}
 			line += gridSepStyle.Render(boxV) + totalCell
 			rowLines = append(rowLines, line)
