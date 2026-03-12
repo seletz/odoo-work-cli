@@ -16,9 +16,6 @@ func CMD(cfgFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Show discovered config files and merged configuration",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			result, err := config.Discover(*cfgFile)
 			if err != nil {

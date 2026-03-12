@@ -29,6 +29,10 @@ func main() {
 		Short:   "CLI for managing Odoo 17 timesheets",
 		Version: version.Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if isNoneSetupCommand(cmd) {
+				return nil
+			}
+
 			cfg, err := loadConfig(cfgFile)
 			if err != nil {
 				fmt.Println(err)
@@ -67,6 +71,18 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func isNoneSetupCommand(cmd *cobra.Command) bool {
+	for current := cmd; current != nil; current = current.Parent() {
+		switch current.Name() {
+		case "completion", "__complete", "__completeNoDesc":
+			return true
+		case "config":
+			return true
+		}
+	}
+	return false
 }
 
 // loadConfig loads and merges config using file discovery and env vars.
