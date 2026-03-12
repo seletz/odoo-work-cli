@@ -7,8 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var tsWeek string
-
 func CMD(client *odoo.XMLRPCClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fields <model>",
