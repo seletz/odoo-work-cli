@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/filter"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
@@ -28,15 +29,19 @@ type subOps struct {
 	description string
 }
 
-func CMD(client *odoo.XMLRPCClient) *cobra.Command {
+func CMD(deps *app.Deps) *cobra.Command {
 	ops := &entrieOps{}
 
 	cmd := &cobra.Command{
 		Use:   "entries",
 		Short: "List individual timesheet entries with full detail",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			var dateFrom, dateTo string
-			var err error
 			if ops.date != "" {
 				dateFrom, dateTo, err = parsing.ParseDateRange(ops.date)
 			} else {
@@ -84,9 +89,9 @@ func CMD(client *odoo.XMLRPCClient) *cobra.Command {
 	cmd.Flags().StringVar(&ops.status, "status", "", "filter by validation status (e.g. draft, validated)")
 
 	// Set Subcommands
-	cmd.AddCommand(addCmd(client))
-	cmd.AddCommand(updateCmd(client))
-	cmd.AddCommand(deleteCmd(client))
+	cmd.AddCommand(addCmd(deps))
+	cmd.AddCommand(updateCmd(deps))
+	cmd.AddCommand(deleteCmd(deps))
 
 	return cmd
 }

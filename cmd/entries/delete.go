@@ -3,16 +3,21 @@ package entries
 import (
 	"fmt"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 
-func deleteCmd(client *odoo.XMLRPCClient) *cobra.Command {
+func deleteCmd(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete ID",
 		Short: "Delete a timesheet entry",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			id, err := parseEntryID(args[0])
 			if err != nil {
 				return err

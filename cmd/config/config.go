@@ -11,7 +11,7 @@ import (
 
 var configMerged bool
 
-func CMD(cfgFile string) *cobra.Command {
+func CMD(cfgFile *string) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -20,7 +20,7 @@ func CMD(cfgFile string) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := config.Discover(cfgFile)
+			result, err := config.Discover(*cfgFile)
 			if err != nil {
 				return err
 			}

@@ -3,18 +3,22 @@ package timesheet
 import (
 	"fmt"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
 	"github.com/spf13/cobra"
 )
 
 var tsWeek string
 
-func CMD(client *odoo.XMLRPCClient) *cobra.Command {
+func CMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "timesheets",
 		Short: "List Odoo timesheets for a week",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
 
 			dateFrom, dateTo, err := parsing.WeekDateRange(tsWeek)
 			if err != nil {

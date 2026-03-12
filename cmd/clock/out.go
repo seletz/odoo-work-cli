@@ -4,16 +4,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
-func outCMD(client *odoo.XMLRPCClient) *cobra.Command {
+func outCMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "out",
 		Short: "Clock out (end attendance)",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			rec, err := client.ClockOut()
 			if err != nil {
 				return err

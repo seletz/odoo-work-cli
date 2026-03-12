@@ -3,16 +3,21 @@ package entries
 import (
 	"fmt"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 
-func addCmd(client *odoo.XMLRPCClient) *cobra.Command {
+func addCmd(deps *app.Deps) *cobra.Command {
 	ops := &subOps{}
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Create a new timesheet entry",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			params, err := buildTimesheetWriteParams(ops.projectID,
 				ops.taskID,
 				ops.date,

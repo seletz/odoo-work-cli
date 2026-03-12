@@ -3,17 +3,22 @@ package entries
 import (
 	"fmt"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 
-func updateCmd(client *odoo.XMLRPCClient) *cobra.Command {
+func updateCmd(deps *app.Deps) *cobra.Command {
 	ops := &subOps{}
 	cmd := &cobra.Command{
 		Use:   "update ID",
 		Short: "Update an existing timesheet entry",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			id, err := parseEntryID(args[0])
 			if err != nil {
 				return err

@@ -4,17 +4,21 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 
-func CMD(client *odoo.XMLRPCClient) *cobra.Command {
+func CMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tasks [project-id]",
 		Short: "List Odoo tasks",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			var projectID int64
 			if len(args) == 1 {
 				projectID, err = strconv.ParseInt(args[0], 10, 64)

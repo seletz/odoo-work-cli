@@ -4,16 +4,24 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/seletz/odoo-work-cli/internal/config"
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 
-func CMD(client *odoo.XMLRPCClient, cfg *config.Config) *cobra.Command {
+func CMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "projects",
 		Short: "List Odoo projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+			cfg, err := deps.RequireConfig()
+			if err != nil {
+				return err
+			}
+
 			projects, err := client.ListProjects()
 			if err != nil {
 				return err

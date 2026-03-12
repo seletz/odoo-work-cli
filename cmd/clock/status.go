@@ -4,16 +4,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
-func statusCMD(client *odoo.XMLRPCClient) *cobra.Command {
+func statusCMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current attendance status",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
+			}
+
 			status, err := client.AttendanceStatus()
 			if err != nil {
 				return err

@@ -1,19 +1,19 @@
 package clock
 
 import (
-	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 
-func CMD(client *odoo.XMLRPCClient) *cobra.Command {
+func CMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clock",
 		Short: "Clock in/out and attendance status",
 	}
 
-	cmd.AddCommand(inCMD(client))
-	cmd.AddCommand(outCMD(client))
-	cmd.AddCommand(statusCMD(client))
+	cmd.AddCommand(inCMD(deps))
+	cmd.AddCommand(outCMD(deps))
+	cmd.AddCommand(statusCMD(deps))
 
 	return cmd
 }
