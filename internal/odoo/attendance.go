@@ -106,31 +106,67 @@ func (x *XMLRPCClient) ClockOut() (*AttendanceRecord, error) {
 	return parseAttendanceRecord(records[0])
 }
 
+// attendanceSearchFunc abstracts over searchReadRaw for testing.
+type attendanceSearchFunc func(model string, criteria *goOdoo.Criteria, opts *goOdoo.Options) ([]map[string]interface{}, error)
+
 // AttendanceStatus returns the current clock state and today's attendance periods.
 func (x *XMLRPCClient) AttendanceStatus() (*AttendanceStatus, error) {
 	empID, err := x.findEmployeeID()
 	if err != nil {
 		return nil, err
 	}
+	return fetchAttendanceStatus(x.searchReadRaw, empID, time.Now())
+}
 
-	now := time.Now()
+// fetchAttendanceStatus queries attendance records and builds the status.
+// It fetches both today's records (by check_in date) and any open records
+// from previous days (check_out = false), so that overnight attendance
+// spanning midnight is correctly detected.
+func fetchAttendanceStatus(searchFn attendanceSearchFunc, empID int64, now time.Time) (*AttendanceStatus, error) {
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	tomorrowStart := todayStart.AddDate(0, 0, 1)
 
-	criteria := goOdoo.NewCriteria().
-		Add("employee_id", "=", empID).
-		Add("check_in", ">=", todayStart.Format(odooDatetimeFormat)).
-		Add("check_in", "<", tomorrowStart.Format(odooDatetimeFormat))
 	opts := goOdoo.NewOptions().
 		FetchFields("id", "employee_id", "check_in", "check_out", "worked_hours")
 
-	records, err := x.searchReadRaw("hr.attendance", criteria, opts)
+	// Query 1: records checked in today.
+	todayCriteria := goOdoo.NewCriteria().
+		Add("employee_id", "=", empID).
+		Add("check_in", ">=", todayStart.Format(odooDatetimeFormat)).
+		Add("check_in", "<", tomorrowStart.Format(odooDatetimeFormat))
+
+	records, err := searchFn("hr.attendance", todayCriteria, opts)
 	if IsNotFound(err) {
 		records = nil
 	} else if err != nil {
 		return nil, fmt.Errorf("fetching today's attendance: %w", err)
 	}
 
+	// Query 2: open records from previous days (check_in before today,
+	// check_out = false). This catches overnight attendance that started
+	// before midnight.
+	openCriteria := goOdoo.NewCriteria().
+		Add("employee_id", "=", empID).
+		Add("check_in", "<", todayStart.Format(odooDatetimeFormat)).
+		Add("check_out", "=", false)
+
+	openRecords, err := searchFn("hr.attendance", openCriteria, opts)
+	if IsNotFound(err) {
+		openRecords = nil
+	} else if err != nil {
+		return nil, fmt.Errorf("fetching open attendance: %w", err)
+	}
+
+	// Merge: open records first, then today's records.
+	all := append(openRecords, records...)
+
+	return buildAttendanceStatus(all, now)
+}
+
+// buildAttendanceStatus processes raw Odoo attendance records into an
+// AttendanceStatus summary. The now parameter is used to compute elapsed
+// time for open (running) periods.
+func buildAttendanceStatus(records []map[string]interface{}, now time.Time) (*AttendanceStatus, error) {
 	status := &AttendanceStatus{}
 	for _, r := range records {
 		rec, err := parseAttendanceRecord(r)
@@ -145,7 +181,7 @@ func (x *XMLRPCClient) AttendanceStatus() (*AttendanceStatus, error) {
 			checkIn := rec.CheckIn
 			status.CheckIn = &checkIn
 			// For running period, compute elapsed time.
-			elapsed := time.Since(rec.CheckIn).Hours()
+			elapsed := now.Sub(rec.CheckIn).Hours()
 			status.TotalHours += elapsed
 		} else {
 			status.TotalHours += rec.WorkedHours
