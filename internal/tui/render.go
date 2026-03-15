@@ -15,10 +15,122 @@ import (
 
 var dayNames = [7]string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
+// Box-drawing characters for grid borders.
+const (
+	boxH  = "─"
+	boxV  = "│"
+	boxTL = "┬"
+	boxBL = "┴"
+	boxX  = "┼"
+	boxLL = "├"
+	boxLR = "┤"
+)
+
+// RenderHeaderBar renders a styled top header bar with app name, week number,
+// date range, clock status, and loading indicator.
+func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, loading bool, spin spinner.Model, width int) string {
+	sunday := monday.AddDate(0, 0, 6)
+	_, isoWeek := monday.ISOWeek()
+
+	weekNum := weekNumberStyle.Render(fmt.Sprintf("W%02d", isoWeek))
+	dateRange := fmt.Sprintf("%s — %s",
+		monday.Format("Mon 02 Jan 2006"),
+		sunday.Format("Mon 02 Jan 2006"))
+
+	left := fmt.Sprintf(" %s  %s", weekNum, dateRange)
+
+	loadingIndicator := ""
+	if loading {
+		loadingIndicator = " " + spin.View()
+	}
+
+	clockStatus := renderClockStatus(attendance)
+	right := clockStatus + loadingIndicator + " "
+
+	// Manually pad to full width so we don't rely on lipgloss Width wrapping
+	// (which can break with nested ANSI sequences).
+	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
+	}
+	bar := left + strings.Repeat(" ", gap) + right
+
+	return headerBarStyle.UnsetPadding().Render(bar)
+}
+
+// RenderStatusBar renders a styled bottom status bar showing current state context.
+func RenderStatusBar(state uiState, weekTotal float64, limits config.HoursLimits, attendance *odoo.AttendanceStatus, width int) string {
+	stateLabel := ""
+	switch state {
+	case stateGrid:
+		stateLabel = "GRID"
+	case stateDetail:
+		stateLabel = "DETAIL"
+	case stateEdit:
+		stateLabel = "EDIT"
+	case stateSearch:
+		stateLabel = "SEARCH"
+	case stateHelp:
+		stateLabel = "HELP"
+	}
+
+	left := " " + stateLabel
+
+	totalStr := FormatHours(weekTotal)
+	if totalStr == "" {
+		totalStr = "0:00"
+	}
+	totalStyled := weekTotalStyle(weekTotal, limits).Render(totalStr)
+	right := "Week: " + totalStyled + " "
+
+	// Manually pad to full width so we don't rely on lipgloss Width wrapping
+	// (which can break with nested ANSI sequences).
+	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
+	}
+	bar := left + strings.Repeat(" ", gap) + right
+
+	return statusBarStyle.UnsetPadding().Render(bar)
+}
+
+// buildGridSeparator builds a box-drawing separator line with connectors.
+func buildGridSeparator(labelWidth, colWidth int, top bool) string {
+	var b strings.Builder
+	b.WriteString(strings.Repeat(boxH, labelWidth+2))
+	for i := 0; i < 8; i++ {
+		connector := boxX
+		if top {
+			connector = boxTL
+		}
+		if i == 0 {
+			connector = boxX
+			if top {
+				connector = boxTL
+			}
+		}
+		b.WriteString(connector)
+		b.WriteString(strings.Repeat(boxH, colWidth-1))
+	}
+	return gridSepStyle.Render(b.String())
+}
+
+// buildGridSeparatorBottom builds a bottom separator line.
+func buildGridSeparatorBottom(labelWidth, colWidth int) string {
+	var b strings.Builder
+	b.WriteString(strings.Repeat(boxH, labelWidth+2))
+	for i := 0; i < 8; i++ {
+		b.WriteString(boxBL)
+		b.WriteString(strings.Repeat(boxH, colWidth-1))
+	}
+	return gridSepStyle.Render(b.String())
+}
+
 // RenderGrid renders the weekly grid as a styled string.
 // holidays is a [7]string with holiday names per day (empty = no holiday).
 // companyColors maps company name to lipgloss color string for row label coloring.
-func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string) string {
+// todayCol is the column index (0-6) for today, or -1 if not in this week.
+func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string, todayCol int) string {
 	minColWidth := 7
 	minLabelWidth := 20
 	maxLabelWidth := 40
@@ -41,11 +153,13 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 
 	var b strings.Builder
 
-	// Header row.
+	// Header row with vertical separators.
 	header := fmt.Sprintf("%-*s  ", labelWidth, "Project / Task")
 	for i, name := range dayNames {
-		cell := fmt.Sprintf("%*s", colWidth, name)
+		cell := fmt.Sprintf("%*s", colWidth-1, name)
 		switch {
+		case i == todayCol && !isHoliday(i):
+			cell = todayHeaderStyle.Render(cell)
 		case isHoliday(i):
 			cell = holidayStyle.Render(cell)
 		case i >= 5:
@@ -53,9 +167,9 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		default:
 			cell = headerStyle.Render(cell)
 		}
-		header += cell
+		header += gridSepStyle.Render(boxV) + cell
 	}
-	header += headerStyle.Render(fmt.Sprintf("%*s", colWidth, "Total"))
+	header += gridSepStyle.Render(boxV) + headerStyle.Render(fmt.Sprintf("%*s", colWidth-1, "Total"))
 	b.WriteString(header)
 	b.WriteString("\n")
 
@@ -71,19 +185,20 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		hline := fmt.Sprintf("%-*s  ", labelWidth, "")
 		for d := 0; d < 7; d++ {
 			name := holidays[d]
-			if len(name) > colWidth {
-				name = name[:colWidth-1] + "…"
+			if len(name) > colWidth-1 {
+				name = name[:colWidth-2] + "…"
 			}
-			cell := fmt.Sprintf("%*s", colWidth, name)
+			cell := fmt.Sprintf("%*s", colWidth-1, name)
 			cell = holidayStyle.Render(cell)
-			hline += cell
+			hline += gridSepStyle.Render(boxV) + cell
 		}
+		hline += gridSepStyle.Render(boxV)
 		b.WriteString(hline)
 		b.WriteString("\n")
 	}
 
-	// Separator.
-	b.WriteString(strings.Repeat("─", labelWidth+2+8*colWidth))
+	// Top separator with connectors.
+	b.WriteString(buildGridSeparator(labelWidth, colWidth, true))
 	b.WriteString("\n")
 
 	// Data rows.
@@ -101,7 +216,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		var rowTotal float64
 		for d := 0; d < 7; d++ {
 			rowTotal += row.Hours[d]
-			cell := fmt.Sprintf("%*s", colWidth, FormatHours(row.Hours[d]))
+			cell := fmt.Sprintf("%*s", colWidth-1, FormatHours(row.Hours[d]))
 			switch {
 			case ri == cursorRow && d == cursorCol:
 				cell = cursorStyle.Render(cell)
@@ -110,31 +225,36 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 			case d >= 5:
 				cell = weekendStyle.Render(cell)
 			case row.Hours[d] > 0:
-				cell = hoursStyle(grid.DayTotals[d], limits).Render(cell)
+				cell = hoursBgStyle(grid.DayTotals[d], limits).Render(cell)
+			case d == todayCol:
+				cell = todayCellStyle.Render(cell)
 			}
-			line += cell
+			line += gridSepStyle.Render(boxV) + cell
 		}
-		totalCell := fmt.Sprintf("%*s", colWidth, FormatHours(rowTotal))
-		line += totalsStyle.Render(totalCell)
+		totalCell := fmt.Sprintf("%*s", colWidth-1, FormatHours(rowTotal))
+		line += gridSepStyle.Render(boxV) + totalsStyle.Render(totalCell)
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
 
-	// Totals row.
-	b.WriteString(strings.Repeat("─", labelWidth+2+8*colWidth))
+	// Bottom separator.
+	b.WriteString(buildGridSeparatorBottom(labelWidth, colWidth))
 	b.WriteString("\n")
-	totalsLine := fmt.Sprintf("%-*s  ", labelWidth, "Total")
+
+	// Totals row with background emphasis.
+	totalsLabel := totalsRowStyle.Render(fmt.Sprintf("%-*s", labelWidth, "Total"))
+	totalsLine := totalsLabel + "  "
 	for d := 0; d < 7; d++ {
-		cell := fmt.Sprintf("%*s", colWidth, FormatHours(grid.DayTotals[d]))
+		cell := fmt.Sprintf("%*s", colWidth-1, FormatHours(grid.DayTotals[d]))
 		if isHoliday(d) {
 			cell = holidayStyle.Bold(true).Render(cell)
 		} else {
-			cell = totalsStyle.Render(cell)
+			cell = totalsRowStyle.Render(cell)
 		}
-		totalsLine += cell
+		totalsLine += gridSepStyle.Render(boxV) + cell
 	}
-	weekCell := fmt.Sprintf("%*s", colWidth, FormatHours(grid.WeekTotal))
-	totalsLine += weekTotalStyle(grid.WeekTotal, limits).Bold(true).Render(weekCell)
+	weekCell := fmt.Sprintf("%*s", colWidth-1, FormatHours(grid.WeekTotal))
+	totalsLine += gridSepStyle.Render(boxV) + weekTotalBoldStyle.Render(weekTotalStyle(grid.WeekTotal, limits).Bold(true).Render(weekCell))
 	b.WriteString(totalsLine)
 	b.WriteString("\n")
 
@@ -230,8 +350,9 @@ func detailTableStyles() table.Styles {
 }
 
 // RenderDetailOverlay composites a bordered detail box centered on top of bg.
-func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int) string {
-	box := detailBoxStyle.Render(detail)
+// boxStyle selects which border style to use for the overlay.
+func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int, boxStyle lipgloss.Style) string {
+	box := boxStyle.Render(detail)
 
 	boxLines := strings.Split(box, "\n")
 	bgLines := strings.Split(bg, "\n")
@@ -278,12 +399,12 @@ func renderClockStatus(attendance *odoo.AttendanceStatus) string {
 		return ""
 	}
 	if !attendance.ClockedIn || attendance.CheckIn == nil {
-		return clockedOutStyle.Render("🔴 Not clocked in")
+		return clockedOutStyle.Render("● Out")
 	}
 	elapsed := time.Since(*attendance.CheckIn)
 	h := int(elapsed.Hours())
 	m := int(elapsed.Minutes()) % 60
-	text := fmt.Sprintf("🟢 Clocked in since %s (%d:%02d)",
+	text := fmt.Sprintf("● In %s (%d:%02d)",
 		attendance.CheckIn.Local().Format("15:04"), h, m)
 	return clockedInStyle.Render(text)
 }
@@ -435,7 +556,14 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 				lastKind = item.Kind
 			}
 
-			label := fmt.Sprintf("    [%s] %s", strings.ToUpper(item.Kind[:1]), item.Name)
+			// Colored badge for kind.
+			var badge string
+			if item.Kind == "project" {
+				badge = searchProjectBadge.Render("[P]")
+			} else {
+				badge = searchTaskBadge.Render("[T]")
+			}
+			label := fmt.Sprintf("    %s %s", badge, item.Name)
 			if item.Extra != "" {
 				extra := item.Extra
 				if item.Kind == "project" {

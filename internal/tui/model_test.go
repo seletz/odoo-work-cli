@@ -343,8 +343,8 @@ func TestRenderClockStatus_Nil(t *testing.T) {
 func TestRenderClockStatus_NotClockedIn(t *testing.T) {
 	status := &odoo.AttendanceStatus{ClockedIn: false}
 	result := renderClockStatus(status)
-	if !strings.Contains(result, "Not clocked in") {
-		t.Fatalf("expected 'Not clocked in' in %q", result)
+	if !strings.Contains(result, "Out") {
+		t.Fatalf("expected 'Out' in %q", result)
 	}
 }
 
@@ -352,8 +352,8 @@ func TestRenderClockStatus_ClockedIn(t *testing.T) {
 	checkIn := time.Now().Add(-90 * time.Minute)
 	status := &odoo.AttendanceStatus{ClockedIn: true, CheckIn: &checkIn}
 	result := renderClockStatus(status)
-	if !strings.Contains(result, "Clocked in since") {
-		t.Fatalf("expected 'Clocked in since' in %q", result)
+	if !strings.Contains(result, "In") {
+		t.Fatalf("expected 'In' in %q", result)
 	}
 }
 
@@ -1407,11 +1407,11 @@ func TestRenderSearchOverlay(t *testing.T) {
 	if !strings.Contains(result, "Tasks:") {
 		t.Fatal("expected 'Tasks:' section")
 	}
-	if !strings.Contains(result, "[P] Alpha") {
-		t.Fatal("expected '[P] Alpha' in output")
+	if !strings.Contains(result, "Alpha") {
+		t.Fatal("expected 'Alpha' in output")
 	}
-	if !strings.Contains(result, "[T] Task X") {
-		t.Fatal("expected '[T] Task X' in output")
+	if !strings.Contains(result, "Task X") {
+		t.Fatal("expected 'Task X' in output")
 	}
 }
 

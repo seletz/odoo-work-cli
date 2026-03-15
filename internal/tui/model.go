@@ -840,6 +840,16 @@ func formatDecimalHours(h float64) string {
 func (m Model) View() tea.View {
 	var s string
 
+	// Compute today's column for the displayed week (-1 if not this week).
+	todayCol := TodayColumn(m.monday.Time, time.Now())
+	nowDate := time.Now()
+	monDate := time.Date(m.monday.Year(), m.monday.Month(), m.monday.Day(), 0, 0, 0, 0, m.monday.Location())
+	nowDateOnly := time.Date(nowDate.Year(), nowDate.Month(), nowDate.Day(), 0, 0, 0, 0, nowDate.Location())
+	daysSince := int(nowDateOnly.Sub(monDate).Hours() / 24)
+	if daysSince < 0 || daysSince > 6 {
+		todayCol = -1
+	}
+
 	switch m.state {
 	case stateLoading:
 		week := m.monday.Format("2006-01-02")
@@ -849,41 +859,27 @@ func (m Model) View() tea.View {
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
 	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp:
-		sunday := m.monday.AddDate(0, 0, 6)
-		loadingIndicator := ""
-		if m.loading {
-			loadingIndicator = " " + m.spinner.View()
-		}
-		_, isoWeek := m.monday.ISOWeek()
-		clockStatus := renderClockStatus(m.attendance)
-		if clockStatus != "" {
-			clockStatus = "  " + clockStatus
-		}
-		title := fmt.Sprintf("  W%02d: %s — %s%s%s\n\n",
-			isoWeek,
-			m.monday.Format("Mon 02 Jan 2006"),
-			sunday.Format("Mon 02 Jan 2006"),
-			loadingIndicator,
-			clockStatus)
-		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors)
+		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.loading, m.spinner, m.width)
+		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors, todayCol)
+		statusBar := RenderStatusBar(m.state, m.grid.WeekTotal, m.limits, m.attendance, m.width)
 
 		helpView := m.help.View(m.keys)
-		s = "\n" + title + grid + "\n  " + helpView + "\n"
+		s = headerBar + "\n\n" + grid + "\n  " + helpView + "\n" + statusBar + "\n"
 
 		if m.state == stateEdit && m.cursor[0] < len(m.grid.Rows) {
 			row := m.grid.Rows[m.cursor[0]]
 			day := m.monday.AddDate(0, 0, m.cursor[1])
 			edit := renderEditForm(row, day, m.editHours, m.editDesc, m.editFocus, m.editErr, m.width, m.editIsNew)
-			s = RenderDetailOverlay(s, edit, m.width, m.height)
+			s = RenderDetailOverlay(s, edit, m.width, m.height, editBoxStyle)
 		} else if m.state == stateDetail && m.cursor[0] < len(m.grid.Rows) {
 			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.detailCursor, m.width, m.companyColors)
-			s = RenderDetailOverlay(s, detail, m.width, m.height)
+			s = RenderDetailOverlay(s, detail, m.width, m.height, detailBoxStyle)
 		} else if m.state == stateSearch {
 			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height, m.companyColors)
-			s = RenderDetailOverlay(s, search, m.width, m.height)
+			s = RenderDetailOverlay(s, search, m.width, m.height, searchBoxStyle)
 		} else if m.state == stateHelp {
 			helpContent := renderHelpOverlay(m.keys, m.width, m.height)
-			s = RenderDetailOverlay(s, helpContent, m.width, m.height)
+			s = RenderDetailOverlay(s, helpContent, m.width, m.height, helpBoxStyle)
 		}
 	}
 
