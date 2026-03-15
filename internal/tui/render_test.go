@@ -37,7 +37,7 @@ func TestRenderGrid_ShowsCompanyPrefix(t *testing.T) {
 	}
 
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
 
 	if !strings.Contains(out, "[DIG] Acme / Dev") {
 		t.Error("output should contain prefixed company label '[DIG] Acme / Dev'")
@@ -159,7 +159,7 @@ func TestRenderGrid_WrapsLongLabels(t *testing.T) {
 	}
 
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 90, config.DefaultHoursLimits(), [7]string{}, nil)
+	out := RenderGrid(g, 0, 0, 90, config.DefaultHoursLimits(), [7]string{}, nil, -1)
 
 	if strings.Contains(out, "…") {
 		t.Fatal("output should wrap long labels instead of truncating with ellipsis")
@@ -182,7 +182,7 @@ func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
 	}
 
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil)
+	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
 
 	selectedLabel := rowCursorStyle.Render(fmt.Sprintf("%-*s", 40, "Beta / QA"))
 	selectedCell := cursorStyle.Render(fmt.Sprintf("%*s", 9, "2:00"))
