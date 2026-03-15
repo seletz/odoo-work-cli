@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var tsWeek string
-
 func CMD(deps *app.Deps) *cobra.Command {
+	var tsWeek string
+
 	cmd := &cobra.Command{
 		Use:   "timesheets",
 		Short: "List Odoo timesheets for a week",

@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/parsing"
 )
 
 // mockClient implements odoo.Client for testing.
@@ -43,6 +44,7 @@ type mockClient struct {
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
+func (c *mockClient) Close()                                     {}
 func (c *mockClient) GetFields(string) ([]odoo.FieldInfo, error) { return nil, nil }
 func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error) {
 	return c.projects, c.projectsErr
@@ -121,7 +123,7 @@ func TestModel_CursorOnTodayColumn(t *testing.T) {
 	// Use the current week so TodayColumn returns the real day offset.
 	now := time.Now()
 	year, week := now.ISOWeek()
-	mon, _ := ParseWeekMonday(fmt.Sprintf("%d-W%02d", year, week))
+	mon, _ := parsing.ParseWeekMonday(fmt.Sprintf("%d-W%02d", year, week))
 	client := &mockClient{}
 	m := NewModel(client, MondayTime{Time: mon}, config.DefaultHoursLimits(), "Deutschland", nil, nil)
 

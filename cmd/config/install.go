@@ -1,4 +1,4 @@
-package project
+package config
 
 import (
 	"fmt"
@@ -36,8 +36,6 @@ func installcmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().BoolVar(&configMerged, "merged", false, "print merged TOML config (password redacted)")
 
 	return cmd
 }

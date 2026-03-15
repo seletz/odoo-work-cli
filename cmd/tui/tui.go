@@ -3,13 +3,14 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/parsing"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
-var tuiWeek string
-
 func CMD(deps *app.Deps) *cobra.Command {
+	var tuiWeek string
+
 	cmd := &cobra.Command{
 		Use:   "tui",
 		Short: "Interactive weekly timesheet view",
@@ -23,7 +24,7 @@ func CMD(deps *app.Deps) *cobra.Command {
 				return err
 			}
 
-			monday, err := tui.ParseWeekMonday(tuiWeek)
+			monday, err := parsing.ParseWeekMonday(tuiWeek)
 			if err != nil {
 				return err
 			}

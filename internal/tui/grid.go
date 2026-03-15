@@ -239,29 +239,6 @@ func hintIdentity(h HintRow) string {
 	return h.Label
 }
 
-// ParseWeekMonday parses an ISO week string (e.g. "2026-W10") and returns
-// the Monday of that week. If week is empty, returns the Monday of the
-// current week.
-func ParseWeekMonday(week string) (time.Time, error) {
-	var year, isoWeek int
-	if week == "" {
-		now := time.Now()
-		year, isoWeek = now.ISOWeek()
-	} else {
-		_, err := fmt.Sscanf(week, "%d-W%d", &year, &isoWeek)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("invalid week format %q (expected YYYY-Www): %w", week, err)
-		}
-	}
-	jan4 := time.Date(year, 1, 4, 0, 0, 0, 0, time.Local)
-	weekday := jan4.Weekday()
-	if weekday == 0 {
-		weekday = 7
-	}
-	monday1 := jan4.AddDate(0, 0, -int(weekday-1))
-	return monday1.AddDate(0, 0, (isoWeek-1)*7), nil
-}
-
 // TodayColumn returns the column index (0=Mon .. 6=Sun) for the given time
 // relative to the week starting at monday. Returns 0 if now falls outside the
 // displayed week.

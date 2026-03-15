@@ -36,12 +36,12 @@ func main() {
 			cfg, err := loadConfig(cfgFile)
 			if err != nil {
 				fmt.Println(err)
-				os.Exit(1)
+				return err
 			}
 			client, err := newClient(cfg)
 			if err != nil {
 				fmt.Println(err)
-				os.Exit(1)
+				return err
 			}
 			deps.Config = cfg
 			deps.Client = client
@@ -98,7 +98,7 @@ func loadConfig(cfgFile string) (*config.Config, error) {
 }
 
 // newClient creates a new Odoo client from the merged config.
-func newClient(cfg *config.Config) (*odoo.XMLRPCClient, error) {
+func newClient(cfg *config.Config) (odoo.Client, error) {
 	return odoo.NewXMLRPCClient(cfg.URL, cfg.Database, cfg.Username, cfg.Password, cfg.WebPassword, cfg.TOTPSecret, cfg.Models)
 }
 
