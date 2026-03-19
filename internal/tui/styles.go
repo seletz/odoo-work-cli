@@ -19,9 +19,10 @@ var (
 )
 
 var (
-	headerStyle  = lipgloss.NewStyle().Bold(true)
-	weekendStyle = lipgloss.NewStyle().Faint(true)
-	totalsStyle  = lipgloss.NewStyle().Bold(true)
+	headerStyle    = lipgloss.NewStyle().Bold(true)
+	weekendStyle   = lipgloss.NewStyle().Faint(true)
+	totalsStyle    = lipgloss.NewStyle().Bold(true)
+	rowCursorStyle = lipgloss.NewStyle().Background(lipgloss.Color("236"))
 
 	// Cursor: bold white on blue background instead of plain Reverse.
 	cursorStyle = lipgloss.NewStyle().

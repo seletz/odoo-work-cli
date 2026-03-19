@@ -34,6 +34,8 @@ func (m *mockClient) WhoAmI() (*UserInfo, error) {
 	return m.info, m.err
 }
 
+func (m *mockClient) Close() {}
+
 func (m *mockClient) ListProjects() ([]ProjectInfo, error) {
 	return m.projects, m.projErr
 }

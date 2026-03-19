@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -30,11 +31,24 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 	}
 }
 
+func TestRenderGrid_ShowsCompanyPrefix(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Acme", Task: "Dev", Company: "Digital Team", Hours: 8.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+
+	if !strings.Contains(out, "[DIG] Acme / Dev") {
+		t.Error("output should contain prefixed company label '[DIG] Acme / Dev'")
+	}
+}
+
 func TestRenderGrid_EmptyGrid(t *testing.T) {
 	g := BuildWeekGrid(nil, monday(2026, 3, 2))
 	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
 
-	if !strings.Contains(out, "Project / Task") {
+	if !strings.Contains(out, "Company Prefix / Project / Task") {
 		t.Error("output should contain header")
 	}
 	if !strings.Contains(out, "Total") {
@@ -136,5 +150,51 @@ func TestRenderGrid_CorrectLineCount(t *testing.T) {
 	// header + sep + 3 data rows + sep + totals = 7
 	if len(lines) != 7 {
 		t.Errorf("expected 7 lines, got %d", len(lines))
+	}
+}
+
+func TestRenderGrid_WrapsLongLabels(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Infrastruktur und Betrieb", Task: "Infrastructure Management", Company: "Digital", Hours: 8.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := RenderGrid(g, 0, 0, 90, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+
+	if strings.Contains(out, "…") {
+		t.Fatal("output should wrap long labels instead of truncating with ellipsis")
+	}
+	if !strings.Contains(out, "[DIG] Infrastruktur") {
+		t.Fatal("output should contain first wrapped label line")
+	}
+	if !strings.Contains(out, "Betrieb /") {
+		t.Fatal("output should contain continuation line for wrapped label")
+	}
+	if !strings.Contains(out, "8:00") {
+		t.Fatal("output should still contain hours for wrapped row")
+	}
+}
+
+func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
+	entries := []odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "Alpha", Task: "Dev", Hours: 1.0},
+		{Date: "2026-03-02", Project: "Beta", Task: "QA", Hours: 2.0},
+	}
+
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+
+	selectedLabel := rowCursorStyle.Render(fmt.Sprintf("%-*s", 40, "Beta / QA"))
+	selectedCell := cursorStyle.Render(fmt.Sprintf("%*s", 9, "2:00"))
+	selectedTotal := rowCursorStyle.Render(totalsStyle.Render(fmt.Sprintf("%*s", 9, "2:00")))
+
+	if !strings.Contains(out, selectedLabel) {
+		t.Fatal("output should highlight the selected row label")
+	}
+	if !strings.Contains(out, selectedCell) {
+		t.Fatal("output should keep the selected cell highlighted")
+	}
+	if !strings.Contains(out, selectedTotal) {
+		t.Fatal("output should highlight the selected row total")
 	}
 }

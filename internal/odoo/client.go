@@ -29,6 +29,7 @@ type TaskInfo struct {
 	Name      string
 	Project   string
 	ProjectID int64
+	Company   string
 	Stage     string
 	Active    bool
 }
@@ -91,6 +92,8 @@ type AttendanceStatus struct {
 
 // Client defines the interface for interacting with an Odoo instance.
 type Client interface {
+	// Close releases underlying client resources.
+	Close()
 	// WhoAmI returns the identity of the currently authenticated user.
 	WhoAmI() (*UserInfo, error)
 	// ListProjects returns projects from Odoo, applying configured filters.

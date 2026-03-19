@@ -153,8 +153,8 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 
 	var b strings.Builder
 
-	// Header row with vertical separators.
-	header := fmt.Sprintf("%-*s  ", labelWidth, "Project / Task")
+	// Header row.
+	header := fmt.Sprintf("%-*s  ", labelWidth, "Company Prefix / Project / Task")
 	for i, name := range dayNames {
 		cell := fmt.Sprintf("%*s", colWidth-1, name)
 		switch {
@@ -203,37 +203,60 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 
 	// Data rows.
 	for ri, row := range grid.Rows {
-		label := row.Label
-		if len(label) > labelWidth {
-			label = label[:labelWidth-1] + "…"
-		}
-		styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
-		if color, ok := companyColors[row.Company]; ok {
-			styledLabel = companyLabelStyle(color).Render(styledLabel)
-		}
-		line := styledLabel + "  "
-
+		rowSelected := ri == cursorRow
+		labelLines := wrapLabel(row.Label, labelWidth)
+		var rowLines []string
 		var rowTotal float64
 		for d := 0; d < 7; d++ {
 			rowTotal += row.Hours[d]
-			cell := fmt.Sprintf("%*s", colWidth-1, FormatHours(row.Hours[d]))
-			switch {
-			case ri == cursorRow && d == cursorCol:
-				cell = cursorStyle.Render(cell)
-			case isHoliday(d):
-				cell = holidayStyle.Render(cell)
-			case d >= 5:
-				cell = weekendStyle.Render(cell)
-			case row.Hours[d] > 0:
-				cell = hoursBgStyle(grid.DayTotals[d], limits).Render(cell)
-			case d == todayCol:
-				cell = todayCellStyle.Render(cell)
-			}
-			line += gridSepStyle.Render(boxV) + cell
 		}
-		totalCell := fmt.Sprintf("%*s", colWidth-1, FormatHours(rowTotal))
-		line += gridSepStyle.Render(boxV) + totalsStyle.Render(totalCell)
-		b.WriteString(line)
+
+		for li, label := range labelLines {
+			styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
+			if color, ok := companyColors[row.Company]; ok {
+				styledLabel = companyLabelStyle(color).Render(styledLabel)
+			}
+			if rowSelected {
+				styledLabel = rowCursorStyle.Render(styledLabel)
+			}
+			line := styledLabel + "  "
+
+			for d := 0; d < 7; d++ {
+				cell := fmt.Sprintf("%*s", colWidth-1, "")
+				if li == 0 {
+					cell = fmt.Sprintf("%*s", colWidth-1, FormatHours(row.Hours[d]))
+					switch {
+					case ri == cursorRow && d == cursorCol:
+						cell = cursorStyle.Render(cell)
+					case isHoliday(d):
+						cell = holidayStyle.Render(cell)
+					case d >= 5:
+						cell = weekendStyle.Render(cell)
+					case row.Hours[d] > 0:
+						cell = hoursBgStyle(grid.DayTotals[d], limits).Render(cell)
+					case d == todayCol:
+						cell = todayCellStyle.Render(cell)
+					}
+				}
+				if rowSelected && !(li == 0 && d == cursorCol) {
+					cell = rowCursorStyle.Render(cell)
+				}
+				line += gridSepStyle.Render(boxV) + cell
+			}
+
+			totalCell := fmt.Sprintf("%*s", colWidth-1, "")
+			if li == 0 {
+				totalCell = fmt.Sprintf("%*s", colWidth-1, FormatHours(rowTotal))
+				totalCell = totalsStyle.Render(totalCell)
+			}
+			if rowSelected {
+				totalCell = rowCursorStyle.Render(totalCell)
+			}
+			line += gridSepStyle.Render(boxV) + totalCell
+			rowLines = append(rowLines, line)
+		}
+
+		b.WriteString(strings.Join(rowLines, "\n"))
 		b.WriteString("\n")
 	}
 
@@ -259,6 +282,66 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	b.WriteString("\n")
 
 	return b.String()
+}
+
+func wrapLabel(label string, width int) []string {
+	if width <= 0 {
+		return []string{label}
+	}
+	if runeLen(label) <= width {
+		return []string{label}
+	}
+
+	words := strings.Fields(label)
+	if len(words) == 0 {
+		return []string{""}
+	}
+
+	lines := make([]string, 0, 2)
+	current := ""
+	for _, word := range words {
+		if runeLen(word) > width {
+			if current != "" {
+				lines = append(lines, current)
+				current = ""
+			}
+			lines = append(lines, breakLongWord(word, width)...)
+			continue
+		}
+
+		next := word
+		if current != "" {
+			next = current + " " + word
+		}
+		if runeLen(next) <= width {
+			current = next
+			continue
+		}
+
+		lines = append(lines, current)
+		current = word
+	}
+	if current != "" {
+		lines = append(lines, current)
+	}
+	return lines
+}
+
+func breakLongWord(word string, width int) []string {
+	runes := []rune(word)
+	lines := make([]string, 0, (len(runes)+width-1)/width)
+	for len(runes) > width {
+		lines = append(lines, string(runes[:width]))
+		runes = runes[width:]
+	}
+	if len(runes) > 0 {
+		lines = append(lines, string(runes))
+	}
+	return lines
+}
+
+func runeLen(s string) int {
+	return len([]rune(s))
 }
 
 // RenderDetail renders a detail panel for a specific cell showing individual entries.
@@ -556,14 +639,21 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 				lastKind = item.Kind
 			}
 
-			// Colored badge for kind.
+			// Colored badge for kind plus optional company prefix.
 			var badge string
 			if item.Kind == "project" {
 				badge = searchProjectBadge.Render("[P]")
 			} else {
 				badge = searchTaskBadge.Render("[T]")
 			}
-			label := fmt.Sprintf("    %s %s", badge, item.Name)
+			labelPrefix := ""
+			if prefix := companyPrefix(item.Company); prefix != "" {
+				labelPrefix = "[" + prefix + "] "
+				if color, ok := companyColors[item.Company]; ok {
+					labelPrefix = companyLabelStyle(color).Render(labelPrefix)
+				}
+			}
+			label := fmt.Sprintf("    %s %s%s", badge, labelPrefix, item.Name)
 			if item.Extra != "" {
 				extra := item.Extra
 				if item.Kind == "project" {

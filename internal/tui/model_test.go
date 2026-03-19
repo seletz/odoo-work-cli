@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/parsing"
 )
 
 // mockClient implements odoo.Client for testing.
@@ -43,6 +44,7 @@ type mockClient struct {
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
+func (c *mockClient) Close()                                     {}
 func (c *mockClient) GetFields(string) ([]odoo.FieldInfo, error) { return nil, nil }
 func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error) {
 	return c.projects, c.projectsErr
@@ -121,7 +123,7 @@ func TestModel_CursorOnTodayColumn(t *testing.T) {
 	// Use the current week so TodayColumn returns the real day offset.
 	now := time.Now()
 	year, week := now.ISOWeek()
-	mon, _ := ParseWeekMonday(fmt.Sprintf("%d-W%02d", year, week))
+	mon, _ := parsing.ParseWeekMonday(fmt.Sprintf("%d-W%02d", year, week))
 	client := &mockClient{}
 	m := NewModel(client, MondayTime{Time: mon}, config.DefaultHoursLimits(), "Deutschland", nil, nil)
 
@@ -1074,7 +1076,7 @@ func newSearchModel(projects []odoo.ProjectInfo, tasks []odoo.TaskInfo) Model {
 		projects: projects,
 		tasks:    tasks,
 		entries: []odoo.TimesheetEntry{
-			{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Hours: 2.0, ProjectID: 10, TaskID: 20},
+			{ID: 1, Date: "2026-03-02", Project: "Acme", Task: "Dev", Company: "Acme Org", Hours: 2.0, ProjectID: 10, TaskID: 20},
 		},
 	}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
@@ -1120,8 +1122,8 @@ func TestModel_SearchDataLoaded(t *testing.T) {
 			{ID: 2, Name: "Beta", Company: "Corp B"},
 		},
 		tasks: []odoo.TaskInfo{
-			{ID: 10, Name: "Task X", Project: "Alpha", ProjectID: 1},
-			{ID: 11, Name: "Task Y", Project: "Beta", ProjectID: 2},
+			{ID: 10, Name: "Task X", Project: "Alpha", ProjectID: 1, Company: "Corp A"},
+			{ID: 11, Name: "Task Y", Project: "Beta", ProjectID: 2, Company: "Corp B"},
 		},
 	}
 	updated, _ = um.Update(msg)
@@ -1174,7 +1176,7 @@ func TestModel_SearchFilter(t *testing.T) {
 			{ID: 2, Name: "Beta", Company: "Corp B"},
 		},
 		tasks: []odoo.TaskInfo{
-			{ID: 10, Name: "Task Alpha", Project: "Alpha", ProjectID: 1},
+			{ID: 10, Name: "Task Alpha", Project: "Alpha", ProjectID: 1, Company: "Corp A"},
 		},
 	}
 	updated, _ = um.Update(msg)
@@ -1308,7 +1310,7 @@ func TestModel_SearchSelectProject(t *testing.T) {
 	// Should have added a new row.
 	found := false
 	for _, row := range um.grid.Rows {
-		if row.Label == "NewProject" {
+		if row.Label == "[ACM] NewProject" {
 			found = true
 			if row.HintProjectID != 5 {
 				t.Fatalf("expected HintProjectID=5, got %d", row.HintProjectID)
@@ -1319,21 +1321,21 @@ func TestModel_SearchSelectProject(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("expected 'NewProject' row in grid")
+		t.Fatal("expected '[ACM] NewProject' row in grid")
 	}
 }
 
 func TestModel_SearchSelectTask(t *testing.T) {
 	m := newSearchModel(
 		nil,
-		[]odoo.TaskInfo{{ID: 42, Name: "TaskZ", Project: "ProjX", ProjectID: 7}},
+		[]odoo.TaskInfo{{ID: 42, Name: "TaskZ", Project: "ProjX", ProjectID: 7, Company: "Acme"}},
 	)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
 	um := updated.(Model)
 
 	// Load data.
 	updated, _ = um.Update(searchDataLoadedMsg{
-		tasks: []odoo.TaskInfo{{ID: 42, Name: "TaskZ", Project: "ProjX", ProjectID: 7}},
+		tasks: []odoo.TaskInfo{{ID: 42, Name: "TaskZ", Project: "ProjX", ProjectID: 7, Company: "Acme"}},
 	})
 	um = updated.(Model)
 
@@ -1346,7 +1348,7 @@ func TestModel_SearchSelectTask(t *testing.T) {
 	}
 	found := false
 	for _, row := range um.grid.Rows {
-		if row.Label == "ProjX / TaskZ" {
+		if row.Label == "[ACM] ProjX / TaskZ" {
 			found = true
 			if row.HintProjectID != 7 {
 				t.Fatalf("expected HintProjectID=7, got %d", row.HintProjectID)
@@ -1357,19 +1359,19 @@ func TestModel_SearchSelectTask(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("expected 'ProjX / TaskZ' row in grid")
+		t.Fatal("expected '[ACM] ProjX / TaskZ' row in grid")
 	}
 }
 
 func TestModel_SearchDuplicateRow(t *testing.T) {
-	// "Acme / Dev" already exists from entries.
+	// "[ACM] Acme / Dev" already exists from entries.
 	m := newSearchModel(nil, nil)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/'})
 	um := updated.(Model)
 
 	// Load data with a task that matches existing row label.
 	updated, _ = um.Update(searchDataLoadedMsg{
-		tasks: []odoo.TaskInfo{{ID: 20, Name: "Dev", Project: "Acme", ProjectID: 10}},
+		tasks: []odoo.TaskInfo{{ID: 20, Name: "Dev", Project: "Acme", ProjectID: 10, Company: "Acme Org"}},
 	})
 	um = updated.(Model)
 
@@ -1392,8 +1394,8 @@ func TestRenderSearchOverlay(t *testing.T) {
 	input.SetValue("test")
 
 	items := []searchItem{
-		{Kind: "project", Name: "Alpha", Extra: "Corp"},
-		{Kind: "task", Name: "Task X", Extra: "Alpha"},
+		{Kind: "project", Name: "Alpha", Extra: "Corp", Company: "Corp"},
+		{Kind: "task", Name: "Task X", Extra: "Alpha", Company: "Corp"},
 	}
 
 	result := renderSearchOverlay(input, items, 0, searchReady, true, nil, spinner.New(), 80, 40, nil)
@@ -1412,6 +1414,12 @@ func TestRenderSearchOverlay(t *testing.T) {
 	}
 	if !strings.Contains(result, "Task X") {
 		t.Fatal("expected 'Task X' in output")
+	}
+	if !strings.Contains(result, "[COR] Alpha") {
+		t.Fatal("expected '[COR] Alpha' in output")
+	}
+	if !strings.Contains(result, "[COR] Task X") {
+		t.Fatal("expected '[COR] Task X' in output")
 	}
 }
 
@@ -1878,18 +1886,18 @@ func TestModel_SearchAddedRowSurvivesReload(t *testing.T) {
 	// Verify the row was added.
 	foundBefore := false
 	for _, row := range um.grid.Rows {
-		if row.Label == "BrandNew" {
+		if row.Label == "[COR] BrandNew" {
 			foundBefore = true
 		}
 	}
 	if !foundBefore {
-		t.Fatal("expected 'BrandNew' row in grid before reload")
+		t.Fatal("expected '[COR] BrandNew' row in grid before reload")
 	}
 
 	// Press Enter on the new row to go to detail → triggers timesheet reload.
 	// First move cursor to the "BrandNew" row.
 	for i, row := range um.grid.Rows {
-		if row.Label == "BrandNew" {
+		if row.Label == "[COR] BrandNew" {
 			um.cursor[0] = i
 			break
 		}
@@ -1920,7 +1928,7 @@ func TestModel_SearchAddedRowSurvivesReload(t *testing.T) {
 	// The "BrandNew" row must still be in the grid.
 	found := false
 	for _, row := range um.grid.Rows {
-		if row.Label == "BrandNew" {
+		if row.Label == "[COR] BrandNew" {
 			found = true
 			if row.HintProjectID != 99 {
 				t.Fatalf("expected HintProjectID=99, got %d", row.HintProjectID)
@@ -1928,7 +1936,7 @@ func TestModel_SearchAddedRowSurvivesReload(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("BUG #30: search-added row 'BrandNew' vanished after timesheet reload")
+		t.Fatal("BUG #30: search-added row '[COR] BrandNew' vanished after timesheet reload")
 	}
 }
 
