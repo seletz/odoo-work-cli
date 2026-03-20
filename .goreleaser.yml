@@ -69,7 +69,7 @@ homebrew_casks:
     license: "MIT"
     completions:
       bash: completions/odoo-work-cli.bash
-      zsh: completions/odoo-work-cli.zsh
+      zsh: completions/_odoo-work-cli
       fish: completions/odoo-work-cli.fish
     hooks:
       post:

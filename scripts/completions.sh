@@ -2,6 +2,6 @@
 set -e
 rm -rf completions
 mkdir completions
-for sh in bash zsh fish; do
-    go run ./cmd/odoo-work-cli completion "$sh" > "completions/odoo-work-cli.$sh"
-done
+go run ./cmd/odoo-work-cli completion bash > "completions/odoo-work-cli.bash"
+go run ./cmd/odoo-work-cli completion zsh > "completions/_odoo-work-cli"
+go run ./cmd/odoo-work-cli completion fish > "completions/odoo-work-cli.fish"
