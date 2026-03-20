@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+cd "$(dirname "$0")/.."
 rm -rf completions
 mkdir completions
 go run ./cmd/odoo-work-cli completion bash > "completions/odoo-work-cli.bash"
