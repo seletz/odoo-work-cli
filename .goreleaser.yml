@@ -5,6 +5,7 @@ project_name: odoo-work-cli
 before:
   hooks:
     - go mod tidy
+    - ./scripts/completions.sh
 
 builds:
   - id: odoo-work-cli
@@ -32,6 +33,8 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    files:
+      - completions/*
 
 checksum:
   name_template: "checksums-{{ .Tag }}.txt"
@@ -64,6 +67,10 @@ homebrew_casks:
     homepage: "https://github.com/seletz/odoo-work-cli"
     description: "CLI tool for managing Odoo 17 timesheets"
     license: "MIT"
+    completions:
+      bash: completions/odoo-work-cli.bash
+      zsh: completions/odoo-work-cli.zsh
+      fish: completions/odoo-work-cli.fish
     hooks:
       post:
         install: |

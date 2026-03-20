@@ -1,6 +1,7 @@
 # Binaries
 /odoo-work-cli
 /dist/
+/completions/
 *.exe
 *.dll
 *.so

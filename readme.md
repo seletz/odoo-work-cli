@@ -55,6 +55,21 @@ your `PATH`.
 go install github.com/seletz/odoo-work-cli/cmd/odoo-work-cli@latest
 ```
 
+### Shell Completions
+
+Homebrew installs completions automatically. For manual installs, add one of:
+
+```bash
+# zsh (add to .zshrc)
+eval "$(odoo-work-cli completion zsh)"
+
+# bash (add to .bashrc, or drop into completions dir)
+odoo-work-cli completion bash > /usr/local/etc/bash_completion.d/odoo-work-cli
+
+# fish
+odoo-work-cli completion fish | source
+```
+
 ## Usage
 
 ### TUI
