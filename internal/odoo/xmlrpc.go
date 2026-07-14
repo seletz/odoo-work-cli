@@ -393,21 +393,36 @@ func (x *XMLRPCClient) GetFields(model string) ([]FieldInfo, error) {
 }
 
 // WhoAmI returns the identity of the currently authenticated user.
+// Only the displayed fields are requested: an unrestricted res.users read
+// touches fields backed by res.users.log, which non-admin users may not read.
 func (x *XMLRPCClient) WhoAmI() (*UserInfo, error) {
 	criteria := goOdoo.NewCriteria().Add("login", "=", x.login)
-	user, err := x.client.FindResUsers(criteria)
+	opts := goOdoo.NewOptions().FetchFields("name", "login", "email", "company_id").Limit(1)
+	records, err := x.searchReadRaw("res.users", criteria, opts)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
-
-	info := &UserInfo{
-		ID:    user.Id.Get(),
-		Name:  user.Name.Get(),
-		Login: user.Login.Get(),
-		Email: user.Email.Get(),
+	if len(records) == 0 {
+		return nil, fmt.Errorf("user %q not found", x.login)
 	}
-	if user.CompanyId != nil {
-		info.Company = user.CompanyId.Name
+
+	r := records[0]
+	info := &UserInfo{
+		Company: extractMany2OneName(r["company_id"]),
+	}
+	if id, ok := r["id"].(int64); ok {
+		info.ID = id
+	} else if id, ok := r["id"].(float64); ok {
+		info.ID = int64(id)
+	}
+	if name, ok := r["name"].(string); ok {
+		info.Name = name
+	}
+	if login, ok := r["login"].(string); ok {
+		info.Login = login
+	}
+	if email, ok := r["email"].(string); ok {
+		info.Email = email
 	}
 
 	return info, nil
