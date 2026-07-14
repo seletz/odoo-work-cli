@@ -18,6 +18,8 @@ import (
 // mockClient implements odoo.Client for testing.
 type mockClient struct {
 	entries         []odoo.TimesheetEntry
+	allEntries      []odoo.TimesheetEntry // ListAllTimesheets result (falls back to entries)
+	listAllTsCalled bool
 	err             error
 	updateErr       error
 	updatedID       int64
@@ -71,6 +73,13 @@ func (c *mockClient) ListAllTasks(_ int64) ([]odoo.TaskInfo, error) {
 func (c *mockClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, error) {
 	return c.entries, c.err
 }
+func (c *mockClient) ListAllTimesheets(string, string) ([]odoo.TimesheetEntry, error) {
+	c.listAllTsCalled = true
+	if c.allEntries != nil {
+		return c.allEntries, c.err
+	}
+	return c.entries, c.err
+}
 func (c *mockClient) CreateTimesheet(params odoo.TimesheetWriteParams) (int64, error) {
 	c.createParams = params
 	return c.createdID, c.createErr
@@ -105,6 +114,35 @@ func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
 	client := &mockClient{entries: entries, err: err}
 	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
 	return NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+}
+
+// Issue #58: the weekly grid must show all of the user's own bookings,
+// including those on other companies' projects that configured
+// [models.timesheet] filters would exclude.
+func TestLoadTimesheets_UsesUnfilteredFetch(t *testing.T) {
+	client := &mockClient{
+		entries: []odoo.TimesheetEntry{
+			{Date: "2026-03-02", Project: "Intern", ProjectID: 1, Hours: 1},
+		},
+		allEntries: []odoo.TimesheetEntry{
+			{Date: "2026-03-02", Project: "Intern", ProjectID: 1, Hours: 1},
+			{Date: "2026-03-02", Project: "Siemens ITECS", ProjectID: 4, TaskID: 8, Company: "nexiles Test AG", Hours: 2},
+		},
+	}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+
+	msg := m.loadTimesheets()()
+	loaded, ok := msg.(timesheetsLoadedMsg)
+	if !ok {
+		t.Fatalf("expected timesheetsLoadedMsg, got %T", msg)
+	}
+	if !client.listAllTsCalled {
+		t.Error("expected loadTimesheets to use ListAllTimesheets so config filters cannot hide own entries")
+	}
+	if len(loaded.entries) != 2 {
+		t.Fatalf("len(entries) = %d, want 2 (foreign-company entry must not vanish)", len(loaded.entries))
+	}
 }
 
 func TestModel_LoadedTransitionsToGrid(t *testing.T) {

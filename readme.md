@@ -324,6 +324,12 @@ Filters scope queries automatically. They are defined per model under
 `[models.<name>]` with `field`, `op`, and `value`. Supported operators include
 `=`, `!=`, `ilike`, `>`, `<`, `>=`, `<=`, etc.
 
+Note: the TUI weekly grid ignores `[models.timesheet]` filters and always
+shows all of your own bookings. Timesheet entries booked on another
+company's project carry that company's `company_id`, so a company filter
+would silently hide hours you just booked (see issue #58). The `entries`
+and `timesheets` commands still apply `[models.timesheet]` filters.
+
 ### Configurable key bindings
 
 TUI key bindings can be overridden in the `[keys]` section. Action names are

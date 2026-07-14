@@ -59,6 +59,10 @@ func (m *mockClient) ListTimesheets(_, _ string) ([]TimesheetEntry, error) {
 	return m.timesheets, m.tsErr
 }
 
+func (m *mockClient) ListAllTimesheets(_, _ string) ([]TimesheetEntry, error) {
+	return m.timesheets, m.tsErr
+}
+
 func (m *mockClient) GetFields(_ string) ([]FieldInfo, error) {
 	return m.fields, m.fieldsErr
 }

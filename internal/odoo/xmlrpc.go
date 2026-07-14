@@ -312,13 +312,36 @@ func (x *XMLRPCClient) listTasks(projectID int64, filtered bool) ([]TaskInfo, er
 	return result, nil
 }
 
-// ListTimesheets returns timesheet entries for the given date range.
-func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error) {
+// timesheetCriteria builds the search domain for the user's timesheet
+// entries in the given date range. Configured [models.timesheet] filters
+// are only added when applyFilters is true.
+func (x *XMLRPCClient) timesheetCriteria(dateFrom, dateTo string, applyFilters bool) *goOdoo.Criteria {
 	criteria := goOdoo.NewCriteria().
 		Add("date", ">=", dateFrom).
 		Add("date", "<=", dateTo).
 		Add("user_id.login", "=", x.login)
-	x.applyCriteriaFilters(criteria, "timesheet")
+	if applyFilters {
+		x.applyCriteriaFilters(criteria, "timesheet")
+	}
+	return criteria
+}
+
+// ListTimesheets returns timesheet entries for the given date range,
+// applying configured filters.
+func (x *XMLRPCClient) ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error) {
+	return x.listTimesheets(dateFrom, dateTo, true)
+}
+
+// ListAllTimesheets returns timesheet entries for the given date range,
+// ignoring configured filters. Entries booked on another company's project
+// carry that company's company_id, so a configured company filter would
+// silently hide the user's own bookings (issue #58).
+func (x *XMLRPCClient) ListAllTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error) {
+	return x.listTimesheets(dateFrom, dateTo, false)
+}
+
+func (x *XMLRPCClient) listTimesheets(dateFrom, dateTo string, applyFilters bool) ([]TimesheetEntry, error) {
+	criteria := x.timesheetCriteria(dateFrom, dateTo, applyFilters)
 
 	fields := []string{"id", "date", "project_id", "task_id", "name", "unit_amount", "employee_id", "validated_status", "company_id"}
 	opts := goOdoo.NewOptions().FetchFields(fields...)
