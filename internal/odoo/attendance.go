@@ -126,28 +126,41 @@ func fetchAttendanceStatus(searchFn attendanceSearchFunc, empID int64, now time.
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	tomorrowStart := todayStart.AddDate(0, 0, 1)
 
+	all, err := fetchAttendanceRange(searchFn, empID, todayStart, tomorrowStart)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildAttendanceStatus(all, now)
+}
+
+// fetchAttendanceRange queries raw attendance records for [from, to).
+// It fetches records checked in within the range plus any still-open
+// records that started before the range (check_out = false), so that
+// attendance spanning midnight is correctly included.
+func fetchAttendanceRange(searchFn attendanceSearchFunc, empID int64, from, to time.Time) ([]map[string]interface{}, error) {
 	opts := goOdoo.NewOptions().
 		FetchFields("id", "employee_id", "check_in", "check_out", "worked_hours")
 
-	// Query 1: records checked in today.
-	todayCriteria := goOdoo.NewCriteria().
+	// Query 1: records checked in within the range.
+	rangeCriteria := goOdoo.NewCriteria().
 		Add("employee_id", "=", empID).
-		Add("check_in", ">=", todayStart.Format(odooDatetimeFormat)).
-		Add("check_in", "<", tomorrowStart.Format(odooDatetimeFormat))
+		Add("check_in", ">=", from.Format(odooDatetimeFormat)).
+		Add("check_in", "<", to.Format(odooDatetimeFormat))
 
-	records, err := searchFn("hr.attendance", todayCriteria, opts)
+	records, err := searchFn("hr.attendance", rangeCriteria, opts)
 	if IsNotFound(err) {
 		records = nil
 	} else if err != nil {
-		return nil, fmt.Errorf("fetching today's attendance: %w", err)
+		return nil, fmt.Errorf("fetching attendance: %w", err)
 	}
 
-	// Query 2: open records from previous days (check_in before today,
+	// Query 2: open records from before the range (check_in before from,
 	// check_out = false). This catches overnight attendance that started
 	// before midnight.
 	openCriteria := goOdoo.NewCriteria().
 		Add("employee_id", "=", empID).
-		Add("check_in", "<", todayStart.Format(odooDatetimeFormat)).
+		Add("check_in", "<", from.Format(odooDatetimeFormat)).
 		Add("check_out", "=", false)
 
 	openRecords, err := searchFn("hr.attendance", openCriteria, opts)
@@ -157,10 +170,52 @@ func fetchAttendanceStatus(searchFn attendanceSearchFunc, empID int64, now time.
 		return nil, fmt.Errorf("fetching open attendance: %w", err)
 	}
 
-	// Merge: open records first, then today's records.
-	all := append(openRecords, records...)
+	// Merge: open records first, then in-range records.
+	return append(openRecords, records...), nil
+}
 
-	return buildAttendanceStatus(all, now)
+// listAttendanceRecords fetches and parses attendance records for [from, to).
+func listAttendanceRecords(searchFn attendanceSearchFunc, empID int64, from, to time.Time) ([]AttendanceRecord, error) {
+	raw, err := fetchAttendanceRange(searchFn, empID, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	records := make([]AttendanceRecord, 0, len(raw))
+	for _, r := range raw {
+		rec, err := parseAttendanceRecord(r)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, *rec)
+	}
+	return records, nil
+}
+
+// ListAttendance returns the current employee's attendance records with
+// check_in in [from, to), plus any still-open records that started before
+// the range (midnight wrap).
+func (x *XMLRPCClient) ListAttendance(from, to time.Time) ([]AttendanceRecord, error) {
+	empID, err := x.findEmployeeID()
+	if err != nil {
+		return nil, err
+	}
+	return listAttendanceRecords(x.searchReadRaw, empID, from, to)
+}
+
+// SumAttendanceHours totals worked hours across attendance records.
+// Closed records contribute their WorkedHours; open records contribute
+// the elapsed time from check-in until now.
+func SumAttendanceHours(records []AttendanceRecord, now time.Time) float64 {
+	var total float64
+	for _, r := range records {
+		if r.CheckOut == nil {
+			total += now.Sub(r.CheckIn).Hours()
+		} else {
+			total += r.WorkedHours
+		}
+	}
+	return total
 }
 
 // buildAttendanceStatus processes raw Odoo attendance records into an

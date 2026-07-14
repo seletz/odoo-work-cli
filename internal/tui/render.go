@@ -27,8 +27,8 @@ const (
 )
 
 // RenderHeaderBar renders a styled top header bar with app name, week number,
-// date range, clock status, and loading indicator.
-func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, loading bool, spin spinner.Model, width int) string {
+// date range, clock status, attendance totals, and loading indicator.
+func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAttendance []odoo.AttendanceRecord, loading bool, spin spinner.Model, width int) string {
 	sunday := monday.AddDate(0, 0, 6)
 	_, isoWeek := monday.ISOWeek()
 
@@ -44,8 +44,11 @@ func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, loadin
 		loadingIndicator = " " + spin.View()
 	}
 
-	clockStatus := renderClockStatus(attendance)
-	right := clockStatus + loadingIndicator + " "
+	right := renderClockStatus(attendance)
+	if summary := renderAttendanceSummary(attendance, weekAttendance, time.Now()); summary != "" {
+		right += "  " + summary
+	}
+	right += loadingIndicator + " "
 
 	// Manually pad to full width so we don't rely on lipgloss Width wrapping
 	// (which can break with nested ANSI sequences).
@@ -238,7 +241,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 						cell = todayCellStyle.Render(cell)
 					}
 				}
-				if rowSelected && !(li == 0 && d == cursorCol) {
+				if rowSelected && (li != 0 || d != cursorCol) {
 					cell = rowCursorStyle.Render(cell)
 				}
 				line += gridSepStyle.Render(boxV) + cell
@@ -490,6 +493,30 @@ func renderClockStatus(attendance *odoo.AttendanceStatus) string {
 	text := fmt.Sprintf("● In %s (%d:%02d)",
 		attendance.CheckIn.Local().Format("15:04"), h, m)
 	return clockedInStyle.Render(text)
+}
+
+// renderAttendanceSummary returns styled daily and weekly attendance totals,
+// e.g. "Today 6:30 · Week 32:15". Today covers the current day's periods
+// (from the attendance status), Week covers the displayed week's records.
+// Open periods contribute elapsed time up to now.
+func renderAttendanceSummary(attendance *odoo.AttendanceStatus, week []odoo.AttendanceRecord, now time.Time) string {
+	if attendance == nil {
+		return ""
+	}
+	today := odoo.SumAttendanceHours(attendance.Periods, now)
+	weekTotal := odoo.SumAttendanceHours(week, now)
+	text := fmt.Sprintf("Today %s · Week %s",
+		formatHoursOrZero(today), formatHoursOrZero(weekTotal))
+	return attendanceSummaryStyle.Render(text)
+}
+
+// formatHoursOrZero formats hours as "H:MM", rendering zero as "0:00"
+// instead of the empty string FormatHours returns.
+func formatHoursOrZero(h float64) string {
+	if s := FormatHours(h); s != "" {
+		return s
+	}
+	return "0:00"
 }
 
 // renderEditForm renders the edit form overlay content.

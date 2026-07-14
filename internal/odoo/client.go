@@ -121,4 +121,7 @@ type Client interface {
 	ClockOut() (*AttendanceRecord, error)
 	// AttendanceStatus returns the current clock state and today's periods.
 	AttendanceStatus() (*AttendanceStatus, error)
+	// ListAttendance returns attendance records with check_in in [from, to),
+	// plus any still-open records that started before the range.
+	ListAttendance(from, to time.Time) ([]AttendanceRecord, error)
 }

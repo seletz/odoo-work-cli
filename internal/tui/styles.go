@@ -95,6 +95,9 @@ var (
 	clockedInStyle  = lipgloss.NewStyle().Foreground(colorGreen).Bold(true)
 	clockedOutStyle = lipgloss.NewStyle().Foreground(colorRed)
 
+	// Daily/weekly attendance totals in the header bar.
+	attendanceSummaryStyle = lipgloss.NewStyle().Faint(true)
+
 	detailHintStyle      = lipgloss.NewStyle().Faint(true)
 	editLabelStyle       = lipgloss.NewStyle().Faint(true)
 	editActiveLabelStyle = lipgloss.NewStyle().Bold(true)

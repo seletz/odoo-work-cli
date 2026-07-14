@@ -57,6 +57,7 @@ type timesheetsLoadedMsg struct {
 // attendanceLoadedMsg is sent when attendance status finishes loading.
 type attendanceLoadedMsg struct {
 	status *odoo.AttendanceStatus
+	week   []odoo.AttendanceRecord // displayed week's attendance records
 	err    error
 }
 
@@ -88,30 +89,31 @@ type attendanceTickMsg time.Time
 
 // Model is the bubbletea model for the weekly timesheet TUI.
 type Model struct {
-	state        uiState
-	client       odoo.Client
-	grid         WeekGrid
-	monday       MondayTime
-	cursor       [2]int // [row, col]
-	spinner      spinner.Model
-	help         help.Model
-	keys         KeyMap
-	limits       config.HoursLimits
-	bundesland   string
-	holidays     HolidayMap
-	weekHols     [7]string
-	attendance   *odoo.AttendanceStatus
-	loading      bool
-	err          error
-	width        int
-	height       int
-	detailCursor int             // selected entry row in detail view
-	editIndex    int             // index into current day's entries slice
-	editHours    textinput.Model // hours input
-	editDesc     textinput.Model // description input
-	editFocus    int             // 0=hours, 1=description
-	editErr      error           // last edit error
-	editIsNew    bool            // true = creating new entry, false = editing existing
+	state          uiState
+	client         odoo.Client
+	grid           WeekGrid
+	monday         MondayTime
+	cursor         [2]int // [row, col]
+	spinner        spinner.Model
+	help           help.Model
+	keys           KeyMap
+	limits         config.HoursLimits
+	bundesland     string
+	holidays       HolidayMap
+	weekHols       [7]string
+	attendance     *odoo.AttendanceStatus
+	weekAttendance []odoo.AttendanceRecord // displayed week's attendance records
+	loading        bool
+	err            error
+	width          int
+	height         int
+	detailCursor   int             // selected entry row in detail view
+	editIndex      int             // index into current day's entries slice
+	editHours      textinput.Model // hours input
+	editDesc       textinput.Model // description input
+	editFocus      int             // 0=hours, 1=description
+	editErr        error           // last edit error
+	editIsNew      bool            // true = creating new entry, false = editing existing
 
 	helpPrevState uiState // state to return to when exiting help
 
@@ -187,9 +189,15 @@ func (m Model) loadTimesheets() tea.Cmd {
 
 func (m Model) loadAttendance() tea.Cmd {
 	client := m.client
+	from := time.Date(m.monday.Year(), m.monday.Month(), m.monday.Day(), 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
 	return func() tea.Msg {
 		status, err := client.AttendanceStatus()
-		return attendanceLoadedMsg{status: status, err: err}
+		if err != nil {
+			return attendanceLoadedMsg{err: err}
+		}
+		week, err := client.ListAttendance(from, to)
+		return attendanceLoadedMsg{status: status, week: week, err: err}
 	}
 }
 
@@ -270,6 +278,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case attendanceLoadedMsg:
 		if msg.err == nil {
 			m.attendance = msg.status
+			m.weekAttendance = msg.week
 		}
 		if m.attendance != nil && m.attendance.ClockedIn {
 			return m, attendanceTick()
@@ -289,10 +298,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.attendance = msg.status
+		// Reload attendance to refresh the displayed week's records.
 		if m.attendance != nil && m.attendance.ClockedIn {
-			return m, attendanceTick()
+			return m, tea.Batch(m.loadAttendance(), attendanceTick())
 		}
-		return m, nil
+		return m, m.loadAttendance()
 
 	case editSavedMsg:
 		if msg.err != nil {
@@ -389,7 +399,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.monday = MondayTime{m.monday.AddDate(0, 0, -7)}
 			m.loading = true
-			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
+			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
 
 		case key.Matches(msg, m.keys.Right):
 			if m.state == stateDetail {
@@ -397,7 +407,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.monday = MondayTime{m.monday.AddDate(0, 0, 7)}
 			m.loading = true
-			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets())
+			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
 		}
 
 		if m.state == stateGrid {
@@ -885,7 +895,7 @@ func (m Model) View() tea.View {
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
 	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp:
-		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.loading, m.spinner, m.width)
+		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.weekAttendance, m.loading, m.spinner, m.width)
 		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors, todayCol)
 		statusBar := RenderStatusBar(m.state, m.grid.WeekTotal, m.limits, m.attendance, m.width)
 

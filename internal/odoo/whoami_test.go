@@ -3,6 +3,7 @@ package odoo
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 // mockClient implements Client for testing.
@@ -22,12 +23,14 @@ type mockClient struct {
 	updateErr  error
 	deleteErr  error
 
-	clockInID        int64
-	clockInErr       error
-	clockOutRecord   *AttendanceRecord
-	clockOutErr      error
-	attendanceStatus *AttendanceStatus
-	attendanceErr    error
+	clockInID         int64
+	clockInErr        error
+	clockOutRecord    *AttendanceRecord
+	clockOutErr       error
+	attendanceStatus  *AttendanceStatus
+	attendanceErr     error
+	attendanceRecords []AttendanceRecord
+	attendanceListErr error
 }
 
 func (m *mockClient) WhoAmI() (*UserInfo, error) {
@@ -82,6 +85,10 @@ func (m *mockClient) ClockOut() (*AttendanceRecord, error) {
 
 func (m *mockClient) AttendanceStatus() (*AttendanceStatus, error) {
 	return m.attendanceStatus, m.attendanceErr
+}
+
+func (m *mockClient) ListAttendance(_, _ time.Time) ([]AttendanceRecord, error) {
+	return m.attendanceRecords, m.attendanceListErr
 }
 
 func TestWhoAmI_Success(t *testing.T) {

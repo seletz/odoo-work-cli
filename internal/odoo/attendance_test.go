@@ -448,6 +448,147 @@ func TestBuildAttendanceStatus_NormalDay(t *testing.T) {
 	}
 }
 
+func TestSumAttendanceHours(t *testing.T) {
+	now := time.Date(2026, 3, 10, 14, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name    string
+		records []AttendanceRecord
+		want    float64
+	}{
+		{
+			name:    "empty",
+			records: nil,
+			want:    0,
+		},
+		{
+			name: "closed records sum worked hours",
+			records: []AttendanceRecord{
+				{WorkedHours: 4.0, CheckIn: time.Date(2026, 3, 9, 8, 0, 0, 0, time.UTC), CheckOut: ptrTime(time.Date(2026, 3, 9, 12, 0, 0, 0, time.UTC))},
+				{WorkedHours: 3.5, CheckIn: time.Date(2026, 3, 10, 8, 0, 0, 0, time.UTC), CheckOut: ptrTime(time.Date(2026, 3, 10, 11, 30, 0, 0, time.UTC))},
+			},
+			want: 7.5,
+		},
+		{
+			name: "open record counts elapsed until now",
+			records: []AttendanceRecord{
+				{CheckIn: time.Date(2026, 3, 10, 13, 0, 0, 0, time.UTC)},
+			},
+			want: 1.0,
+		},
+		{
+			name: "mixed closed and open",
+			records: []AttendanceRecord{
+				{WorkedHours: 4.0, CheckIn: time.Date(2026, 3, 10, 8, 0, 0, 0, time.UTC), CheckOut: ptrTime(time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC))},
+				{CheckIn: time.Date(2026, 3, 10, 13, 30, 0, 0, time.UTC)},
+			},
+			want: 4.5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SumAttendanceHours(tt.records, now)
+			if got < tt.want-0.01 || got > tt.want+0.01 {
+				t.Errorf("SumAttendanceHours = %f, want %f", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestListAttendanceRecords_InRange(t *testing.T) {
+	// Two closed records within the week range.
+	rangeRecords := []map[string]interface{}{
+		{
+			"id":           int64(70),
+			"employee_id":  []interface{}{int64(7), "Test User"},
+			"check_in":     "2026-03-09 08:00:00",
+			"check_out":    "2026-03-09 16:00:00",
+			"worked_hours": float64(8.0),
+		},
+		{
+			"id":           int64(71),
+			"employee_id":  []interface{}{int64(7), "Test User"},
+			"check_in":     "2026-03-10 08:00:00",
+			"check_out":    "2026-03-10 12:00:00",
+			"worked_hours": float64(4.0),
+		},
+	}
+
+	searchFn := fakeSearchFn(rangeRecords, nil)
+	from := time.Date(2026, 3, 9, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	records, err := listAttendanceRecords(searchFn, 7, from, to)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("records len = %d, want 2", len(records))
+	}
+	if records[0].ID != 70 || records[1].ID != 71 {
+		t.Errorf("record IDs = %d, %d, want 70, 71", records[0].ID, records[1].ID)
+	}
+}
+
+func TestListAttendanceRecords_MidnightWrap(t *testing.T) {
+	// An open record that started before the range (overnight from the
+	// previous Sunday) must be included via the open-records pass.
+	openRecords := []map[string]interface{}{
+		{
+			"id":           int64(80),
+			"employee_id":  []interface{}{int64(7), "Test User"},
+			"check_in":     "2026-03-08 23:30:00",
+			"check_out":    false,
+			"worked_hours": float64(0),
+		},
+	}
+
+	searchFn := fakeSearchFn(nil, openRecords)
+	from := time.Date(2026, 3, 9, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	records, err := listAttendanceRecords(searchFn, 7, from, to)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("records len = %d, want 1", len(records))
+	}
+	if records[0].ID != 80 {
+		t.Errorf("record ID = %d, want 80", records[0].ID)
+	}
+	if records[0].CheckOut != nil {
+		t.Error("expected open record (CheckOut = nil)")
+	}
+}
+
+func TestListAttendanceRecords_QueryRange(t *testing.T) {
+	// Verify the range boundaries appear in the search criteria.
+	var captured []string
+	searchFn := func(_ string, criteria *goOdoo.Criteria, _ *goOdoo.Options) ([]map[string]interface{}, error) {
+		captured = append(captured, fmt.Sprintf("%v", *criteria))
+		return nil, nil
+	}
+
+	from := time.Date(2026, 3, 9, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	if _, err := listAttendanceRecords(searchFn, 7, from, to); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(captured) != 2 {
+		t.Fatalf("expected 2 queries, got %d", len(captured))
+	}
+	if !strings.Contains(captured[0], "2026-03-09 00:00:00") ||
+		!strings.Contains(captured[0], "2026-03-16 00:00:00") {
+		t.Errorf("range query criteria = %q, want from/to bounds", captured[0])
+	}
+	if !strings.Contains(captured[1], "check_out") ||
+		!strings.Contains(captured[1], "2026-03-09 00:00:00") {
+		t.Errorf("open query criteria = %q, want check_out filter with from bound", captured[1])
+	}
+}
+
 // ptrTime returns a pointer to the given time.Time.
 func ptrTime(t time.Time) *time.Time {
 	return &t
