@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
@@ -196,5 +198,96 @@ func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
 	}
 	if !strings.Contains(out, selectedTotal) {
 		t.Fatal("output should highlight the selected row total")
+	}
+}
+
+func TestRenderAttendanceSummary(t *testing.T) {
+	now := time.Date(2026, 3, 10, 14, 0, 0, 0, time.UTC)
+	checkIn := now.Add(-time.Hour)
+
+	closed := func(day int, hours float64) odoo.AttendanceRecord {
+		in := time.Date(2026, 3, day, 8, 0, 0, 0, time.UTC)
+		out := in.Add(time.Duration(hours * float64(time.Hour)))
+		return odoo.AttendanceRecord{CheckIn: in, CheckOut: &out, WorkedHours: hours}
+	}
+
+	tests := []struct {
+		name       string
+		attendance *odoo.AttendanceStatus
+		week       []odoo.AttendanceRecord
+		want       []string
+		wantEmpty  bool
+	}{
+		{
+			name:       "nil attendance renders nothing",
+			attendance: nil,
+			wantEmpty:  true,
+		},
+		{
+			name: "closed periods and week records",
+			attendance: &odoo.AttendanceStatus{
+				Periods: []odoo.AttendanceRecord{closed(10, 6.5)},
+			},
+			week: []odoo.AttendanceRecord{closed(9, 30.0), closed(10, 2.25)},
+			want: []string{"Today 6:30", "Week 32:15"},
+		},
+		{
+			name: "open period counts elapsed time",
+			attendance: &odoo.AttendanceStatus{
+				ClockedIn: true,
+				CheckIn:   &checkIn,
+				Periods:   []odoo.AttendanceRecord{{CheckIn: checkIn}},
+			},
+			week: []odoo.AttendanceRecord{{CheckIn: checkIn}},
+			want: []string{"Today 1:00", "Week 1:00"},
+		},
+		{
+			name:       "no records shows zero totals",
+			attendance: &odoo.AttendanceStatus{},
+			week:       nil,
+			want:       []string{"Today 0:00", "Week 0:00"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := renderAttendanceSummary(tt.attendance, tt.week, now)
+			if tt.wantEmpty {
+				if out != "" {
+					t.Fatalf("expected empty string, got %q", out)
+				}
+				return
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(out, want) {
+					t.Errorf("output %q should contain %q", out, want)
+				}
+			}
+		})
+	}
+}
+
+func TestRenderHeaderBar_ShowsAttendanceTotals(t *testing.T) {
+	mon := monday(2026, 3, 9)
+	checkIn := time.Now().Add(-30 * time.Minute)
+	attendance := &odoo.AttendanceStatus{
+		ClockedIn: true,
+		CheckIn:   &checkIn,
+		Periods:   []odoo.AttendanceRecord{{CheckIn: checkIn}},
+	}
+	weekOut := checkIn.Add(-time.Hour)
+	week := []odoo.AttendanceRecord{
+		{CheckIn: weekOut.Add(-8 * time.Hour), CheckOut: &weekOut, WorkedHours: 8.0},
+		{CheckIn: checkIn},
+	}
+
+	s := spinner.New()
+	out := RenderHeaderBar(mon, attendance, week, false, s, 160)
+
+	if !strings.Contains(out, "Today 0:30") {
+		t.Errorf("header %q should contain today's attendance total", out)
+	}
+	if !strings.Contains(out, "Week 8:30") {
+		t.Errorf("header %q should contain weekly attendance total", out)
 	}
 }

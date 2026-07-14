@@ -41,6 +41,10 @@ type mockClient struct {
 	clockOutErr     error
 	attendStatus    *odoo.AttendanceStatus
 	attendStatusErr error
+	attendWeek      []odoo.AttendanceRecord
+	attendWeekErr   error
+	attendWeekFrom  time.Time // capture last ListAttendance call
+	attendWeekTo    time.Time
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
@@ -90,6 +94,11 @@ func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error) {
 }
 func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) {
 	return c.attendStatus, c.attendStatusErr
+}
+func (c *mockClient) ListAttendance(from, to time.Time) ([]odoo.AttendanceRecord, error) {
+	c.attendWeekFrom = from
+	c.attendWeekTo = to
+	return c.attendWeek, c.attendWeekErr
 }
 
 func newTestModel(entries []odoo.TimesheetEntry, err error) Model {
@@ -1804,9 +1813,9 @@ func TestModel_ClockToggleMsgUpdatesClockedOut(t *testing.T) {
 	if um.attendance.ClockedIn {
 		t.Error("expected ClockedIn=false")
 	}
-	// Should not start tick when clocked out.
-	if cmd != nil {
-		t.Error("expected no tick command when clocked out")
+	// Should still reload attendance (week records changed on clock out).
+	if cmd == nil {
+		t.Error("expected attendance reload command after clock out")
 	}
 }
 
@@ -1967,4 +1976,98 @@ func TestModel_SearchAddedRowRemovedAfterEntryExists(t *testing.T) {
 	})
 	// No assertion on pendingRows internals, just verify grid has BrandNew.
 	// (The row now comes from server data, not pending rows.)
+}
+
+// execCmd runs a tea.Cmd, recursively executing nested batch commands so
+// that side effects on the mock client (captured calls) take place.
+func execCmd(cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, fn := range batch {
+			execCmd(fn)
+		}
+	}
+}
+
+func TestModel_AttendanceLoadedStoresWeekRecords(t *testing.T) {
+	m := newTestModel(nil, nil)
+	m.state = stateDetail
+
+	out := time.Date(2026, 3, 9, 16, 0, 0, 0, time.UTC)
+	msg := attendanceLoadedMsg{
+		status: &odoo.AttendanceStatus{ClockedIn: false},
+		week: []odoo.AttendanceRecord{
+			{ID: 1, CheckIn: out.Add(-8 * time.Hour), CheckOut: &out, WorkedHours: 8.0},
+		},
+	}
+	updated, _ := m.Update(msg)
+	um := updated.(Model)
+
+	if len(um.weekAttendance) != 1 {
+		t.Fatalf("weekAttendance len = %d, want 1", len(um.weekAttendance))
+	}
+	if um.state != stateDetail {
+		t.Fatalf("expected stateDetail to be preserved, got %d", um.state)
+	}
+}
+
+func TestLoadAttendance_FetchesDisplayedWeek(t *testing.T) {
+	client := &mockClient{
+		attendStatus: &odoo.AttendanceStatus{},
+		attendWeek:   []odoo.AttendanceRecord{{ID: 5}},
+	}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+
+	msg := m.loadAttendance()()
+	am, ok := msg.(attendanceLoadedMsg)
+	if !ok {
+		t.Fatalf("expected attendanceLoadedMsg, got %T", msg)
+	}
+	if am.err != nil {
+		t.Fatalf("unexpected error: %v", am.err)
+	}
+	if len(am.week) != 1 {
+		t.Fatalf("week len = %d, want 1", len(am.week))
+	}
+
+	wantFrom := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
+	if !client.attendWeekFrom.Equal(wantFrom) {
+		t.Errorf("from = %v, want %v", client.attendWeekFrom, wantFrom)
+	}
+	if !client.attendWeekTo.Equal(wantFrom.AddDate(0, 0, 7)) {
+		t.Errorf("to = %v, want %v", client.attendWeekTo, wantFrom.AddDate(0, 0, 7))
+	}
+}
+
+func TestModel_WeekNavReloadsAttendance(t *testing.T) {
+	client := &mockClient{attendStatus: &odoo.AttendanceStatus{}}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.state = stateGrid
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'l'})
+	execCmd(cmd)
+
+	wantFrom := time.Date(2026, 3, 9, 0, 0, 0, 0, time.UTC)
+	if !client.attendWeekFrom.Equal(wantFrom) {
+		t.Errorf("attendance reload from = %v, want next week %v", client.attendWeekFrom, wantFrom)
+	}
+}
+
+func TestModel_ClockToggleReloadsWeekAttendance(t *testing.T) {
+	client := &mockClient{attendStatus: &odoo.AttendanceStatus{}}
+	mon := MondayTime{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)}
+	m := NewModel(client, mon, config.DefaultHoursLimits(), "Deutschland", nil, nil)
+	m.state = stateGrid
+
+	_, cmd := m.Update(clockToggleMsg{status: &odoo.AttendanceStatus{ClockedIn: false}})
+	execCmd(cmd)
+
+	if client.attendWeekFrom.IsZero() {
+		t.Fatal("expected ListAttendance to be called after clock toggle")
+	}
 }
