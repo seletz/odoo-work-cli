@@ -1,10 +1,15 @@
 bundesland = "Baden-Württemberg"
 
+# Secrets for the odoo-erp DEV environment (issue #48).
+# api-key authenticates XML-RPC; password + totp_secret drive the
+# JSON-RPC web session used for attendance clock in/out.
 [op_secrets]
-url      = "op://Employee/Digitalgedacht Odoo/url"
-database = "op://Employee/Digitalgedacht Odoo/database-name"
-username = "op://Employee/Digitalgedacht Odoo/login"
-password = "op://Employee/Digitalgedacht Odoo/api-key"
+url         = "op://Employee/ODOO Work CLI/url"
+database    = "op://Employee/ODOO Work CLI/database-name"
+username    = "op://Employee/ODOO Work CLI/login"
+api-key     = "op://Employee/ODOO Work CLI/api-key"
+password    = "op://Employee/ODOO Work CLI/password"
+totp_secret = "op://Employee/ODOO Work CLI/totp_secret"
 
 [hours]
 daily_low = 6.0

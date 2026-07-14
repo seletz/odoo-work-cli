@@ -5,6 +5,14 @@ op = "latest"
 gh = "latest"
 goreleaser = "latest"
 
+[env]
+# Dev-environment credentials, generated from 1p.env via `mise run prepare_env`.
+_.file = ".env"
+
+[task_config]
+# File tasks: scripts/tasks/odoo/<name> becomes task "odoo:<name>".
+includes = ["scripts/tasks"]
+
 [tasks.build]
 description = "Build the CLI binary"
 run = """
@@ -20,6 +28,23 @@ run = "scripts/release.sh"
 description = "Build and run the CLI (pass args after --)"
 depends = ["build"]
 run = "./odoo-work-cli {{arg(i=0, var=true)}}"
+
+[tasks.prepare_env]
+description = "Generate .env from 1Password (op inject on 1p.env)"
+run = """
+op inject -f -i 1p.env -o .env
+chmod 600 .env
+echo ".env written from 1p.env"
+"""
+
+[tasks."odoo:prepare-db"]
+description = "Bootstrap the dev database: create API key, refresh .env, add test data"
+# Each step is a fresh `mise run` so it picks up the .env the previous step wrote.
+run = [
+    "mise run odoo:create-api-key",
+    "mise run prepare_env",
+    "mise run odoo:add-test-data",
+]
 
 [tasks.test]
 description = "Run all tests"

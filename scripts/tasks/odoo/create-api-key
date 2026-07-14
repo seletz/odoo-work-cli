@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+#MISE description="Create an Odoo XML-RPC API key for the dev user (via web login + 2FA)"
+#USAGE flag "--key-name <name>" help="Description stored on the API key" default="odoo-work-cli dev"
+#USAGE flag "--no-update-op" help="Only print the key; do not write it to the 1Password item"
+#USAGE flag "--op-item <item>" help="1Password item to update" default="ODOO Work CLI"
+#USAGE flag "--op-vault <vault>" help="1Password vault holding the item" default="Employee"
+
+"""Create an Odoo API key for XML-RPC access on the dev environment.
+
+Logs in via the HTML web flow (``/web/login`` -> ``/web/login/totp``),
+which is the only flow that binds the session to a database on the
+multi-db dev server, then drives the ``res.users.apikeys.description``
+wizard and its ``res.users.identitycheck`` confirmation.
+
+Required environment (see 1p.env / ``mise run prepare_env``):
+    ODOO_URL, ODOO_DATABASE, ODOO_USERNAME, ODOO_WEB_PASSWORD
+    ODOO_TOTP_SECRET (only when 2FA is enabled on the user)
+
+By default the new key is written back to the 1Password item so that
+``mise run prepare_env`` picks it up; pass --no-update-op to just print it.
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import os
+import re
+import ssl
+import struct
+import subprocess
+import sys
+import time
+import urllib.request
+from http.cookiejar import CookieJar
+from urllib.parse import urlencode
+
+CSRF_RE = re.compile(r'name="csrf_token"[^>]*value="([^"]+)"')
+
+
+def env(name, required=True):
+    value = os.environ.get(name, "")
+    if required and not value:
+        sys.exit(f"error: {name} is not set (run: mise run prepare_env)")
+    return value
+
+
+def ssl_context():
+    ctx = ssl.create_default_context()
+    if not ctx.get_ca_certs() and os.path.exists("/etc/ssl/cert.pem"):
+        ctx = ssl.create_default_context(cafile="/etc/ssl/cert.pem")
+    return ctx
+
+
+def totp_code(secret):
+    key = base64.b32decode(secret.replace(" ", "").upper())
+    h = hmac.new(key, struct.pack(">Q", int(time.time()) // 30), hashlib.sha1).digest()
+    offset = h[19] & 0xF
+    return "%06d" % ((struct.unpack(">I", h[offset : offset + 4])[0] & 0x7FFFFFFF) % 1000000)
+
+
+class OdooWebSession:
+    """Minimal authenticated Odoo web session (HTML login flow + call_kw)."""
+
+    def __init__(self, base_url, database):
+        self.base = base_url.rstrip("/")
+        self.database = database
+        self.opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=ssl_context()),
+            urllib.request.HTTPCookieProcessor(CookieJar()),
+        )
+
+    def get(self, path):
+        with self.opener.open(self.base + path, timeout=60) as resp:
+            return resp.geturl(), resp.read().decode()
+
+    def post_form(self, path, data):
+        req = urllib.request.Request(self.base + path, data=urlencode(data).encode())
+        with self.opener.open(req, timeout=60) as resp:
+            return resp.geturl(), resp.read().decode()
+
+    def login(self, username, password, totp_secret):
+        _, page = self.get(f"/web/login?db={self.database}")
+        csrf = CSRF_RE.search(page).group(1)
+        url, page = self.post_form(
+            "/web/login",
+            {"csrf_token": csrf, "login": username, "password": password, "redirect": ""},
+        )
+        if "/web/login/totp" in url:
+            if not totp_secret:
+                sys.exit("error: 2FA is enabled but ODOO_TOTP_SECRET is not set")
+            csrf = CSRF_RE.search(page).group(1)
+            url, _ = self.post_form(
+                "/web/login/totp",
+                {"csrf_token": csrf, "totp_token": totp_code(totp_secret), "redirect": ""},
+            )
+            if "totp" in url:
+                sys.exit("error: TOTP challenge failed (wrong ODOO_TOTP_SECRET or clock skew?)")
+        elif "/web/login" in url:
+            sys.exit("error: login failed (wrong ODOO_USERNAME/ODOO_WEB_PASSWORD?)")
+
+    def call_kw(self, model, method, args, kwargs=None):
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "call",
+            "id": 1,
+            "params": {"model": model, "method": method, "args": args, "kwargs": kwargs or {"context": {}}},
+        }
+        req = urllib.request.Request(
+            self.base + "/web/dataset/call_kw",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with self.opener.open(req, timeout=60) as resp:
+            body = json.load(resp)
+        if body.get("error"):
+            err = body["error"]
+            msg = err.get("data", {}).get("message") or err.get("message")
+            raise RuntimeError(f"{model}.{method}: {msg}")
+        return body.get("result")
+
+
+def create_api_key(session, key_name, password, totp_secret):
+    wizard_id = session.call_kw("res.users.apikeys.description", "create", [{"name": key_name}])
+    result = session.call_kw("res.users.apikeys.description", "make_key", [[wizard_id]])
+
+    # make_key is @check_identity-guarded: it may hand back the identity
+    # check wizard instead of the key. Confirm with the password (some
+    # builds validate a TOTP code instead).
+    if isinstance(result, dict) and result.get("res_model") == "res.users.identitycheck":
+        check_id = result["res_id"]
+        session.call_kw("res.users.identitycheck", "write", [[check_id], {"password": password}])
+        try:
+            result = session.call_kw("res.users.identitycheck", "run_check", [[check_id]])
+        except RuntimeError:
+            session.call_kw(
+                "res.users.identitycheck",
+                "write",
+                [[check_id], {"password": totp_code(totp_secret)}],
+            )
+            result = session.call_kw("res.users.identitycheck", "run_check", [[check_id]])
+
+    key = (result.get("context") or {}).get("default_key") if isinstance(result, dict) else None
+    if not key:
+        sys.exit(f"error: no key in wizard result: {json.dumps(result)[:300]}")
+    return key
+
+
+def update_1password(item, vault, key):
+    cmd = ["op", "item", "edit", item, f"api-key={key}", "--vault", vault]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        sys.exit(f"error: op item edit failed: {proc.stderr.strip()}")
+
+
+def main():
+    key_name = os.environ.get("usage_key_name", "odoo-work-cli dev")
+    update_op = os.environ.get("usage_no_update_op", "false") != "true"
+    op_item = os.environ.get("usage_op_item", "ODOO Work CLI")
+    op_vault = os.environ.get("usage_op_vault", "Employee")
+
+    url = env("ODOO_URL")
+    database = env("ODOO_DATABASE")
+    username = env("ODOO_USERNAME")
+    password = env("ODOO_WEB_PASSWORD")
+    totp_secret = env("ODOO_TOTP_SECRET", required=False)
+
+    print(f"logging in to {url} db={database} as {username} ...", file=sys.stderr)
+    session = OdooWebSession(url, database)
+    session.login(username, password, totp_secret)
+
+    key = create_api_key(session, key_name, password, totp_secret)
+    print(f"created API key {key[:6]}... ({key_name})", file=sys.stderr)
+
+    if update_op:
+        update_1password(op_item, op_vault, key)
+        print(f"updated 1Password item '{op_item}' field api-key", file=sys.stderr)
+        print("run 'mise run prepare_env' to refresh .env", file=sys.stderr)
+    else:
+        print(key)
+
+
+if __name__ == "__main__":
+    main()
