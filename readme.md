@@ -70,6 +70,43 @@ odoo-work-cli completion bash > /usr/local/etc/bash_completion.d/odoo-work-cli
 odoo-work-cli completion fish | source
 ```
 
+## Quick Start
+
+1. **Install** the CLI (see [Installation](#installation)).
+
+2. **Create an Odoo API key**: in Odoo, open your user's preferences
+   (*Settings → Users → your user → API Keys* tab, or avatar → *My Profile →
+   Account Security → New API Key*). Odoo 17 **requires API keys** for
+   XML-RPC — your login password will not work for most commands (see
+   [Credentials](#credentials)).
+
+3. **Create a config file**:
+
+   ```bash
+   odoo-work-cli config install
+   ```
+
+   Then edit the generated `config.toml` and set `url`, `database` and
+   `username`.
+
+4. **Provide the API key** — via 1Password (see
+   [Secrets](#secrets-via-1password)) or as an environment variable:
+
+   ```bash
+   export ODOO_PASSWORD="your-api-key"   # yes, the API key — not your login password
+   ```
+
+5. **Verify the connection**:
+
+   ```bash
+   odoo-work-cli whoami
+   ```
+
+6. **Optional — clock in/out**: `clock in|out` additionally needs your real
+   login password (`password` / `ODOO_WEB_PASSWORD`) and, if 2FA is enabled,
+   your TOTP secret (`totp_secret` / `ODOO_TOTP_SECRET`). See
+   [Credentials](#credentials) for why.
+
 ## Usage
 
 ### TUI
@@ -132,6 +169,37 @@ Examples:
 
 ## Configuration
 
+### Credentials
+
+The CLI talks to Odoo over two different channels, and they need **different
+credentials**. This is the most common setup stumbling block, so here is the
+full picture:
+
+| Credential         | Config key (`[op_secrets]`) | Environment variable | Needed for                                                                                                   | Where to get it                                                            |
+| ------------------ | --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| **API key**        | `api-key`                   | `ODOO_PASSWORD`      | Everything that reads or writes models: `projects`, `tasks`, `timesheets`, `entries`, `whoami`, `fields`, `clock status`, the TUI | Odoo: *Settings → Users → your user → API Keys* (or *My Profile → Account Security*) |
+| **Login password** | `password`                  | `ODOO_WEB_PASSWORD`  | `clock in` / `clock out` only (JSON-RPC web session)                                                           | Your normal Odoo login password                                             |
+| **TOTP secret**    | `totp_secret`               | `ODOO_TOTP_SECRET`   | Completing the 2FA challenge during clock in/out — only if your account has 2FA enabled                        | The base32 secret (or `otpauth://` URL) shown when enabling 2FA in Odoo     |
+
+Why three credentials?
+
+- Odoo 17 **requires API keys for XML-RPC**. Login passwords are not
+  accepted — and the failure is silent: `authenticate` just returns `false`
+  with no error message.
+- The attendance systray controller used by `clock in|out` cannot be reached
+  via XML-RPC by regular employees, so the CLI opens a JSON-RPC **web
+  session** for those two commands. Odoo's web session login is the exact
+  opposite of XML-RPC: it **rejects API keys** and wants the real login
+  password.
+- If the account has 2FA enabled, the web session login is followed by a
+  TOTP challenge. With `totp_secret` configured the CLI completes it
+  automatically — no interactive prompt.
+
+Note the naming: `ODOO_PASSWORD` holds the **API key**, and
+`ODOO_WEB_PASSWORD` holds the actual password.
+
+If you never use `clock in|out`, the API key is all you need.
+
 ### Layered config discovery
 
 Configuration is loaded in layers, with later layers overriding earlier ones:
@@ -153,24 +221,36 @@ reference automatically. No manual injection step needed.
 url         = "op://Employee/odoo/url"
 database    = "op://Employee/odoo/database"
 username    = "op://Employee/odoo/username"
-api-key     = "op://Employee/odoo/api-key"        # Odoo API key (for XML-RPC reads)
+api-key     = "op://Employee/odoo/api-key"        # Odoo API key (for XML-RPC)
 password    = "op://Employee/odoo/password"        # Odoo login password (for clock in/out)
 totp_secret = "op://Employee/odoo/totp_secret"     # TOTP secret (for 2FA, if enabled)
 ```
 
-The CLI uses **two separate credentials**:
-
-- **`api-key`** — Odoo API key used for XML-RPC operations (timesheets, projects, tasks). Created in Odoo Settings > Users > API Keys.
-- **`password`** — Odoo login password used for JSON-RPC web session auth (clock in/out). Required because Odoo's web session authenticate rejects API keys.
-- **`totp_secret`** — Base32 TOTP secret for 2FA. Only needed if your Odoo account has two-factor authentication enabled. The value can be a raw base32 secret or a full `otpauth://` URL.
+See [Credentials](#credentials) for what each key is and when it is needed.
 
 Values without the `op://` prefix are used as-is (useful for non-secret fields
 like database name). If `op` is not installed or the `[op_secrets]` section is
-absent, the CLI falls back to environment variables (`ODOO_PASSWORD`,
-`ODOO_WEB_PASSWORD`, `ODOO_TOTP_SECRET`).
+absent, the section is skipped and the CLI falls back to environment variables.
+If `op` **is** installed but not signed in, resolution fails with an error.
 
-Plain-text passwords in config files are still rejected — passwords must come
-from `[op_secrets]` or environment variables.
+Plain-text passwords in config files are rejected at load time — a `password`
+key outside `[op_secrets]` is an error. Secrets must come from `[op_secrets]`
+or environment variables.
+
+### Environment variables
+
+Every connection setting can also be provided as an environment variable.
+Env vars have the **highest priority** and override both config file values
+and resolved `[op_secrets]`:
+
+| Variable            | Meaning                                        |
+| ------------------- | ---------------------------------------------- |
+| `ODOO_URL`          | Server URL, e.g. `https://odoo.example.com`    |
+| `ODOO_DATABASE`     | Database name                                  |
+| `ODOO_USERNAME`     | Login (usually your email address)             |
+| `ODOO_PASSWORD`     | **API key** — XML-RPC auth                     |
+| `ODOO_WEB_PASSWORD` | Login password — web session (clock in/out)    |
+| `ODOO_TOTP_SECRET`  | Base32 TOTP secret or `otpauth://` URL (2FA)   |
 
 ### Config file example
 
@@ -285,6 +365,44 @@ defines a filter on the same field as a parent, the child's entry overrides the
 parent's. This lets you set a company-wide filter in a parent directory and add
 project-specific filters in subdirectories.
 
+## Troubleshooting
+
+**`whoami` / `projects` / `entries` fail with an authentication error even
+though the credentials look right.**
+XML-RPC needs an **API key**, not your login password (see
+[Credentials](#credentials)). This failure is silent on the Odoo side:
+password auth against XML-RPC — especially with 2FA enabled — simply returns
+`false` without an error message. Create an API key and put it in `api-key` /
+`ODOO_PASSWORD`.
+
+**Authentication worked before and suddenly fails (dev environment).**
+If the dev database was recreated, all API keys stored in it are gone and the
+key in 1Password / `.env` is stale. Run `mise run odoo:prepare-db` (or
+`mise run odoo:create-api-key` followed by `mise run prepare_env`).
+
+**`clock in` fails with "authentication failed".**
+The web session needs your real login **password** (`password` /
+`ODOO_WEB_PASSWORD`) — Odoo's `/web/session/authenticate` rejects API keys.
+
+**`clock in` fails with "2FA is enabled but no TOTP secret configured".**
+Set `totp_secret` in `[op_secrets]` or `ODOO_TOTP_SECRET`. The value is the
+base32 secret (or the full `otpauth://` URL) shown when enabling 2FA in Odoo.
+
+**"TOTP verification failed".**
+The `totp_secret` is wrong, or your machine's clock is skewed (TOTP codes are
+time-based).
+
+**`clock in|out` fails against a multi-database server.**
+Known limitation — the web session is not reliably bound to the requested
+database on multi-db servers. Tracked in
+[#48](https://github.com/seletz/odoo-work-cli/issues/48). `clock status` and
+all other commands are unaffected (they use XML-RPC).
+
+**`op inject` errors at startup.**
+The config has an `[op_secrets]` section and the 1Password CLI is installed
+but not signed in. Run `op signin`, or remove the section and use environment
+variables instead.
+
 ## Development
 
 ### Prerequisites
@@ -308,6 +426,49 @@ mise run test
 # Lint
 mise run lint
 ```
+
+### Dev environment setup
+
+> [!IMPORTANT]
+> Local development and automated tests target the **dev** Odoo environment
+> **only**. The test and prod environments must never be touched by local
+> development or tests.
+
+Dev credentials live in a single 1Password item and flow into the project in
+two ways:
+
+- **`.env` for mise tasks** — [`1p.env`](1p.env) is a 1Password template
+  containing `op://` references. `mise run prepare_env` runs `op inject` on it
+  to generate a local `.env`, which mise auto-loads for every task (including
+  `mise run run -- ...` and the `odoo:*` tasks below).
+- **`[op_secrets]` for the CLI** — the checked-in
+  [`.odoo-work-cli.toml`](.odoo-work-cli.toml) resolves the same 1Password
+  item at runtime, so running the built binary from the repo directory picks
+  up dev credentials automatically.
+
+Both expect a 1Password item with the fields `url`, `database-name`, `login`,
+`api-key`, `password`, and `totp_secret`.
+
+Bootstrap tasks:
+
+```bash
+mise run prepare_env          # generate .env from 1p.env via op inject
+mise run odoo:create-api-key  # create an XML-RPC API key via the web login
+                              # flow (handles 2FA) and write it back to 1Password
+mise run odoo:add-test-data   # idempotent: seed the dev db with the modules,
+                              # company, project, tasks and employee the
+                              # checked-in config filters expect
+mise run odoo:prepare-db      # all of the above in order — bootstraps a
+                              # freshly recreated dev db in one command
+```
+
+When the dev database is recreated ("nuked"), all previously issued API keys
+are gone. `mise run odoo:prepare-db` fixes that end-to-end: it creates a new
+API key, refreshes `.env`, and re-seeds the test data.
+
+**Known limitation:** `clock in|out` currently fails against multi-database
+servers — the web session is not reliably bound to the requested database.
+Tracked in [#48](https://github.com/seletz/odoo-work-cli/issues/48).
 
 ## Releasing
 
