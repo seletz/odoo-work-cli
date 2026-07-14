@@ -17,7 +17,7 @@ import (
 )
 
 // jsonRPCSession manages a JSON-RPC session with Odoo.
-// It handles authentication via /web/session/authenticate and
+// It authenticates through the HTML web login flow (/web/login) and
 // maintains session cookies for subsequent requests.
 // This is needed for controller endpoints (like attendance toggle)
 // that require an authenticated web session.
@@ -47,63 +47,62 @@ func newJSONRPCSession(baseURL, database, login, password, totpSecret string) *j
 	}
 }
 
-// authenticate performs JSON-RPC session authentication against Odoo.
-// When 2FA (TOTP) is enabled, the initial authenticate returns uid=false
-// and sets a pre_uid in the session. We then complete the TOTP challenge
-// by POSTing the generated code to /web/login/totp.
+// authenticate logs in through the HTML web login flow: GET
+// /web/login?db=<db> for the CSRF token, then POST the credentials to
+// /web/login. On multi-db servers this is the only flow that binds the
+// session to a database — the JSON /web/session/authenticate endpoint
+// leaves a 2FA-pending session unbound, so /web/login/totp is dispatched
+// in nodb mode and 404s (#54). When Odoo redirects to /web/login/totp,
+// the 2FA challenge is completed with a generated TOTP code.
 func (s *jsonRPCSession) authenticate() error {
-	payload := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      s.reqID.Add(1),
-		"method":  "call",
-		"params": map[string]interface{}{
-			"db":       s.database,
-			"login":    s.login,
-			"password": s.password,
-		},
+	// GET /web/login?db=<db> binds the session to the database
+	// (ensure_db) and yields the CSRF token for the login form.
+	csrfToken, err := s.fetchCSRFToken("/web/login?db=" + url.QueryEscape(s.database))
+	if err != nil {
+		return fmt.Errorf("fetching login form: %w", err)
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshalling auth request: %w", err)
+	// POST credentials without following redirects: a redirect means the
+	// credentials were accepted (to /web/login/totp when 2FA is pending),
+	// a 200 means the login form was re-rendered with an error.
+	form := url.Values{
+		"csrf_token": {csrfToken},
+		"login":      {s.login},
+		"password":   {s.password},
+		"redirect":   {""},
 	}
-
-	resp, err := s.httpClient.Post(s.baseURL+"/web/session/authenticate", "application/json", bytes.NewReader(body))
+	resp, err := s.noRedirectClient().PostForm(s.baseURL+"/web/login", form)
 	if err != nil {
-		return fmt.Errorf("authenticating: %w", err)
+		return fmt.Errorf("submitting login form: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	var result struct {
-		Error *struct {
-			Message string                 `json:"message"`
-			Data    map[string]interface{} `json:"data"`
-		} `json:"error"`
-		Result map[string]interface{} `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decoding auth response: %w", err)
-	}
-	if result.Error != nil {
-		msg := result.Error.Message
-		if data, ok := result.Error.Data["message"].(string); ok {
-			msg = data
-		}
-		return fmt.Errorf("authentication failed: %s", msg)
-	}
-
-	// Odoo returns uid: false when 2FA is required (pre_uid set in session).
-	if uid, ok := result.Result["uid"]; ok {
-		if uid == false || uid == nil {
-			if s.totpSecret != "" {
-				return s.completeTOTP()
+	switch resp.StatusCode {
+	case http.StatusSeeOther, http.StatusFound:
+		if strings.Contains(resp.Header.Get("Location"), "/web/login/totp") {
+			if s.totpSecret == "" {
+				return fmt.Errorf("authentication failed: 2FA is enabled but no TOTP secret configured (set totp_secret in [op_secrets] or ODOO_TOTP_SECRET env var)")
 			}
-			return fmt.Errorf("authentication failed: 2FA is enabled but no TOTP secret configured (set totp_secret in [op_secrets] or ODOO_TOTP_SECRET env var)")
+			return s.completeTOTP()
 		}
+		s.authenticated = true
+		return nil
+	case http.StatusOK:
+		return fmt.Errorf("authentication failed: Odoo rejected the login (the web session needs the login password, not the API key)")
+	default:
+		return fmt.Errorf("authentication failed: unexpected status %d from /web/login", resp.StatusCode)
 	}
+}
 
-	s.authenticated = true
-	return nil
+// noRedirectClient returns a client sharing the session cookie jar that
+// does not follow redirects, so redirect status codes stay observable.
+func (s *jsonRPCSession) noRedirectClient() *http.Client {
+	return &http.Client{
+		Jar: s.httpClient.Jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }
 
 // completeTOTP finishes the 2FA flow by generating a TOTP code and
@@ -123,20 +122,13 @@ func (s *jsonRPCSession) completeTOTP() error {
 		return fmt.Errorf("fetching CSRF token: %w", err)
 	}
 
-	// POST the TOTP code as form data. Use a non-redirecting client
-	// so we can distinguish success (302/303 redirect) from failure (200).
-	noRedirect := &http.Client{
-		Jar: s.httpClient.Jar,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
+	// POST the TOTP code as form data. Success is a redirect (302/303),
+	// failure re-renders the form (200).
 	form := url.Values{
 		"csrf_token": {csrfToken},
 		"totp_token": {code},
 	}
-	totpResp, err := noRedirect.PostForm(s.baseURL+"/web/login/totp", form)
+	totpResp, err := s.noRedirectClient().PostForm(s.baseURL+"/web/login/totp", form)
 	if err != nil {
 		return fmt.Errorf("submitting TOTP code: %w", err)
 	}

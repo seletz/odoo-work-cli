@@ -2,243 +2,323 @@ package odoo
 
 import (
 	"encoding/json"
-	"io"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"sync"
 	"testing"
+
+	"github.com/pquerna/otp/totp"
 )
 
-func TestJSONRPCSession_Authenticate(t *testing.T) {
-	var gotBody map[string]interface{}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/web/session/authenticate" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		if r.Method != http.MethodPost {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &gotBody)
+const (
+	testTOTPSecret = "JBSWY3DPEHPK3PXP"
+	mockLoginCSRF  = "mock-login-csrf"
+	mockTOTPCSRF   = "mock-totp-csrf"
+)
 
-		http.SetCookie(w, &http.Cookie{Name: "session_id", Value: "abc123"})
-		resp := map[string]interface{}{
-			"jsonrpc": "2.0",
-			"id":      1,
-			"result": map[string]interface{}{
-				"uid": float64(42),
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
+// mockOdooServer simulates the Odoo web login endpoints, including the
+// multi-db behaviour (#54): with no dbfilter, routes like /web/login/totp
+// are dispatched in nodb mode and return 404 until the session is bound
+// to a database via GET /web/login?db=<db>. The legacy JSON endpoint
+// /web/session/authenticate does NOT bind the session when 2FA is
+// pending, which is exactly the bug the HTML login flow works around.
+type mockOdooServer struct {
+	*httptest.Server
 
-	s := newJSONRPCSession(srv.URL, "testdb", "user@test.com", "secret123", "")
-	err := s.authenticate()
-	if err != nil {
+	multiDB    bool
+	totpSecret string // non-empty means 2FA is enabled for the user
+	db         string
+	login      string
+	password   string
+	callError  bool // make the attendance endpoint return a JSON-RPC error
+
+	mu            sync.Mutex
+	dbBound       bool
+	totpPending   bool
+	authenticated bool
+	loginForm     url.Values // last POST /web/login form values
+}
+
+func newMockOdooServer(t *testing.T, m *mockOdooServer) *mockOdooServer {
+	t.Helper()
+	m.Server = httptest.NewServer(http.HandlerFunc(m.handler))
+	t.Cleanup(m.Close)
+	return m
+}
+
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (m *mockOdooServer) handler(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	switch {
+	case r.URL.Path == "/web/session/authenticate":
+		// Legacy JSON auth. A single-db server binds the session as a
+		// side effect; a multi-db server with 2FA pending does not.
+		if !m.multiDB {
+			m.dbBound = true
+		}
+		if m.totpSecret != "" {
+			m.totpPending = true
+			writeJSON(w, map[string]interface{}{
+				"jsonrpc": "2.0", "id": 1,
+				"result": map[string]interface{}{"uid": false},
+			})
+			return
+		}
+		m.authenticated = true
+		writeJSON(w, map[string]interface{}{
+			"jsonrpc": "2.0", "id": 1,
+			"result": map[string]interface{}{"uid": 42},
+		})
+
+	case r.URL.Path == "/web/login" && r.Method == http.MethodGet:
+		if r.URL.Query().Get("db") == m.db || !m.multiDB {
+			m.dbBound = true
+		}
+		if !m.dbBound {
+			http.Redirect(w, r, "/web/database/selector", http.StatusSeeOther)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprintf(w, `<form><input type="hidden" name="csrf_token" value="%s"/></form>`, mockLoginCSRF)
+
+	case r.URL.Path == "/web/login" && r.Method == http.MethodPost:
+		if !m.dbBound {
+			http.NotFound(w, r)
+			return
+		}
+		_ = r.ParseForm()
+		m.loginForm = r.PostForm
+		if r.PostFormValue("csrf_token") != mockLoginCSRF {
+			http.Error(w, "invalid CSRF token", http.StatusBadRequest)
+			return
+		}
+		if r.PostFormValue("login") != m.login || r.PostFormValue("password") != m.password {
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = fmt.Fprintf(w, `<form><input type="hidden" name="csrf_token" value="%s"/>Wrong login/password</form>`, mockLoginCSRF)
+			return
+		}
+		if m.totpSecret != "" {
+			m.totpPending = true
+			w.Header().Set("Location", "/web/login/totp")
+			w.WriteHeader(http.StatusSeeOther)
+			return
+		}
+		m.authenticated = true
+		w.Header().Set("Location", "/web")
+		w.WriteHeader(http.StatusSeeOther)
+
+	case r.URL.Path == "/web/login/totp" && r.Method == http.MethodGet:
+		if !m.dbBound {
+			http.NotFound(w, r) // nodb dispatch: the #54 symptom
+			return
+		}
+		if !m.totpPending {
+			http.Redirect(w, r, "/web/login", http.StatusSeeOther)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprintf(w, `<form><input type="hidden" name="csrf_token" value="%s"/></form>`, mockTOTPCSRF)
+
+	case r.URL.Path == "/web/login/totp" && r.Method == http.MethodPost:
+		if !m.dbBound {
+			http.NotFound(w, r)
+			return
+		}
+		_ = r.ParseForm()
+		if r.PostFormValue("csrf_token") != mockTOTPCSRF {
+			http.Error(w, "invalid CSRF token", http.StatusBadRequest)
+			return
+		}
+		if !m.totpPending || !totp.Validate(r.PostFormValue("totp_token"), m.totpSecret) {
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = fmt.Fprintf(w, `<form><input type="hidden" name="csrf_token" value="%s"/>Invalid code</form>`, mockTOTPCSRF)
+			return
+		}
+		m.totpPending = false
+		m.authenticated = true
+		w.Header().Set("Location", "/web")
+		w.WriteHeader(http.StatusSeeOther)
+
+	case r.URL.Path == "/hr_attendance/systray_check_in_out":
+		if !m.authenticated {
+			writeJSON(w, map[string]interface{}{
+				"jsonrpc": "2.0", "id": 1,
+				"error": map[string]interface{}{
+					"code":    100,
+					"message": "Odoo Session Expired",
+					"data":    map[string]interface{}{"message": "Session expired"},
+				},
+			})
+			return
+		}
+		if m.callError {
+			writeJSON(w, map[string]interface{}{
+				"jsonrpc": "2.0", "id": 1,
+				"error": map[string]interface{}{
+					"code":    200,
+					"message": "Odoo Server Error",
+					"data":    map[string]interface{}{"message": "Something went wrong"},
+				},
+			})
+			return
+		}
+		writeJSON(w, map[string]interface{}{
+			"jsonrpc": "2.0", "id": 1,
+			"result": map[string]interface{}{"attendance_state": "checked_in"},
+		})
+
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+// TestJSONRPCSession_Authenticate_MultiDB_TOTP is the #54 regression test:
+// on a multi-db server the TOTP route 404s until the session is bound to
+// the database, so authentication must go through the HTML login flow.
+func TestJSONRPCSession_Authenticate_MultiDB_TOTP(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:    true,
+		totpSecret: testTOTPSecret,
+		db:         "testdb",
+		login:      "user@test.com",
+		password:   "pass",
+	})
+
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", testTOTPSecret)
+	if err := s.authenticate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !s.authenticated {
+		t.Error("expected client session authenticated = true")
+	}
+	if !m.authenticated {
+		t.Error("expected server session to be finalized")
+	}
+}
+
+// TestJSONRPCSession_Authenticate_SingleDB_TOTP guards the previously
+// working case: single-db servers must keep authenticating fine.
+func TestJSONRPCSession_Authenticate_SingleDB_TOTP(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:    false,
+		totpSecret: testTOTPSecret,
+		db:         "testdb",
+		login:      "user@test.com",
+		password:   "pass",
+	})
+
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", testTOTPSecret)
+	if err := s.authenticate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !m.authenticated {
+		t.Error("expected server session to be finalized")
+	}
+}
+
+func TestJSONRPCSession_Authenticate_NoTOTP(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:  true,
+		db:       "testdb",
+		login:    "user@test.com",
+		password: "secret123",
+	})
+
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "secret123", "")
+	if err := s.authenticate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !s.authenticated {
 		t.Error("expected authenticated = true")
 	}
 
-	// Verify request body structure.
-	params, _ := gotBody["params"].(map[string]interface{})
-	if params["db"] != "testdb" {
-		t.Errorf("db = %v, want testdb", params["db"])
+	// Verify the login form carried the credentials.
+	if got := m.loginForm.Get("login"); got != "user@test.com" {
+		t.Errorf("login = %q, want user@test.com", got)
 	}
-	if params["login"] != "user@test.com" {
-		t.Errorf("login = %v, want user@test.com", params["login"])
-	}
-	if params["password"] != "secret123" {
-		t.Errorf("password = %v, want secret123", params["password"])
+	if got := m.loginForm.Get("password"); got != "secret123" {
+		t.Errorf("password = %q, want secret123", got)
 	}
 }
 
-func TestJSONRPCSession_AuthenticateError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := map[string]interface{}{
-			"jsonrpc": "2.0",
-			"id":      1,
-			"error": map[string]interface{}{
-				"code":    200,
-				"message": "Odoo Server Error",
-				"data": map[string]interface{}{
-					"message": "Access Denied",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
+func TestJSONRPCSession_Authenticate_WrongPassword(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:  true,
+		db:       "testdb",
+		login:    "user@test.com",
+		password: "correct",
+	})
 
-	s := newJSONRPCSession(srv.URL, "testdb", "bad@test.com", "wrong", "")
-	err := s.authenticate()
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "wrong", "")
+	if err := s.authenticate(); err == nil {
+		t.Fatal("expected error for wrong password, got nil")
+	}
+	if s.authenticated {
+		t.Error("expected authenticated = false")
 	}
 }
 
-func TestJSONRPCSession_AuthenticateUIDFalse_NoTOTP(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := map[string]interface{}{
-			"jsonrpc": "2.0",
-			"id":      1,
-			"result": map[string]interface{}{
-				"uid": false,
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
+func TestJSONRPCSession_Authenticate_TOTPRequiredNoSecret(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:    true,
+		totpSecret: testTOTPSecret,
+		db:         "testdb",
+		login:      "user@test.com",
+		password:   "pass",
+	})
 
-	s := newJSONRPCSession(srv.URL, "testdb", "user@test.com", "pass", "")
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "")
 	err := s.authenticate()
 	if err == nil {
-		t.Fatal("expected error for uid=false without TOTP secret, got nil")
+		t.Fatal("expected error when 2FA is required without TOTP secret, got nil")
 	}
 	if got := err.Error(); got != "authentication failed: 2FA is enabled but no TOTP secret configured (set totp_secret in [op_secrets] or ODOO_TOTP_SECRET env var)" {
 		t.Errorf("unexpected error message: %s", got)
 	}
 }
 
-func TestJSONRPCSession_AuthenticateWithTOTP(t *testing.T) {
-	var totpPath string
-	var totpFormValues map[string]string
+func TestJSONRPCSession_Authenticate_TOTPWrongSecret(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:    true,
+		totpSecret: testTOTPSecret,
+		db:         "testdb",
+		login:      "user@test.com",
+		password:   "pass",
+	})
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		switch r.URL.Path {
-		case "/web/session/authenticate":
-			// Return uid=false to trigger 2FA flow.
-			http.SetCookie(w, &http.Cookie{Name: "session_id", Value: "pre-auth-session"})
-			resp := map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      1,
-				"result": map[string]interface{}{
-					"uid": false,
-				},
-			}
-			_ = json.NewEncoder(w).Encode(resp)
-
-		case "/web/login/totp":
-			if r.Method == http.MethodGet {
-				// Return an HTML page with a CSRF token.
-				w.Header().Set("Content-Type", "text/html")
-				_, _ = w.Write([]byte(`<form><input type="hidden" name="csrf_token" value="test-csrf-42"/></form>`))
-				return
-			}
-			// POST: verify TOTP submission.
-			totpPath = r.URL.Path
-			_ = r.ParseForm()
-			totpFormValues = map[string]string{
-				"csrf_token": r.FormValue("csrf_token"),
-				"totp_token": r.FormValue("totp_token"),
-			}
-			// Simulate success: redirect to /web.
-			w.Header().Set("Location", "/web")
-			w.WriteHeader(http.StatusSeeOther)
-
-		default:
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-	}))
-	defer srv.Close()
-
-	// Use a known TOTP secret and verify that a code was submitted.
-	s := newJSONRPCSession(srv.URL, "testdb", "user@test.com", "pass", "JBSWY3DPEHPK3PXP")
-	err := s.authenticate()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !s.authenticated {
-		t.Error("expected authenticated = true after TOTP")
-	}
-	if totpPath != "/web/login/totp" {
-		t.Errorf("TOTP path = %q, want /web/login/totp", totpPath)
-	}
-	if totpFormValues["csrf_token"] != "test-csrf-42" {
-		t.Errorf("csrf_token = %q, want test-csrf-42", totpFormValues["csrf_token"])
-	}
-	if totpFormValues["totp_token"] == "" {
-		t.Error("totp_token was empty, expected a generated code")
-	}
-}
-
-func TestJSONRPCSession_TOTPVerificationFailed(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/web/session/authenticate":
-			w.Header().Set("Content-Type", "application/json")
-			http.SetCookie(w, &http.Cookie{Name: "session_id", Value: "pre-auth"})
-			resp := map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      1,
-				"result": map[string]interface{}{
-					"uid": false,
-				},
-			}
-			_ = json.NewEncoder(w).Encode(resp)
-
-		case "/web/login/totp":
-			if r.Method == http.MethodGet {
-				w.Header().Set("Content-Type", "text/html")
-				_, _ = w.Write([]byte(`<form><input type="hidden" name="csrf_token" value="csrf-abc"/></form>`))
-				return
-			}
-			// Return 200 (form re-rendered) = verification failed.
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = w.Write([]byte(`<form>Error: invalid code</form>`))
-		}
-	}))
-	defer srv.Close()
-
-	s := newJSONRPCSession(srv.URL, "testdb", "user@test.com", "pass", "JBSWY3DPEHPK3PXP")
-	err := s.authenticate()
-	if err == nil {
+	// Client generates codes from a different secret than the server expects.
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "XYNHNRPRJMRNG6UP")
+	if err := s.authenticate(); err == nil {
 		t.Fatal("expected TOTP verification error, got nil")
+	}
+	if m.authenticated {
+		t.Error("expected server session to remain unauthenticated")
 	}
 }
 
 func TestJSONRPCSession_Call(t *testing.T) {
-	authCalled := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:    true,
+		totpSecret: testTOTPSecret,
+		db:         "testdb",
+		login:      "user@test.com",
+		password:   "pass",
+	})
 
-		if r.URL.Path == "/web/session/authenticate" {
-			authCalled = true
-			http.SetCookie(w, &http.Cookie{Name: "session_id", Value: "abc123"})
-			resp := map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      1,
-				"result":  map[string]interface{}{"uid": float64(42)},
-			}
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-
-		if r.URL.Path != "/hr_attendance/systray_check_in_out" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-
-		resp := map[string]interface{}{
-			"jsonrpc": "2.0",
-			"id":      2,
-			"result":  map[string]interface{}{"attendance_state": "checked_in"},
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	s := newJSONRPCSession(srv.URL, "testdb", "user@test.com", "secret123", "")
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", testTOTPSecret)
 	result, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !authCalled {
+	if !m.authenticated {
 		t.Error("expected auto-authentication")
 	}
 	if result["attendance_state"] != "checked_in" {
@@ -247,36 +327,15 @@ func TestJSONRPCSession_Call(t *testing.T) {
 }
 
 func TestJSONRPCSession_CallErrorResponse(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:   true,
+		db:        "testdb",
+		login:     "user@test.com",
+		password:  "pass",
+		callError: true,
+	})
 
-		if r.URL.Path == "/web/session/authenticate" {
-			http.SetCookie(w, &http.Cookie{Name: "session_id", Value: "abc123"})
-			resp := map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      1,
-				"result":  map[string]interface{}{"uid": float64(42)},
-			}
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-
-		resp := map[string]interface{}{
-			"jsonrpc": "2.0",
-			"id":      2,
-			"error": map[string]interface{}{
-				"code":    200,
-				"message": "Odoo Server Error",
-				"data": map[string]interface{}{
-					"message": "Something went wrong",
-				},
-			},
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	s := newJSONRPCSession(srv.URL, "testdb", "user@test.com", "secret123", "")
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "")
 	_, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
