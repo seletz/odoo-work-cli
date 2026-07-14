@@ -21,6 +21,14 @@ description = "Build and run the CLI (pass args after --)"
 depends = ["build"]
 run = "./odoo-work-cli {{arg(i=0, var=true)}}"
 
+[tasks.prepare_env]
+description = "Generate .env from 1Password (op inject on 1p.env)"
+run = """
+op inject -f -i 1p.env -o .env
+chmod 600 .env
+echo ".env written from 1p.env"
+"""
+
 [tasks.test]
 description = "Run all tests"
 run = "go test ./..."
