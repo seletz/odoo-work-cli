@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
@@ -60,6 +61,10 @@ func (s *stubClient) ClockOut() (*odoo.AttendanceRecord, error) {
 }
 
 func (s *stubClient) AttendanceStatus() (*odoo.AttendanceStatus, error) {
+	return nil, nil
+}
+
+func (s *stubClient) ListAttendance(time.Time, time.Time) ([]odoo.AttendanceRecord, error) {
 	return nil, nil
 }
 
