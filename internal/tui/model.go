@@ -171,7 +171,10 @@ func (m Model) loadTimesheets() tea.Cmd {
 	client := m.client
 	mondayStr := monday.Format("2006-01-02")
 	return func() tea.Msg {
-		entries, err := client.ListTimesheets(dateFrom, dateTo)
+		// Unfiltered fetch: the weekly grid must show all of the user's own
+		// bookings; configured [models.timesheet] filters would silently hide
+		// entries booked on another company's projects (issue #58).
+		entries, err := client.ListAllTimesheets(dateFrom, dateTo)
 		if err != nil {
 			return timesheetsLoadedMsg{err: err}
 		}

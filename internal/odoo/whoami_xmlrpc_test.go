@@ -61,10 +61,10 @@ func extractRequestedFields(body string) []string {
 	return fields
 }
 
-// newMockOdooServer simulates an Odoo XML-RPC endpoint as seen by a
+// newMockXMLRPCServer simulates an Odoo XML-RPC endpoint as seen by a
 // non-admin user: reading res.users without a minimal field restriction
 // raises the res.users.log ACL fault.
-func newMockOdooServer(t *testing.T, requestedFields *[]string) *httptest.Server {
+func newMockXMLRPCServer(t *testing.T, requestedFields *[]string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -95,7 +95,7 @@ func newMockOdooServer(t *testing.T, requestedFields *[]string) *httptest.Server
 
 func TestWhoAmI_RequestsMinimalFields(t *testing.T) {
 	var requestedFields []string
-	server := newMockOdooServer(t, &requestedFields)
+	server := newMockXMLRPCServer(t, &requestedFields)
 	defer server.Close()
 
 	client, err := NewXMLRPCClient(server.URL, "testdb", "test@example.com", "api-key", "", "", nil)

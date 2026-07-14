@@ -36,6 +36,10 @@ func (s *stubClient) ListTimesheets(string, string) ([]odoo.TimesheetEntry, erro
 	return nil, nil
 }
 
+func (s *stubClient) ListAllTimesheets(string, string) ([]odoo.TimesheetEntry, error) {
+	return nil, nil
+}
+
 func (s *stubClient) GetFields(string) ([]odoo.FieldInfo, error) {
 	return nil, nil
 }

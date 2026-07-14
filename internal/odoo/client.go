@@ -104,8 +104,12 @@ type Client interface {
 	ListTasks(projectID int64) ([]TaskInfo, error)
 	// ListAllTasks returns tasks ignoring configured filters, optionally filtered by project ID.
 	ListAllTasks(projectID int64) ([]TaskInfo, error)
-	// ListTimesheets returns timesheet entries for the given date range.
+	// ListTimesheets returns timesheet entries for the given date range,
+	// applying configured filters.
 	ListTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error)
+	// ListAllTimesheets returns timesheet entries for the given date range,
+	// ignoring configured filters.
+	ListAllTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error)
 	// GetFields returns field metadata for the given Odoo model.
 	GetFields(model string) ([]FieldInfo, error)
 	// CreateTimesheet creates a new timesheet entry and returns its ID.
