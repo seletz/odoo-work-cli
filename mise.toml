@@ -27,7 +27,8 @@ run = "scripts/release.sh"
 [tasks.run]
 description = "Build and run the CLI (pass args after --)"
 depends = ["build"]
-run = "./odoo-work-cli {{arg(i=0, var=true)}}"
+usage = 'arg "[args]" var=#true'
+run = "./odoo-work-cli"
 
 [tasks.prepare_env]
 description = "Generate .env from 1Password (op inject on 1p.env)"
