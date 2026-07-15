@@ -1,12 +1,13 @@
 package tui
 
 import (
-	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/lipgloss/v2"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
@@ -177,6 +178,19 @@ func TestRenderGrid_WrapsLongLabels(t *testing.T) {
 	}
 }
 
+// stylePrefix returns the ANSI escape sequence a style emits before its
+// content, so highlight assertions do not depend on exact column widths.
+func stylePrefix(t *testing.T, s lipgloss.Style) string {
+	t.Helper()
+	const marker = "\x00"
+	rendered := s.Render(marker)
+	i := strings.Index(rendered, marker)
+	if i < 0 {
+		t.Fatalf("style output %q should contain marker", rendered)
+	}
+	return rendered[:i]
+}
+
 func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
 	entries := []odoo.TimesheetEntry{
 		{Date: "2026-03-02", Project: "Alpha", Task: "Dev", Hours: 1.0},
@@ -186,18 +200,34 @@ func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
 	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
 
-	selectedLabel := rowCursorStyle.Render(fmt.Sprintf("%-*s", 40, "Beta / QA"))
-	selectedCell := cursorStyle.Render(fmt.Sprintf("%*s", 9, "2:00"))
-	selectedTotal := rowCursorStyle.Render(totalsStyle.Render(fmt.Sprintf("%*s", 9, "2:00")))
+	var selectedLine string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "Beta / QA") {
+			selectedLine = line
+			break
+		}
+	}
+	if selectedLine == "" {
+		t.Fatal("output should contain the selected row")
+	}
 
-	if !strings.Contains(out, selectedLabel) {
-		t.Fatal("output should highlight the selected row label")
+	// Label is left-aligned, so the row cursor sequence immediately
+	// precedes the label text.
+	if !strings.Contains(selectedLine, stylePrefix(t, rowCursorStyle)+"Beta / QA") {
+		t.Error("output should highlight the selected row label")
 	}
-	if !strings.Contains(out, selectedCell) {
-		t.Fatal("output should keep the selected cell highlighted")
+
+	// Cells are right-aligned; match the style sequence followed by
+	// padding and the hours, whatever the column width.
+	selectedCell := regexp.MustCompile(regexp.QuoteMeta(stylePrefix(t, cursorStyle)) + ` *2:00`)
+	if !selectedCell.MatchString(selectedLine) {
+		t.Error("output should keep the selected cell highlighted")
 	}
-	if !strings.Contains(out, selectedTotal) {
-		t.Fatal("output should highlight the selected row total")
+
+	selectedTotal := regexp.MustCompile(
+		regexp.QuoteMeta(stylePrefix(t, rowCursorStyle)+stylePrefix(t, totalsStyle)) + ` *2:00`)
+	if !selectedTotal.MatchString(selectedLine) {
+		t.Error("output should highlight the selected row total")
 	}
 }
 
