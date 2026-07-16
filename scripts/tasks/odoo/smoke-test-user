@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#MISE description="Smoke-check the non-admin test user against dev (whoami, clock status, entries)"
+
+# Runs a small set of read commands as the non-admin test user and fails
+# loudly if any of them faults (issue #55). This is exactly the class of
+# check that would have caught #40 (whoami faulting for regular users).
+
+set -euo pipefail
+
+commands=(
+    "whoami"
+    "clock status"
+    "entries"
+)
+
+for cmd in "${commands[@]}"; do
+    echo "==> odoo-work-cli ${cmd} (as non-admin test user)"
+    # shellcheck disable=SC2086
+    if ! mise run odoo:run-as-user -- ${cmd}; then
+        echo "FAIL: '${cmd}' failed as the non-admin test user (ACL regression?)" >&2
+        exit 1
+    fi
+    echo
+done
+
+echo "smoke check passed: all commands work as the non-admin test user"

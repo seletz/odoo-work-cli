@@ -464,6 +464,8 @@ mise run odoo:create-api-key  # create an XML-RPC API key via the web login
 mise run odoo:add-test-data   # idempotent: seed the dev db with the modules,
                               # company, project, tasks and employee the
                               # checked-in config filters expect
+mise run odoo:ensure-test-user # idempotent: provision the non-admin test
+                              # user (see below)
 mise run odoo:prepare-db      # all of the above in order — bootstraps a
                               # freshly recreated dev db in one command
 ```
@@ -471,6 +473,33 @@ mise run odoo:prepare-db      # all of the above in order — bootstraps a
 When the dev database is recreated ("nuked"), all previously issued API keys
 are gone. `mise run odoo:prepare-db` fixes that end-to-end: it creates a new
 API key, refreshes `.env`, and re-seeds the test data.
+
+### Non-admin test user
+
+The CLI user provisioned above is an **administrator**, so ACL/permission
+bugs never surface with it — [#40](https://github.com/seletz/odoo-work-cli/issues/40)
+(`whoami` faulting for regular users) is exactly the class of bug that hides.
+The bootstrap therefore also provisions a permanent **non-admin** test user
+(issue [#55](https://github.com/seletz/odoo-work-cli/issues/55)):
+
+- `mise run odoo:ensure-test-user` — idempotent; creates/repairs a user with
+  login `test-user`, the regular-employee groups only (**Internal User**,
+  **Project/User**, **Timesheets/User: own timesheets only** — verified not
+  to be in Administration/Settings), and a linked `hr.employee` record.
+  Strictly Internal-User-only does not work: Odoo denies reading
+  `account.analytic.line` / `project.project` without the per-app user
+  groups every real employee has. A fresh random
+  password is set on every run and written to the `test-user-password` field
+  of the "ODOO Work CLI" 1Password item (printed once to stdout instead if
+  the `op` CLI is unavailable). The user has no 2FA, so XML-RPC accepts the
+  plain password — no API key needed.
+- `mise run odoo:run-as-user -- <args...>` — run any CLI/TUI command as that
+  user, e.g. `mise run odoo:run-as-user -- whoami`. Overrides
+  `ODOO_USERNAME`/`ODOO_PASSWORD`/`ODOO_WEB_PASSWORD` for the invocation
+  (password read from 1Password, or from `ODOO_TEST_USER_PASSWORD` if set).
+- `mise run odoo:smoke-test-user` — smoke check: runs `whoami`,
+  `clock status` and `entries` as the non-admin user and fails loudly on
+  ACL faults. Run it after changes that touch Odoo model reads/writes.
 
 **Known limitation:** `clock in|out` currently fails against multi-database
 servers — the web session is not reliably bound to the requested database.
