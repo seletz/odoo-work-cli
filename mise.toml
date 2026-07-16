@@ -48,6 +48,11 @@ run = [
     "mise run odoo:ensure-test-user",
 ]
 
+[tasks."odoo:login-canary"]
+description = "Version-drift canary: exercise the full web-login flow (login + TOTP + session call) against dev — run BEFORE any Odoo upgrade reaches test/prod"
+# -count=1: a canary must never report a cached pass.
+run = "go test -tags devverify -count=1 -run TestDevVerify_LoginFlowCanary -v ./internal/odoo/"
+
 [tasks.test]
 description = "Run all tests"
 run = "go test ./..."

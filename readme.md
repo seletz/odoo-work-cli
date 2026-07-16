@@ -501,6 +501,33 @@ The bootstrap therefore also provisions a permanent **non-admin** test user
   `clock status` and `entries` as the non-admin user and fails loudly on
   ACL faults. Run it after changes that touch Odoo model reads/writes.
 
+### Pre-upgrade check: web-login version-drift canary
+
+The 2FA web session used by `clock in|out` authenticates through Odoo's HTML
+login flow (`/web/login` → `/web/login/totp`) and therefore encodes
+web-controller internals that a new Odoo version may change
+([#57](https://github.com/seletz/odoo-work-cli/issues/57)):
+
+- `GET /web/login?db=<db>` binds the session and serves a `csrf_token` input
+- `POST /web/login` accepts `csrf_token`, `login`, `password`, `redirect`
+- 303 redirect = accepted (to `/web/login/totp` when 2FA is pending),
+  200 = rejected
+- `POST /web/login/totp` accepts `csrf_token`, `totp_token`
+
+```bash
+mise run odoo:login-canary
+```
+
+exercises the full flow against the **dev** instance — login, TOTP challenge,
+and a session-authenticated JSON-RPC call — and on failure names the encoded
+assumption that broke (e.g. "login page markup may have changed; check the
+Odoo version").
+
+**This is the mandatory pre-upgrade check.** Dev receives new Odoo versions
+first, so run the canary against dev **before any Odoo upgrade reaches test
+or prod**. If it fails, `clock in|out` (and `mise run odoo:create-api-key`,
+which mirrors the same flow) will break on that Odoo version.
+
 **Known limitation:** `clock in|out` currently fails against multi-database
 servers — the web session is not reliably bound to the requested database.
 Tracked in [#48](https://github.com/seletz/odoo-work-cli/issues/48).
