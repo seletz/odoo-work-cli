@@ -27,6 +27,10 @@ type mockClient struct {
 	clockInErr        error
 	clockOutRecord    *AttendanceRecord
 	clockOutErr       error
+	createAttID       int64
+	createAttErr      error
+	editAttRecord     *AttendanceRecord
+	editAttErr        error
 	attendanceStatus  *AttendanceStatus
 	attendanceErr     error
 	attendanceRecords []AttendanceRecord
@@ -85,6 +89,22 @@ func (m *mockClient) ClockIn() (int64, error) {
 
 func (m *mockClient) ClockOut() (*AttendanceRecord, error) {
 	return m.clockOutRecord, m.clockOutErr
+}
+
+func (m *mockClient) ClockInAt(_ time.Time) (int64, error) {
+	return m.clockInID, m.clockInErr
+}
+
+func (m *mockClient) ClockOutAt(_ time.Time) (*AttendanceRecord, error) {
+	return m.clockOutRecord, m.clockOutErr
+}
+
+func (m *mockClient) CreateAttendance(_, _ time.Time) (int64, error) {
+	return m.createAttID, m.createAttErr
+}
+
+func (m *mockClient) EditAttendance(_ int64, _, _ *time.Time) (*AttendanceRecord, error) {
+	return m.editAttRecord, m.editAttErr
 }
 
 func (m *mockClient) AttendanceStatus() (*AttendanceStatus, error) {

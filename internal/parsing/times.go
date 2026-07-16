@@ -5,6 +5,36 @@ import (
 	"time"
 )
 
+// ParseClockTime parses a clock time flag value into a concrete time in
+// day's location. Accepted formats: "HH:MM" (resolved on day's date) and
+// "YYYY-MM-DD HH:MM" (explicit date, overrides day).
+func ParseClockTime(s string, day time.Time) (time.Time, error) {
+	loc := day.Location()
+	if t, err := time.ParseInLocation("2006-01-02 15:04", s, loc); err == nil {
+		return t, nil
+	}
+	t, err := time.ParseInLocation("15:04", s, loc)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid time %q: expected HH:MM or YYYY-MM-DD HH:MM", s)
+	}
+	return time.Date(day.Year(), day.Month(), day.Day(),
+		t.Hour(), t.Minute(), 0, 0, loc), nil
+}
+
+// ParseDay parses a YYYY-MM-DD date into midnight in now's location.
+// An empty string means today (now's date).
+func ParseDay(s string, now time.Time) (time.Time, error) {
+	loc := now.Location()
+	if s == "" {
+		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc), nil
+	}
+	t, err := time.ParseInLocation("2006-01-02", s, loc)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", s)
+	}
+	return t, nil
+}
+
 // ParseDateRange returns a single-day date range for the given YYYY-MM-DD string.
 func ParseDateRange(date string) (string, string, error) {
 	d, err := time.Parse("2006-01-02", date)

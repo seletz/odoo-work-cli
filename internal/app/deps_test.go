@@ -64,6 +64,22 @@ func (s *stubClient) ClockOut() (*odoo.AttendanceRecord, error) {
 	return nil, nil
 }
 
+func (s *stubClient) ClockInAt(time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (s *stubClient) ClockOutAt(time.Time) (*odoo.AttendanceRecord, error) {
+	return nil, nil
+}
+
+func (s *stubClient) CreateAttendance(time.Time, time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (s *stubClient) EditAttendance(int64, *time.Time, *time.Time) (*odoo.AttendanceRecord, error) {
+	return nil, nil
+}
+
 func (s *stubClient) AttendanceStatus() (*odoo.AttendanceStatus, error) {
 	return nil, nil
 }
