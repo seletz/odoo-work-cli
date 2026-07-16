@@ -123,6 +123,19 @@ type Client interface {
 	ClockIn() (int64, error)
 	// ClockOut writes check_out = now on the open attendance record.
 	ClockOut() (*AttendanceRecord, error)
+	// ClockInAt creates an attendance record with an explicit check-in time
+	// via XML-RPC. Requires attendance officer rights.
+	ClockInAt(checkIn time.Time) (int64, error)
+	// ClockOutAt closes the open attendance record at an explicit time via
+	// XML-RPC. Requires attendance officer rights.
+	ClockOutAt(checkOut time.Time) (*AttendanceRecord, error)
+	// CreateAttendance creates a closed attendance record with explicit
+	// check-in and check-out times. Requires attendance officer rights.
+	CreateAttendance(checkIn, checkOut time.Time) (int64, error)
+	// EditAttendance updates check_in and/or check_out on an attendance
+	// record; nil times are left unchanged. Returns the updated record.
+	// Requires attendance officer rights.
+	EditAttendance(id int64, checkIn, checkOut *time.Time) (*AttendanceRecord, error)
 	// AttendanceStatus returns the current clock state and today's periods.
 	AttendanceStatus() (*AttendanceStatus, error)
 	// ListAttendance returns attendance records with check_in in [from, to),

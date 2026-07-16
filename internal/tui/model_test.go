@@ -101,6 +101,20 @@ func (c *mockClient) ClockOut() (*odoo.AttendanceRecord, error) {
 	c.clockOutCalled = true
 	return nil, c.clockOutErr
 }
+func (c *mockClient) ClockInAt(_ time.Time) (int64, error) {
+	c.clockInCalled = true
+	return 1, c.clockInErr
+}
+func (c *mockClient) ClockOutAt(_ time.Time) (*odoo.AttendanceRecord, error) {
+	c.clockOutCalled = true
+	return nil, c.clockOutErr
+}
+func (c *mockClient) CreateAttendance(_, _ time.Time) (int64, error) {
+	return 1, nil
+}
+func (c *mockClient) EditAttendance(_ int64, _, _ *time.Time) (*odoo.AttendanceRecord, error) {
+	return nil, nil
+}
 func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) {
 	return c.attendStatus, c.attendStatusErr
 }

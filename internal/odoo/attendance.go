@@ -139,6 +139,11 @@ func fetchAttendanceStatus(searchFn attendanceSearchFunc, empID int64, now time.
 // records that started before the range (check_out = false), so that
 // attendance spanning midnight is correctly included.
 func fetchAttendanceRange(searchFn attendanceSearchFunc, empID int64, from, to time.Time) ([]map[string]interface{}, error) {
+	// Odoo compares datetimes as UTC strings; normalize the bounds so that
+	// callers may pass local times.
+	from = from.UTC()
+	to = to.UTC()
+
 	opts := goOdoo.NewOptions().
 		FetchFields("id", "employee_id", "check_in", "check_out", "worked_hours")
 
