@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#MISE description="Build and run the CLI as the non-admin test user (pass args after --)"
+#MISE depends=["build"]
+
+# Runs any CLI/TUI command as the non-admin test user provisioned by
+# `mise run odoo:ensure-test-user` (issue #55). Overrides the Odoo
+# credentials for this invocation only — env vars take priority over the
+# [op_secrets] section in .odoo-work-cli.toml.
+#
+# The password comes from ODOO_TEST_USER_PASSWORD if set, otherwise it is
+# read from the 1Password item the bootstrap wrote it to. The test user has
+# no 2FA, so the plain password works for both XML-RPC and the web session.
+
+set -euo pipefail
+
+login="${ODOO_TEST_USER_LOGIN:-test-user}"
+password="${ODOO_TEST_USER_PASSWORD:-}"
+
+if [ -z "$password" ]; then
+    if command -v op >/dev/null 2>&1; then
+        password="$(op read "op://Employee/ODOO Work CLI/test-user-password")"
+    else
+        echo "error: ODOO_TEST_USER_PASSWORD is not set and the op CLI is not available" >&2
+        echo "hint: run 'mise run odoo:ensure-test-user' and export the printed password" >&2
+        exit 1
+    fi
+fi
+
+exec env \
+    ODOO_USERNAME="$login" \
+    ODOO_PASSWORD="$password" \
+    ODOO_WEB_PASSWORD="$password" \
+    ./odoo-work-cli "$@"

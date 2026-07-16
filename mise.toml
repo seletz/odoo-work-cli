@@ -45,6 +45,7 @@ run = [
     "mise run odoo:create-api-key",
     "mise run prepare_env",
     "mise run odoo:add-test-data",
+    "mise run odoo:ensure-test-user",
 ]
 
 [tasks.test]

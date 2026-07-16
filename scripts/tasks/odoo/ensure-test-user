@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+#MISE description="Idempotently provision the non-admin test user on the dev database (issue #55)"
+#USAGE flag "--login <login>" help="Login of the test user" default="test-user"
+#USAGE flag "--name <name>" help="Display name of the test user" default="Test User"
+#USAGE flag "--no-update-op" help="Only print the password; do not write it to the 1Password item"
+#USAGE flag "--op-item <item>" help="1Password item to update" default="ODOO Work CLI"
+#USAGE flag "--op-vault <vault>" help="1Password vault holding the item" default="Employee"
+
+"""Provision a permanent non-admin test user on the odoo-work-cli dev database.
+
+The dev bootstrap otherwise only knows the administrator CLI user, so
+ACL/permission bugs (like #40) stay invisible. This script idempotently
+ensures a regular user exists that mirrors what real employees have:
+
+* ``res.users`` with a deterministic login (default ``test-user``) and
+  the regular-employee groups only — **Internal User**, **Project/User**
+  and **Timesheets/User: own timesheets only** (the latter two are what
+  every real employee gets and are required by the server to read
+  ``project.project`` and ``account.analytic.line`` at all) — verified
+  to NOT be in Administration / Settings or Administration / Access Rights
+* a linked ``hr.employee`` record (required for timesheets/attendance)
+* a fresh random password, written to the 1Password item used by the
+  other dev tasks (field ``test-user-password``) so that
+  ``mise run odoo:run-as-user`` can pick it up; if the ``op`` CLI is not
+  available the password is printed once to stdout instead
+
+The password is rotated on every run — 1Password (or the printed value)
+is the source of truth. The user has no 2FA, so XML-RPC accepts the
+plain password directly (no API key needed).
+
+Required environment (see 1p.env / ``mise run prepare_env``):
+    ODOO_URL, ODOO_DATABASE, ODOO_USERNAME, ODOO_PASSWORD (admin API key)
+"""
+
+import os
+import secrets
+import shutil
+import ssl
+import subprocess
+import sys
+import xmlrpc.client
+
+
+def env(name):
+    value = os.environ.get(name, "")
+    if not value:
+        sys.exit(f"error: {name} is not set (run: mise run prepare_env)")
+    return value
+
+
+def ssl_context():
+    ctx = ssl.create_default_context()
+    if not ctx.get_ca_certs() and os.path.exists("/etc/ssl/cert.pem"):
+        ctx = ssl.create_default_context(cafile="/etc/ssl/cert.pem")
+    return ctx
+
+
+class OdooXMLRPC:
+    """Thin XML-RPC wrapper bound to one database and user."""
+
+    def __init__(self, url, database, username, api_key):
+        ctx = ssl_context()
+        self.database = database
+        self.api_key = api_key
+        common = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/common", context=ctx)
+        self.uid = common.authenticate(database, username, api_key, {})
+        if not self.uid:
+            sys.exit("error: XML-RPC authentication failed (stale ODOO_PASSWORD api key? run: mise run odoo:create-api-key)")
+        self.models = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/object", context=ctx)
+
+    def call(self, model, method, *args, **kwargs):
+        return self.models.execute_kw(
+            self.database, self.uid, self.api_key, model, method, list(args), kwargs
+        )
+
+    def find(self, model, domain, fields=("id",)):
+        return self.call(model, "search_read", domain, fields=list(fields), limit=1)
+
+
+def step(message):
+    print(f"* {message}")
+
+
+def xmlid_res_id(odoo, module, name):
+    rec = odoo.find(
+        "ir.model.data", [["module", "=", module], ["name", "=", name]], ("res_id",)
+    )
+    if not rec:
+        sys.exit(f"error: xml id {module}.{name} not found on the server")
+    return rec[0]["res_id"]
+
+
+def main_company_id(odoo):
+    return odoo.call("res.company", "search", [], limit=1, order="id asc")[0]
+
+
+def ensure_user(odoo, login, name, group_ids, company_id):
+    user = odoo.find(
+        "res.users",
+        [["login", "=", login], ["active", "in", [True, False]]],
+        ("id", "active"),
+    )
+    values = {
+        "name": name,
+        "active": True,
+        "groups_id": [[6, 0, group_ids]],
+        "company_id": company_id,
+        "company_ids": [[6, 0, [company_id]]],
+    }
+    if user:
+        uid = user[0]["id"]
+        odoo.call("res.users", "write", [uid], values)
+        step(f"user '{login}': exists (id {uid}), groups reset to regular-employee set")
+    else:
+        values["login"] = login
+        uid = odoo.call("res.users", "create", values)
+        step(f"user '{login}': created (id {uid})")
+    return uid
+
+
+def verify_non_admin(odoo, uid, login):
+    forbidden = {
+        "Administration / Settings": xmlid_res_id(odoo, "base", "group_system"),
+        "Administration / Access Rights": xmlid_res_id(odoo, "base", "group_erp_manager"),
+    }
+    groups = odoo.call("res.users", "read", [uid], fields=["groups_id"])[0]["groups_id"]
+    for label, gid in forbidden.items():
+        if gid in groups:
+            sys.exit(f"error: user '{login}' is in {label} — refusing to continue")
+    step(f"user '{login}': verified NOT in Administration/Settings or Access Rights")
+
+
+def ensure_employee(odoo, uid, name, company_id):
+    employee = odoo.find("hr.employee", [["user_id", "=", uid]])
+    if employee:
+        step(f"employee for uid {uid}: exists (id {employee[0]['id']})")
+        return
+    eid = odoo.call(
+        "hr.employee",
+        "create",
+        {"name": name, "user_id": uid, "company_id": company_id},
+    )
+    step(f"employee for uid {uid}: created (id {eid})")
+
+
+def set_password(odoo, uid, login):
+    password = secrets.token_urlsafe(24)
+    odoo.call("res.users", "write", [uid], {"password": password})
+    step(f"user '{login}': password rotated")
+    return password
+
+
+def store_password(password, update_op, op_item, op_vault):
+    if update_op and shutil.which("op"):
+        cmd = ["op", "item", "edit", op_item, f"test-user-password[password]={password}", "--vault", op_vault]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            sys.exit(f"error: op item edit failed: {proc.stderr.strip()}")
+        step(f"password written to 1Password item '{op_item}' field test-user-password")
+        return
+    if update_op:
+        step("op CLI not available — printing the password once instead")
+    print(f"\ntest user password (store it now, it is not saved anywhere else):\n{password}")
+
+
+def main():
+    login = os.environ.get("usage_login", "test-user")
+    name = os.environ.get("usage_name", "Test User")
+    update_op = os.environ.get("usage_no_update_op", "false") != "true"
+    op_item = os.environ.get("usage_op_item", "ODOO Work CLI")
+    op_vault = os.environ.get("usage_op_vault", "Employee")
+
+    odoo = OdooXMLRPC(env("ODOO_URL"), env("ODOO_DATABASE"), env("ODOO_USERNAME"), env("ODOO_PASSWORD"))
+    print(f"connected to {os.environ['ODOO_URL']} db={odoo.database} uid={odoo.uid}\n")
+
+    # what every regular (non-admin) employee has: Internal User plus the
+    # default per-app user groups — without them the server denies reads
+    # on project.project / account.analytic.line outright
+    group_ids = [
+        xmlid_res_id(odoo, "base", "group_user"),
+        xmlid_res_id(odoo, "project", "group_project_user"),
+        xmlid_res_id(odoo, "hr_timesheet", "group_hr_timesheet_user"),
+    ]
+    company_id = main_company_id(odoo)
+    uid = ensure_user(odoo, login, name, group_ids, company_id)
+    verify_non_admin(odoo, uid, login)
+    ensure_employee(odoo, uid, name, company_id)
+    password = set_password(odoo, uid, login)
+    store_password(password, update_op, op_item, op_vault)
+
+    print(f"\nnon-admin test user '{login}' ready (uid {uid})")
+
+
+if __name__ == "__main__":
+    main()
