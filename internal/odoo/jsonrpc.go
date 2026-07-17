@@ -29,6 +29,7 @@ type jsonRPCSession struct {
 	totpSecret    string
 	httpClient    *http.Client
 	authenticated bool
+	totpCompleted bool // a /web/login/totp challenge was served and passed
 	reqID         atomic.Int64
 }
 
@@ -88,9 +89,9 @@ func (s *jsonRPCSession) authenticate() error {
 		s.authenticated = true
 		return nil
 	case http.StatusOK:
-		return fmt.Errorf("authentication failed: Odoo rejected the login (the web session needs the login password, not the API key)")
+		return fmt.Errorf("authentication failed: Odoo re-rendered the login form (HTTP 200) — either the credentials were rejected (the web session needs the login password, not the API key), or the /web/login form fields (csrf_token, login, password, redirect) were renamed; check the Odoo version")
 	default:
-		return fmt.Errorf("authentication failed: unexpected status %d from /web/login", resp.StatusCode)
+		return fmt.Errorf("authentication failed: unexpected HTTP %d from POST /web/login — expected a 303 redirect (success, or /web/login/totp when 2FA is pending) or 200 (rejected); the login redirect semantics may have changed; check the Odoo version", resp.StatusCode)
 	}
 }
 
@@ -138,10 +139,11 @@ func (s *jsonRPCSession) completeTOTP() error {
 	// 200 means the form was re-rendered (wrong code).
 	if totpResp.StatusCode == http.StatusSeeOther || totpResp.StatusCode == http.StatusFound {
 		s.authenticated = true
+		s.totpCompleted = true
 		return nil
 	}
 
-	return fmt.Errorf("TOTP verification failed (status %d): check that totp_secret is correct", totpResp.StatusCode)
+	return fmt.Errorf("TOTP verification failed (HTTP %d) — either the code was rejected (check totp_secret and the system clock), or the /web/login/totp form fields (csrf_token, totp_token) were renamed; check the Odoo version", totpResp.StatusCode)
 }
 
 // csrfTokenRe matches the CSRF token hidden input in Odoo HTML forms.
@@ -162,7 +164,7 @@ func (s *jsonRPCSession) fetchCSRFToken(path string) (string, error) {
 
 	matches := csrfTokenRe.FindSubmatch(body)
 	if matches == nil {
-		return "", fmt.Errorf("CSRF token not found in %s response", path)
+		return "", fmt.Errorf("GET %s served no csrf_token input (HTTP %d, final URL %s) — the login page markup may have changed; check the Odoo version", path, resp.StatusCode, resp.Request.URL)
 	}
 	return string(matches[1]), nil
 }

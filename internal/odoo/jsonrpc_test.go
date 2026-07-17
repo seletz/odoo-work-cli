@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 
@@ -33,6 +34,11 @@ type mockOdooServer struct {
 	login      string
 	password   string
 	callError  bool // make the attendance endpoint return a JSON-RPC error
+
+	// Version-drift simulation (#57): serve a login page without the
+	// csrf_token input, or answer POST /web/login with an unexpected status.
+	noCSRF          bool
+	loginPostStatus int
 
 	mu            sync.Mutex
 	dbBound       bool
@@ -87,11 +93,19 @@ func (m *mockOdooServer) handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html")
+		if m.noCSRF {
+			_, _ = fmt.Fprint(w, `<form><input type="hidden" name="token" value="renamed"/></form>`)
+			return
+		}
 		_, _ = fmt.Fprintf(w, `<form><input type="hidden" name="csrf_token" value="%s"/></form>`, mockLoginCSRF)
 
 	case r.URL.Path == "/web/login" && r.Method == http.MethodPost:
 		if !m.dbBound {
 			http.NotFound(w, r)
+			return
+		}
+		if m.loginPostStatus != 0 {
+			w.WriteHeader(m.loginPostStatus)
 			return
 		}
 		_ = r.ParseForm()
@@ -258,12 +272,81 @@ func TestJSONRPCSession_Authenticate_WrongPassword(t *testing.T) {
 	})
 
 	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "wrong", "")
-	if err := s.authenticate(); err == nil {
+	err := s.authenticate()
+	if err == nil {
 		t.Fatal("expected error for wrong password, got nil")
 	}
 	if s.authenticated {
 		t.Error("expected authenticated = false")
 	}
+	// The 200 re-render is ambiguous: rejected credentials or renamed form
+	// fields (version drift). The message must name both (#57).
+	assertErrorContains(t, err,
+		"re-rendered the login form",
+		"login password, not the API key",
+		"csrf_token, login, password, redirect",
+		"check the Odoo version",
+	)
+}
+
+// assertErrorContains checks that the error message names each expected
+// fragment — the #57 requirement that failures point at the encoded
+// assumption that broke.
+func assertErrorContains(t *testing.T, err error, fragments ...string) {
+	t.Helper()
+	for _, want := range fragments {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error message missing %q:\n%s", want, err.Error())
+		}
+	}
+}
+
+// TestJSONRPCSession_Diagnostic_MissingCSRFInput simulates Odoo 18/19
+// changing the login page markup so the csrf_token input disappears: the
+// error must name the missing input and point at version drift (#57).
+func TestJSONRPCSession_Diagnostic_MissingCSRFInput(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:  true,
+		db:       "testdb",
+		login:    "user@test.com",
+		password: "pass",
+		noCSRF:   true,
+	})
+
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "")
+	err := s.authenticate()
+	if err == nil {
+		t.Fatal("expected error when login page has no csrf_token input, got nil")
+	}
+	assertErrorContains(t, err,
+		"no csrf_token input",
+		"login page markup may have changed",
+		"check the Odoo version",
+	)
+}
+
+// TestJSONRPCSession_Diagnostic_UnexpectedLoginStatus simulates the login
+// POST answering with a status outside the encoded 303/200 semantics: the
+// error must point at redirect-semantics drift (#57).
+func TestJSONRPCSession_Diagnostic_UnexpectedLoginStatus(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:         true,
+		db:              "testdb",
+		login:           "user@test.com",
+		password:        "pass",
+		loginPostStatus: http.StatusTeapot,
+	})
+
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "")
+	err := s.authenticate()
+	if err == nil {
+		t.Fatal("expected error for unexpected login status, got nil")
+	}
+	assertErrorContains(t, err,
+		"unexpected HTTP 418 from POST /web/login",
+		"redirect semantics may have changed",
+		"check the Odoo version",
+	)
 }
 
 func TestJSONRPCSession_Authenticate_TOTPRequiredNoSecret(t *testing.T) {
@@ -296,12 +379,21 @@ func TestJSONRPCSession_Authenticate_TOTPWrongSecret(t *testing.T) {
 
 	// Client generates codes from a different secret than the server expects.
 	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "XYNHNRPRJMRNG6UP")
-	if err := s.authenticate(); err == nil {
+	err := s.authenticate()
+	if err == nil {
 		t.Fatal("expected TOTP verification error, got nil")
 	}
 	if m.authenticated {
 		t.Error("expected server session to remain unauthenticated")
 	}
+	// Like the login 200, a TOTP re-render is ambiguous: wrong code/clock
+	// skew or renamed form fields. The message must name both (#57).
+	assertErrorContains(t, err,
+		"TOTP verification failed",
+		"totp_secret and the system clock",
+		"csrf_token, totp_token",
+		"check the Odoo version",
+	)
 }
 
 func TestJSONRPCSession_Call(t *testing.T) {

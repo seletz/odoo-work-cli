@@ -35,6 +35,10 @@ There are now full **dev**, **test**, and **prod** environments of odoo-erp.
 
 - Development and testing **MUST ONLY** target the **dev** environment.
 - **test and prod MUST NOT be touched** by local development or automated tests.
+- **Before any Odoo upgrade reaches test/prod**: run `mise run odoo:login-canary`
+  against dev (dev gets new Odoo versions first). It verifies the web-login
+  flow internals encoded in `internal/odoo/jsonrpc.go` (see readme,
+  "Pre-upgrade check: web-login version-drift canary").
 
 ## Project Structure
 
