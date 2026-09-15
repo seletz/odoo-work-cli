@@ -714,3 +714,21 @@ func TestHelpOverlay_ListsAttendanceEdit(t *testing.T) {
 		t.Errorf("help overlay should list the attendance edit key\n%s", out)
 	}
 }
+
+func TestModel_AttendanceDayLoadedSortsByCheckIn(t *testing.T) {
+	// Odoo returns hr.attendance newest-first by default; the pick list
+	// must read top-down in chronological order.
+	closed := closedRecord()
+	open := openRecord()
+	m := loadedAttendanceModel(t, &mockClient{}, open, closed)
+	if m.att.sub != attPick {
+		t.Fatalf("sub = %v, want attPick", m.att.sub)
+	}
+	if got := m.att.records[0].ID; got != closed.ID {
+		t.Errorf("first record = #%d, want the earlier record #%d", got, closed.ID)
+	}
+	out := renderAttendanceOverlay(m.att, m.spinner)
+	if strings.Index(out, "#11") > strings.Index(out, "#12") {
+		t.Errorf("pick list should show #11 (08:58) before #12 (18:00)\n%s", out)
+	}
+}

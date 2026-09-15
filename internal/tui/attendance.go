@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -189,8 +190,11 @@ func (m Model) handleAttendanceDayLoaded(msg attendanceDayLoadedMsg) (tea.Model,
 		m.att.err = fmt.Errorf("loading attendance: %w", msg.err)
 		return m.openAttendanceForm(nil)
 	}
-	m.att.records = msg.records
-	switch len(msg.records) {
+	// Odoo returns hr.attendance newest-first; show the day chronologically.
+	records := append([]odoo.AttendanceRecord(nil), msg.records...)
+	sort.Slice(records, func(i, j int) bool { return records[i].CheckIn.Before(records[j].CheckIn) })
+	m.att.records = records
+	switch len(records) {
 	case 0:
 		return m.openAttendanceForm(nil)
 	case 1:
@@ -209,10 +213,10 @@ func (m Model) openAttendanceForm(record *odoo.AttendanceRecord) (tea.Model, tea
 	m.att.focus = 0
 
 	m.att.inInput = textinput.New()
-	m.att.inInput.SetWidth(18)
+	m.att.inInput.SetWidth(20)
 	m.att.inInput.Placeholder = "HH:MM"
 	m.att.outInput = textinput.New()
-	m.att.outInput.SetWidth(18)
+	m.att.outInput.SetWidth(20)
 	m.att.outInput.Placeholder = "HH:MM"
 	if record != nil {
 		m.att.inInput.SetValue(formatClockTime(record.CheckIn, m.att.day))
