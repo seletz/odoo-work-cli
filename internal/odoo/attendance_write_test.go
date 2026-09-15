@@ -1,6 +1,7 @@
 package odoo
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -436,5 +437,33 @@ func TestFetchAttendanceRange_ConvertsBoundsToUTC(t *testing.T) {
 	}
 	if strings.Contains(all, "2026-07-16 00:00:00") {
 		t.Errorf("criteria must not contain local wall-clock bound, got: %s", all)
+	}
+}
+
+func TestIsAccessError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"access error fault", errors.New("Fault(4): You are not allowed to modify 'Attendance' (hr.attendance) records."), true},
+		{"wrapped access error", fmt.Errorf("updating attendance record 7: %w", errors.New("Fault(4): denied")), true},
+		{"other fault", errors.New("Fault(1): internal error"), false},
+		{"plain error", errors.New("connection refused"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsAccessError(tt.err); got != tt.want {
+				t.Errorf("IsAccessError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAttendanceAccessHint_MatchesWrappedHint(t *testing.T) {
+	err := wrapAttendanceAccessErr(errors.New("Fault(4): denied"), "updating attendance record 7")
+	if !strings.Contains(err.Error(), AttendanceAccessHint) {
+		t.Errorf("wrapped error %q should contain the exported hint %q", err, AttendanceAccessHint)
 	}
 }
