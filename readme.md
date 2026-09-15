@@ -21,6 +21,8 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Add, edit and delete time entries
 - Hours input accepts both `H:MM` (e.g. `1:30`) and decimal (e.g. `1.5`) formats
 - Clock in/out toggle directly from TUI (`c` key)
+- Edit or backdate attendance for the selected day (`t` key): fix a forgotten
+  or late clock-in, or add a missed day
 - Help overlay (`?` key) showing all key bindings grouped by context
 - Cursor starts on today's column when viewing the current week
 - It's pretty fast
@@ -116,6 +118,32 @@ Just do:
 ```bash
 odoo-work-cli tui
 ```
+
+#### Editing attendance
+
+Press `t` on any grid cell to edit the attendance (clock-in / clock-out
+times) of that cell's day — the cursor starts on today. Depending on what the
+day holds, the overlay shows:
+
+- **one record**: a form pre-filled with its check-in and check-out; change
+  either time and press `Enter` to save. A running record has an empty
+  check-out — fill it in to close the record, or leave it empty to keep it open.
+- **several records**: a list to pick the record first (`↑`/`↓`, `Enter`);
+  `Esc` in the form returns to the list.
+- **no record** (a missed day): an empty form; enter both times to create the
+  record.
+
+Times are `HH:MM` on that day, or `YYYY-MM-DD HH:MM` for e.g. an overnight
+check-out. Future times and a check-out before the check-in are rejected
+inline; `Tab` switches fields, `Esc` cancels. After saving, the header's
+`Today`/`Week` attendance totals reload. The key is configurable as
+`grid_attendance_edit` in the `[keys]` section.
+
+Like the `clock edit` command, this writes `hr.attendance` over XML-RPC and
+therefore needs the *Attendance Officer* access right with you set as your own
+attendance manager (see the clock commands below); without it the form shows
+Odoo's access error together with that hint, and plain `c` clock in/out still
+works.
 
 ### CLI
 
