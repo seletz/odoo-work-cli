@@ -103,8 +103,9 @@ func TestApplyKeysConfig_AllActions(t *testing.T) {
 	allActions := []string{
 		"cursor_up", "cursor_down",
 		"grid_next_col", "grid_prev_col", "grid_enter", "grid_search",
+		"grid_attendance_edit",
 		"detail_edit", "detail_add", "detail_delete",
-		"search_toggle",
+		"search_toggle", "focus_toggle",
 		"global_quit", "global_help", "global_refresh", "global_back",
 		"global_prev_week", "global_next_week", "global_clock_toggle",
 	}
@@ -143,6 +144,28 @@ func TestApplyKeysConfig_AttendanceEdit(t *testing.T) {
 	}
 }
 
+func TestDefaultKeyMap_FocusToggle(t *testing.T) {
+	km := DefaultKeyMap()
+	keys := km.FocusToggle.Keys()
+	if len(keys) != 2 || keys[0] != "tab" || keys[1] != "shift+tab" {
+		t.Errorf("FocusToggle.Keys() = %v, want [tab shift+tab]", keys)
+	}
+	if help := km.FocusToggle.Help(); help.Desc != "switch focus" {
+		t.Errorf("FocusToggle help desc = %q, want %q", help.Desc, "switch focus")
+	}
+}
+
+func TestApplyKeysConfig_FocusToggle(t *testing.T) {
+	km := ApplyKeysConfig(DefaultKeyMap(), config.KeysConfig{"focus_toggle": {"ctrl+n"}})
+	if keys := km.FocusToggle.Keys(); len(keys) != 1 || keys[0] != "ctrl+n" {
+		t.Errorf("FocusToggle.Keys() = %v, want [ctrl+n]", keys)
+	}
+}
+
+// TestDefaultKeyMap_NoDuplicateGridKeys guards the bindings that are live at
+// the same time in the grid view. FocusToggle is deliberately absent: it shares
+// tab/shift+tab with NextCol/PrevCol, but only ever applies in the search view
+// and the add/edit form, where the grid column bindings are not evaluated.
 func TestDefaultKeyMap_NoDuplicateGridKeys(t *testing.T) {
 	km := DefaultKeyMap()
 	bindings := map[string][]string{

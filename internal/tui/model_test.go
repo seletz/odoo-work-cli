@@ -1291,6 +1291,10 @@ func TestModel_SearchCursorNavigation(t *testing.T) {
 	updated, _ = um.Update(msg)
 	um = updated.(Model)
 
+	// j/k only navigate once the results list has focus (issue #41).
+	updated, _ = um.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	um = updated.(Model)
+
 	// Move down.
 	updated, _ = um.Update(tea.KeyPressMsg{Code: 'j'})
 	um = updated.(Model)
@@ -1477,7 +1481,7 @@ func TestRenderSearchOverlay(t *testing.T) {
 		{Kind: "task", Name: "Task X", Extra: "Alpha", Company: "Corp"},
 	}
 
-	result := renderSearchOverlay(input, items, 0, searchReady, true, nil, spinner.New(), 80, 40, nil)
+	result := renderSearchOverlay(input, items, 0, searchReady, true, nil, spinner.New(), 80, 40, nil, focusInput, DefaultKeyMap())
 
 	if !strings.Contains(result, "Search (filtered)") {
 		t.Fatal("expected 'Search (filtered)' in output")
@@ -1504,7 +1508,7 @@ func TestRenderSearchOverlay(t *testing.T) {
 
 func TestRenderSearchOverlay_Unfiltered(t *testing.T) {
 	input := textinput.New()
-	result := renderSearchOverlay(input, nil, 0, searchReady, false, nil, spinner.New(), 80, 40, nil)
+	result := renderSearchOverlay(input, nil, 0, searchReady, false, nil, spinner.New(), 80, 40, nil, focusInput, DefaultKeyMap())
 
 	if !strings.Contains(result, "all") {
 		t.Fatal("expected 'all' in output for unfiltered mode")
