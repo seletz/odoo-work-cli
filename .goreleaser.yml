@@ -71,9 +71,16 @@ homebrew_casks:
       bash: completions/odoo-work-cli.bash
       zsh: completions/_odoo-work-cli
       fish: completions/odoo-work-cli.fish
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/odoo-work-cli"]
-          end
+    # Strip the macOS quarantine attribute so the unsigned binary runs without a
+    # Gatekeeper prompt. Homebrew 7 deprecated the Ruby `postflight do` block in
+    # favour of the declarative `postflight_steps` stanza, but GoReleaser (as of
+    # 2.18) still renders `hooks.post.install` as `postflight do`, so the stanza
+    # is emitted via `custom_block` instead (#68). `{{staged_path}}` is a
+    # Homebrew install-time token; GoReleaser runs the rendered cask through Go
+    # templates, so the braces are escaped to reach Homebrew verbatim.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/odoo-work-cli"]
+        end
+      end
