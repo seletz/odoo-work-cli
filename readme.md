@@ -159,9 +159,10 @@ Commands:
 | `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (hours: `2.5` or `2:30`, date defaults to today, task-id optional)                     |
 | `entries update ID [--hours H] [--description "…"] …`    | Partially update a timesheet entry (hours: `2.5` or `2:30`, only set flags are sent)                                |
 | `entries delete ID`                                      | Delete a timesheet entry by ID                                                                                      |
-| `clock in`                                               | Clock in (start attendance period). Works for non-admin users via JSON-RPC; supports 2FA (TOTP).                    |
-| `clock out`                                              | Clock out (end attendance period, shows duration). Works for non-admin users via JSON-RPC; supports 2FA (TOTP).     |
+| `clock in [--at "HH:MM"]`                                | Clock in (start attendance period). Works for non-admin users via JSON-RPC; supports 2FA (TOTP). `--at` backdates the check-in (see [Attendance editing](#attendance-backdated-clock-inout-and-editing)) |
+| `clock out [--at "HH:MM"]`                               | Clock out (end attendance period, shows duration). Works for non-admin users via JSON-RPC; supports 2FA (TOTP). `--at` backdates the check-out |
 | `clock status`                                           | Show current attendance state and today's periods                                                                   |
+| `clock edit --in HH:MM [--out HH:MM] [--date D] [--id N]` | Fix a day's attendance record (check-in and/or check-out); creates the record for a missed day. Requires Attendance Officer rights |
 | `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
@@ -190,10 +191,104 @@ Examples:
 ./odoo-work-cli clock in
 ./odoo-work-cli clock out
 ./odoo-work-cli clock status
+./odoo-work-cli clock in --at "08:30"
+./odoo-work-cli clock out --at "2026-09-14 17:15"
+./odoo-work-cli clock edit --in 08:00 --out 12:30
+./odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30
+./odoo-work-cli clock edit --id 15 --out 13:45
 ./odoo-work-cli config
 ./odoo-work-cli config --merged
 ./odoo-work-cli config install
 ```
+
+### Attendance: backdated clock in/out and editing
+
+Plain `clock in` / `clock out` record the *current* time through Odoo's
+attendance systray endpoint, which every employee may use. For a forgotten
+or wrong entry there are three more options. They write `hr.attendance`
+directly over XML-RPC (API key only — no login password or TOTP needed) and
+therefore need extra access rights, see [Permissions](#permissions-attendance-officer) below.
+
+```bash
+# clock in / out at a past time instead of now
+odoo-work-cli clock in --at "08:30"                    # today, 08:30 local time
+odoo-work-cli clock out --at "17:15"
+odoo-work-cli clock in --at "2026-09-14 08:30"         # explicit date
+
+# fix today's record: check-in and/or check-out
+odoo-work-cli clock edit --in 08:00
+odoo-work-cli clock edit --in 08:00 --out 12:30
+
+# a day you forgot entirely: both times create the record
+odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30
+
+# several records on the same day: pick one by ID
+odoo-work-cli clock edit --id 15 --out 13:45
+```
+
+How times are interpreted:
+
+- `HH:MM` means that time on today (or on the `--date` day for `clock edit`);
+  `YYYY-MM-DD HH:MM` names the day explicitly.
+- Times are entered in your **local timezone** and stored in Odoo as UTC
+  (08:00 CEST becomes 06:00:00 in the database). `clock status` and the TUI
+  convert back to local time, so what you type is what you see.
+- **Future times are rejected** (`time 2026-09-15 23:30 is in the future`),
+  with a one-minute grace period for clock skew. To clock in *now*, use plain
+  `clock in`.
+
+How `clock edit` picks the record:
+
+- It looks at the day given by `--date` (default: today) and needs at least
+  one of `--in` / `--out`. Check-out must be after check-in.
+- **One record** on that day: it is updated.
+- **No record** on that day: it is created — but only when both `--in` and
+  `--out` are given; otherwise the command fails with
+  `no attendance record on 2026-09-14: provide both --in and --out to create one`.
+- **Several records** on that day: the command lists them and fails with
+  `multiple attendance records on that date, select one with --id`. Re-run with
+  `--id N` using the `#N` shown in that list (a plain `clock in --at` also
+  prints the ID of the record it created).
+
+#### Permissions: Attendance Officer
+
+Odoo 17 lets a regular employee only **read** their own attendance records
+over the API. Creating or modifying `hr.attendance` — which is what `--at`
+and `clock edit` do — requires the **Officer: Manage attendances** access
+right (`hr_attendance.group_hr_attendance_officer`), and the officer record
+rule additionally restricts officers to employees whose **Attendance
+manager** they are. Editing your own records therefore requires that you are
+your own attendance manager. (Users with the *Attendances / Administrator*
+right can edit everything.)
+
+Without these rights Odoo raises an AccessError and the CLI explains:
+
+```
+Error: creating attendance record: Fault(4): You are not allowed to create 'Attendance' (hr.attendance) records.
+...
+hint: editing attendance over the API requires the 'Attendance Officer' access right with you set as your own attendance manager; ask your administrator, or use plain 'clock in'/'clock out'
+```
+
+Plain `clock in` / `clock out` (without `--at`) keep working for everyone,
+because they go through Odoo's own systray controller.
+
+**How to get the rights** (Odoo 17, verified on the dev instance): the
+officer group is a hidden *Technical* group. It does **not** appear in the
+*Attendances* dropdown on the user's *Access Rights* tab (that only offers
+*Administrator*). Instead, Odoo grants it automatically through the
+employee's attendance approver:
+
+1. An administrator opens *Employees → your employee → Work Information
+   tab → Approvers → Attendance* and selects **your own user** there
+   (field `attendance_manager_id` on `hr.employee`).
+2. Saving that field adds you to *Officer: Manage attendances*; clearing it
+   again removes the group (unless you still approve other employees'
+   attendance).
+
+To check your current state, ask your administrator to look at that field, or
+simply run `odoo-work-cli clock edit --in HH:MM` on a day with a record: it
+either succeeds or prints the hint above. Nothing is changed on failure.
+
 
 ## Configuration
 
@@ -205,8 +300,8 @@ full picture:
 
 | Credential         | Config key (`[op_secrets]`) | Environment variable | Needed for                                                                                                   | Where to get it                                                            |
 | ------------------ | --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| **API key**        | `api-key`                   | `ODOO_PASSWORD`      | Everything that reads or writes models: `projects`, `tasks`, `timesheets`, `entries`, `whoami`, `fields`, `clock status`, the TUI | Odoo: *Settings → Users → your user → API Keys* (or *My Profile → Account Security*) |
-| **Login password** | `password`                  | `ODOO_WEB_PASSWORD`  | `clock in` / `clock out` only (JSON-RPC web session)                                                           | Your normal Odoo login password                                             |
+| **API key**        | `api-key`                   | `ODOO_PASSWORD`      | Everything that reads or writes models: `projects`, `tasks`, `timesheets`, `entries`, `whoami`, `fields`, `clock status`, `clock in\|out --at`, `clock edit`, the TUI | Odoo: *Settings → Users → your user → API Keys* (or *My Profile → Account Security*) |
+| **Login password** | `password`                  | `ODOO_WEB_PASSWORD`  | `clock in` / `clock out` without `--at` only (JSON-RPC web session)                                            | Your normal Odoo login password                                             |
 | **TOTP secret**    | `totp_secret`               | `ODOO_TOTP_SECRET`   | Completing the 2FA challenge during clock in/out — only if your account has 2FA enabled                        | The base32 secret (or `otpauth://` URL) shown when enabling 2FA in Odoo     |
 
 Why three credentials?
@@ -425,6 +520,12 @@ base32 secret (or the full `otpauth://` URL) shown when enabling 2FA in Odoo.
 **"TOTP verification failed".**
 The `totp_secret` is wrong, or your machine's clock is skewed (TOTP codes are
 time-based).
+
+**`clock in --at`, `clock out --at` or `clock edit` fail with "You are not allowed to create/modify 'Attendance'".**
+These commands write `hr.attendance` over XML-RPC, which needs the
+*Officer: Manage attendances* right plus being your own attendance manager.
+See [Permissions: Attendance Officer](#permissions-attendance-officer). Plain
+`clock in|out` is unaffected.
 
 **`clock in|out` fails against a multi-database server.**
 Known limitation — the web session is not reliably bound to the requested
