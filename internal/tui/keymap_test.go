@@ -119,3 +119,45 @@ func TestApplyKeysConfig_AllActions(t *testing.T) {
 		_ = km
 	}
 }
+
+func TestDefaultKeyMap_AttendanceEdit(t *testing.T) {
+	km := DefaultKeyMap()
+	keys := km.AttendanceEdit.Keys()
+	if len(keys) != 1 || keys[0] != "t" {
+		t.Errorf("AttendanceEdit.Keys() = %v, want [t]", keys)
+	}
+	if desc := km.AttendanceEdit.Help().Desc; desc != "edit attendance" {
+		t.Errorf("AttendanceEdit help desc = %q, want %q", desc, "edit attendance")
+	}
+}
+
+func TestApplyKeysConfig_AttendanceEdit(t *testing.T) {
+	km := ApplyKeysConfig(DefaultKeyMap(), config.KeysConfig{
+		"grid_attendance_edit": {"A"},
+	})
+	if keys := km.AttendanceEdit.Keys(); len(keys) != 1 || keys[0] != "A" {
+		t.Errorf("AttendanceEdit.Keys() = %v, want [A]", keys)
+	}
+	if desc := km.AttendanceEdit.Help().Desc; desc != "edit attendance" {
+		t.Errorf("AttendanceEdit help desc = %q, want %q", desc, "edit attendance")
+	}
+}
+
+func TestDefaultKeyMap_NoDuplicateGridKeys(t *testing.T) {
+	km := DefaultKeyMap()
+	bindings := map[string][]string{
+		"Up": km.Up.Keys(), "Down": km.Down.Keys(), "Left": km.Left.Keys(), "Right": km.Right.Keys(),
+		"NextCol": km.NextCol.Keys(), "PrevCol": km.PrevCol.Keys(), "Refresh": km.Refresh.Keys(),
+		"Help": km.Help.Keys(), "Quit": km.Quit.Keys(), "Enter": km.Enter.Keys(), "Back": km.Back.Keys(),
+		"Search": km.Search.Keys(), "ClockToggle": km.ClockToggle.Keys(), "AttendanceEdit": km.AttendanceEdit.Keys(),
+	}
+	seen := map[string]string{}
+	for name, keys := range bindings {
+		for _, k := range keys {
+			if other, dup := seen[k]; dup {
+				t.Errorf("key %q bound to both %s and %s", k, other, name)
+			}
+			seen[k] = name
+		}
+	}
+}

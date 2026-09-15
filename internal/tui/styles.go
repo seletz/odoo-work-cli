@@ -86,6 +86,12 @@ var (
 			BorderForeground(colorMagenta).
 			Padding(1, 2)
 
+	// Attendance overlay: rounded border with cyan foreground.
+	attendanceBoxStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(colorCyan).
+				Padding(1, 2)
+
 	// Help overlay: rounded border with gold foreground.
 	helpBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -102,6 +108,7 @@ var (
 	editLabelStyle       = lipgloss.NewStyle().Faint(true)
 	editActiveLabelStyle = lipgloss.NewStyle().Bold(true)
 	editErrorStyle       = lipgloss.NewStyle().Foreground(colorRed)
+	editHintStyle        = lipgloss.NewStyle().Foreground(colorYellow)
 
 	searchFilterWarning = lipgloss.NewStyle().Foreground(colorYellow).Bold(true)
 	searchSectionStyle  = lipgloss.NewStyle().Bold(true).Faint(true)

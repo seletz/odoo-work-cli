@@ -26,6 +26,7 @@ const (
 	stateEdit
 	stateSearch
 	stateHelp
+	stateAttendance
 )
 
 type searchSubState int
@@ -128,6 +129,10 @@ type Model struct {
 	searchCursor    int
 	searchUseFilter bool // true = config filters active (default)
 	searchErr       error
+
+	att attendanceState // attendance edit overlay (issue #47)
+
+	now func() time.Time // clock source, overridable in tests
 }
 
 // MondayTime wraps time.Time for the Monday of the displayed week.
@@ -154,6 +159,7 @@ func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, 
 		spinner:       s,
 		help:          help.New(),
 		keys:          km,
+		now:           time.Now,
 	}
 }
 
@@ -307,6 +313,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.loadAttendance()
 
+	case attendanceDayLoadedMsg:
+		return m.handleAttendanceDayLoaded(msg)
+
+	case attendanceSavedMsg:
+		return m.handleAttendanceSaved(msg)
+
 	case editSavedMsg:
 		if msg.err != nil {
 			m.editErr = msg.err
@@ -371,6 +383,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// In edit state, forward keys to text inputs.
 		if m.state == stateEdit {
 			return m.updateEdit(msg)
+		}
+		// In attendance state, forward keys to the attendance overlay.
+		if m.state == stateAttendance {
+			return m.updateAttendance(msg)
 		}
 
 		switch {
@@ -441,6 +457,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case key.Matches(msg, m.keys.Search):
 				return m.enterSearch()
+			case key.Matches(msg, m.keys.AttendanceEdit):
+				return m.enterAttendance()
 			}
 		}
 
@@ -897,7 +915,7 @@ func (m Model) View() tea.View {
 	case stateError:
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
-	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp:
+	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp, stateAttendance:
 		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.weekAttendance, m.loading, m.spinner, m.width)
 		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors, todayCol)
 		statusBar := RenderStatusBar(m.state, m.grid.WeekTotal, m.limits, m.attendance, m.width)
@@ -919,6 +937,9 @@ func (m Model) View() tea.View {
 		} else if m.state == stateHelp {
 			helpContent := renderHelpOverlay(m.keys, m.width, m.height)
 			s = RenderDetailOverlay(s, helpContent, m.width, m.height, helpBoxStyle)
+		} else if m.state == stateAttendance {
+			att := renderAttendanceOverlay(m.att, m.spinner)
+			s = RenderDetailOverlay(s, att, m.width, m.height, attendanceBoxStyle)
 		}
 	}
 

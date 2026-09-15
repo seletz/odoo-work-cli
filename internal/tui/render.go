@@ -75,6 +75,8 @@ func RenderStatusBar(state uiState, weekTotal float64, limits config.HoursLimits
 		stateLabel = "SEARCH"
 	case stateHelp:
 		stateLabel = "HELP"
+	case stateAttendance:
+		stateLabel = "ATTENDANCE"
 	}
 
 	left := " " + stateLabel
@@ -750,6 +752,7 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 		{"Grid View", []binding{
 			{km.Enter.Help().Key, km.Enter.Help().Desc},
 			{km.Search.Help().Key, km.Search.Help().Desc},
+			{km.AttendanceEdit.Help().Key, km.AttendanceEdit.Help().Desc},
 		}},
 		{"Detail View", []binding{
 			{km.Edit.Help().Key, km.Edit.Help().Desc},

@@ -47,6 +47,16 @@ type mockClient struct {
 	attendWeekErr   error
 	attendWeekFrom  time.Time // capture last ListAttendance call
 	attendWeekTo    time.Time
+	attendCalls     int // number of ListAttendance calls
+	createAttErr    error
+	createAttIn     time.Time // capture last CreateAttendance call
+	createAttOut    time.Time
+	createAttCalled bool
+	editAttErr      error
+	editAttID       int64 // capture last EditAttendance call
+	editAttIn       *time.Time
+	editAttOut      *time.Time
+	editAttCalled   bool
 }
 
 func (c *mockClient) WhoAmI() (*odoo.UserInfo, error)            { return nil, nil }
@@ -109,16 +119,24 @@ func (c *mockClient) ClockOutAt(_ time.Time) (*odoo.AttendanceRecord, error) {
 	c.clockOutCalled = true
 	return nil, c.clockOutErr
 }
-func (c *mockClient) CreateAttendance(_, _ time.Time) (int64, error) {
-	return 1, nil
+func (c *mockClient) CreateAttendance(checkIn, checkOut time.Time) (int64, error) {
+	c.createAttCalled = true
+	c.createAttIn = checkIn
+	c.createAttOut = checkOut
+	return 1, c.createAttErr
 }
-func (c *mockClient) EditAttendance(_ int64, _, _ *time.Time) (*odoo.AttendanceRecord, error) {
-	return nil, nil
+func (c *mockClient) EditAttendance(id int64, checkIn, checkOut *time.Time) (*odoo.AttendanceRecord, error) {
+	c.editAttCalled = true
+	c.editAttID = id
+	c.editAttIn = checkIn
+	c.editAttOut = checkOut
+	return nil, c.editAttErr
 }
 func (c *mockClient) AttendanceStatus() (*odoo.AttendanceStatus, error) {
 	return c.attendStatus, c.attendStatusErr
 }
 func (c *mockClient) ListAttendance(from, to time.Time) ([]odoo.AttendanceRecord, error) {
+	c.attendCalls++
 	c.attendWeekFrom = from
 	c.attendWeekTo = to
 	return c.attendWeek, c.attendWeekErr

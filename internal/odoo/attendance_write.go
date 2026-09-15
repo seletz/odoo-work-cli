@@ -16,19 +16,26 @@ import (
 // message text is locale-dependent, the code is not.
 const odooAccessErrorPrefix = "Fault(4):"
 
-// attendanceAccessHint explains the ACL constraint on hr.attendance writes
+// AttendanceAccessHint explains the ACL constraint on hr.attendance writes
 // discovered in #47: regular employees may only read their own records;
 // create/write/unlink require the officer group, and the officer record rule
-// additionally requires being the employee's attendance manager.
-const attendanceAccessHint = "editing attendance over the API requires the " +
+// additionally requires being the employee's attendance manager. Callers
+// that present errors (CLI, TUI) show it next to an AccessError.
+const AttendanceAccessHint = "editing attendance over the API requires the " +
 	"'Attendance Officer' access right with you set as your own attendance " +
 	"manager; ask your administrator, or use plain 'clock in'/'clock out'"
+
+// IsAccessError reports whether err (or any error it wraps textually)
+// originates from an Odoo AccessError fault.
+func IsAccessError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), odooAccessErrorPrefix)
+}
 
 // wrapAttendanceAccessErr wraps an hr.attendance write error, appending a
 // hint about the required access rights when Odoo raised an AccessError.
 func wrapAttendanceAccessErr(err error, action string) error {
-	if strings.HasPrefix(err.Error(), odooAccessErrorPrefix) {
-		return fmt.Errorf("%s: %w\nhint: %s", action, err, attendanceAccessHint)
+	if IsAccessError(err) {
+		return fmt.Errorf("%s: %w\nhint: %s", action, err, AttendanceAccessHint)
 	}
 	return fmt.Errorf("%s: %w", action, err)
 }
