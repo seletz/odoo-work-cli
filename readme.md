@@ -459,9 +459,51 @@ TUI key bindings can be overridden in the `[keys]` section. Action names are
 prefixed with the context they apply to. Only overridden keys change; others
 keep their defaults. Values can be a single string or an array of strings.
 
+#### Default key bindings
+
+| Action | Default keys | Context | Description |
+|--------|--------------|---------|-------------|
+| `cursor_up` | `up`, `k` | grid, detail, search results | move cursor up |
+| `cursor_down` | `down`, `j` | grid, detail, search results | move cursor down |
+| `grid_next_col` | `tab` | grid | next day |
+| `grid_prev_col` | `shift+tab` | grid | previous day |
+| `grid_enter` | `enter` | grid | open detail view |
+| `grid_search` | `/` | grid | open project/task search |
+| `detail_edit` | `e` | detail | edit selected entry |
+| `detail_add` | `a` | detail | add entry |
+| `detail_delete` | `d` | detail | delete selected entry |
+| `search_toggle` | `ctrl+a` | search | toggle configured filters on/off |
+| `focus_toggle` | `tab`, `shift+tab` | search, add/edit form | switch focus between text field and results list / between form fields |
+| `global_prev_week` | `left`, `h` | grid, detail | previous week |
+| `global_next_week` | `right`, `l` | grid, detail | next week |
+| `global_back` | `esc` | all | back / cancel |
+| `global_clock_toggle` | `c` | grid, detail | clock in/out |
+| `global_refresh` | `r` | grid, detail | reload |
+| `global_help` | `?` | grid, detail | help overlay |
+| `global_quit` | `q`, `ctrl+c` | grid, detail | quit |
+
+#### Typing vs. key bindings (focus model)
+
+Text inputs are never intercepted by key bindings: while a text field has
+focus, every printable key (letters, digits, punctuation) goes into the field,
+even if the same key is bound to an action. Only non-printable keys (arrows,
+`enter`, `esc`, `ctrl+…`) are matched against bindings there. This is why the
+default `j`/`k`, `h`/`l`, `q`, `?` etc. are safe to keep.
+
+In the **search view** the search field has focus first. Press `tab`
+(`focus_toggle`) to move focus to the results list; there `cursor_up` /
+`cursor_down` (including `j`/`k`) navigate, and `tab` / `shift+tab` returns to
+the field. Arrow keys, `enter` (select) and `esc` (cancel) work in both focus
+states. The focused part is highlighted: a bold `>` prompt means the field has
+focus, a bright selection bar means the list has focus, and the hint line at
+the bottom always names the keys that currently apply.
+
+In the **add/edit form** `tab` switches between the hours and description
+fields the same way.
+
 ```toml
 [keys]
-# Cursor movement (shared across grid, detail, search views)
+# Cursor movement (shared across grid, detail, search results)
 cursor_up = ["up", "k"]
 cursor_down = ["down", "j"]
 
@@ -478,6 +520,9 @@ detail_delete = ["d"]
 
 # Search view
 search_toggle = ["ctrl+a"]
+
+# Focus switching (search view: field <-> results; add/edit form: hours <-> description)
+focus_toggle = ["tab", "shift+tab"]
 
 # Global (available in all non-modal views)
 global_prev_week = ["left", "h"]

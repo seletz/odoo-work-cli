@@ -57,6 +57,9 @@ detail_delete = ["d"]
 # Search view
 search_toggle = ["ctrl+a"]
 
+# Focus switching (search view: field <-> results; add/edit form: hours <-> description)
+focus_toggle = ["tab", "shift+tab"]
+
 # Global (available in all non-modal views)
 global_prev_week = ["p"]
 global_next_week = ["n"]
