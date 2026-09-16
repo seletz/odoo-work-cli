@@ -48,6 +48,7 @@ grid_next_col = ["right", "l"]
 grid_prev_col = ["left", "h"]
 grid_enter = ["enter"]
 grid_search = ["/"]
+grid_attendance_edit = ["t"]
 
 # Detail view
 detail_edit = ["e"]
@@ -57,7 +58,8 @@ detail_delete = ["d"]
 # Search view
 search_toggle = ["ctrl+a"]
 
-# Focus switching (search view: field <-> results; add/edit form: hours <-> description)
+# Focus switching (search view: field <-> results; add/edit and attendance
+# forms: between the two fields)
 focus_toggle = ["tab", "shift+tab"]
 
 # Global (available in all non-modal views)

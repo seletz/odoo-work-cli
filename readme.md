@@ -469,11 +469,12 @@ keep their defaults. Values can be a single string or an array of strings.
 | `grid_prev_col` | `shift+tab` | grid | previous day |
 | `grid_enter` | `enter` | grid | open detail view |
 | `grid_search` | `/` | grid | open project/task search |
+| `grid_attendance_edit` | `t` | grid | edit attendance for the cursor's day |
 | `detail_edit` | `e` | detail | edit selected entry |
 | `detail_add` | `a` | detail | add entry |
 | `detail_delete` | `d` | detail | delete selected entry |
 | `search_toggle` | `ctrl+a` | search | toggle configured filters on/off |
-| `focus_toggle` | `tab`, `shift+tab` | search, add/edit form | switch focus between text field and results list / between form fields |
+| `focus_toggle` | `tab`, `shift+tab` | search, add/edit form, attendance form | switch focus between text field and results list / between form fields |
 | `global_prev_week` | `left`, `h` | grid, detail | previous week |
 | `global_next_week` | `right`, `l` | grid, detail | next week |
 | `global_back` | `esc` | all | back / cancel |
@@ -499,7 +500,8 @@ focus, a bright selection bar means the list has focus, and the hint line at
 the bottom always names the keys that currently apply.
 
 In the **add/edit form** `tab` switches between the hours and description
-fields the same way.
+fields the same way, and in the **attendance form** between the check-in and
+check-out times.
 
 ```toml
 [keys]
@@ -512,6 +514,7 @@ grid_next_col = ["tab"]
 grid_prev_col = ["shift+tab"]
 grid_enter = ["enter"]
 grid_search = ["/"]
+grid_attendance_edit = ["t"]
 
 # Detail view
 detail_edit = ["e"]
@@ -521,7 +524,8 @@ detail_delete = ["d"]
 # Search view
 search_toggle = ["ctrl+a"]
 
-# Focus switching (search view: field <-> results; add/edit form: hours <-> description)
+# Focus switching (search view: field <-> results; add/edit and attendance
+# forms: between the two fields)
 focus_toggle = ["tab", "shift+tab"]
 
 # Global (available in all non-modal views)

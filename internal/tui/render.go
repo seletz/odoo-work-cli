@@ -786,6 +786,11 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 			{"enter", "save"},
 			{km.Back.Help().Key, "cancel"},
 		}},
+		{"Attendance Form", []binding{
+			{km.FocusToggle.Help().Key, km.FocusToggle.Help().Desc + " (check-in/check-out)"},
+			{"enter", "save"},
+			{km.Back.Help().Key, "cancel"},
+		}},
 		{"Global", []binding{
 			{km.Left.Help().Key, km.Left.Help().Desc},
 			{km.Right.Help().Key, km.Right.Help().Desc},

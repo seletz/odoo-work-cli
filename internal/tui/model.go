@@ -1003,7 +1003,7 @@ func (m Model) View() tea.View {
 			helpContent := renderHelpOverlay(m.keys, m.width, m.height)
 			s = RenderDetailOverlay(s, helpContent, m.width, m.height, helpBoxStyle)
 		} else if m.state == stateAttendance {
-			att := renderAttendanceOverlay(m.att, m.spinner)
+			att := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 			s = RenderDetailOverlay(s, att, m.width, m.height, attendanceBoxStyle)
 		}
 	}

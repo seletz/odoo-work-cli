@@ -414,3 +414,137 @@ func TestRenderHelpOverlay_AlignsLongKeys(t *testing.T) {
 		t.Errorf("description columns differ: %q at %d, %q at %d", "toggle filter", a, "switch focus", b)
 	}
 }
+
+// --- attendance overlay -----------------------------------------------------
+//
+// The attendance form (#47) has the same shape as the add/edit form: two text
+// inputs and a focus toggle. It must obey the same #41 rule — a printable key
+// is typed, never matched against a binding — and it must use the shared
+// focus_toggle binding rather than a hard-coded Tab.
+
+// attendanceFormModel returns a model showing the attendance form for a single
+// closed record, with the given [keys] config applied and both inputs cleared.
+func attendanceFormModel(t *testing.T, keys config.KeysConfig) Model {
+	t.Helper()
+	mon := MondayTime{Time: attDay(2)}
+	m := NewModel(&mockClient{}, mon, config.DefaultHoursLimits(), "Deutschland", keys, nil)
+	m.now = func() time.Time { return attNow }
+	m.state = stateAttendance
+	m.att = attendanceState{sub: attLoading, day: attDay(2), prevState: stateGrid}
+	updated, _ := m.Update(attendanceDayLoadedMsg{records: []odoo.AttendanceRecord{closedRecord()}})
+	um := updated.(Model)
+	if um.att.sub != attForm {
+		t.Fatalf("sub = %v, want attForm", um.att.sub)
+	}
+	um.att.inInput.SetValue("")
+	um.att.outInput.SetValue("")
+	return um
+}
+
+func TestAttendanceForm_TypingIsNotInterceptedByBindings(t *testing.T) {
+	tests := []struct {
+		name string
+		keys config.KeysConfig
+		r    rune
+	}{
+		{"grid attendance key", nil, 't'},
+		{"cursor_down default", nil, 'j'},
+		{"global_quit default", nil, 'q'},
+		{"global_back rebound to a letter", config.KeysConfig{"global_back": {"x"}}, 'x'},
+		{"focus_toggle rebound to a letter", config.KeysConfig{"focus_toggle": {"n"}}, 'n'},
+		{"cursor_up rebound to a letter", config.KeysConfig{"cursor_up": {"w"}}, 'w'},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := attendanceFormModel(t, tc.keys)
+			updated, _ := m.Update(typed(tc.r))
+			m = updated.(Model)
+
+			if m.state != stateAttendance || m.att.sub != attForm {
+				t.Fatalf("state/sub = %v/%v, want the attendance form", m.state, m.att.sub)
+			}
+			if m.att.focus != 0 {
+				t.Errorf("focus = %d, want 0 (unchanged)", m.att.focus)
+			}
+			if got := m.att.inInput.Value(); got != string(tc.r) {
+				t.Errorf("check-in input = %q, want %q", got, string(tc.r))
+			}
+		})
+	}
+}
+
+func TestAttendanceForm_TypingGoesToTheFocusedInput(t *testing.T) {
+	m := attendanceFormModel(t, nil)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	m = updated.(Model)
+	updated, _ = m.Update(typed('q'))
+	m = updated.(Model)
+
+	if got := m.att.outInput.Value(); got != "q" {
+		t.Errorf("check-out input = %q, want q", got)
+	}
+	if got := m.att.inInput.Value(); got != "" {
+		t.Errorf("check-in input = %q, want empty", got)
+	}
+}
+
+func TestAttendanceForm_FocusToggleBinding(t *testing.T) {
+	tests := []struct {
+		name  string
+		keys  config.KeysConfig
+		press tea.KeyPressMsg
+	}{
+		{"default tab", nil, tea.KeyPressMsg{Code: tea.KeyTab}},
+		{"default shift+tab", nil, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}},
+		{"configured ctrl+n", config.KeysConfig{"focus_toggle": {"ctrl+n"}}, tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := attendanceFormModel(t, tc.keys)
+			if m.att.focus != 0 || !m.att.inInput.Focused() {
+				t.Fatalf("initial focus = %d, in.Focused = %v", m.att.focus, m.att.inInput.Focused())
+			}
+
+			updated, _ := m.Update(tc.press)
+			m = updated.(Model)
+			if m.att.focus != 1 || !m.att.outInput.Focused() || m.att.inInput.Focused() {
+				t.Fatalf("after toggle: focus=%d in.Focused=%v out.Focused=%v", m.att.focus, m.att.inInput.Focused(), m.att.outInput.Focused())
+			}
+
+			updated, _ = m.Update(tc.press)
+			m = updated.(Model)
+			if m.att.focus != 0 || !m.att.inInput.Focused() || m.att.outInput.Focused() {
+				t.Errorf("after second toggle: focus=%d in.Focused=%v out.Focused=%v", m.att.focus, m.att.inInput.Focused(), m.att.outInput.Focused())
+			}
+		})
+	}
+}
+
+func TestRenderAttendanceOverlay_HintsShowConfiguredKeys(t *testing.T) {
+	km := ApplyKeysConfig(DefaultKeyMap(), config.KeysConfig{
+		"focus_toggle": {"ctrl+n"},
+		"cursor_up":    {"up", "w"},
+		"cursor_down":  {"down", "s"},
+	})
+	rec := closedRecord()
+
+	form := renderAttendanceOverlay(attendanceState{sub: attForm, day: attDay(2), record: &rec}, spinner.New(), km)
+	if !strings.Contains(form, "ctrl+n") {
+		t.Errorf("attendance form hint should name the configured focus toggle, got %q", form)
+	}
+	if strings.Contains(form, "Tab: next field") {
+		t.Errorf("attendance form hint still hard-codes Tab: %q", form)
+	}
+
+	pick := renderAttendanceOverlay(attendanceState{sub: attPick, day: attDay(2), records: []odoo.AttendanceRecord{rec, openRecord()}}, spinner.New(), km)
+	if !strings.Contains(pick, "up/w") || !strings.Contains(pick, "down/s") {
+		t.Errorf("attendance pick hint should name the configured cursor keys, got %q", pick)
+	}
+}
+
+func TestRenderHelpOverlay_ListsAttendanceFormFocusToggle(t *testing.T) {
+	out := ansiSeq.ReplaceAllString(renderHelpOverlay(DefaultKeyMap(), 80, 40), "")
+	if !strings.Contains(out, "check-in/check-out") {
+		t.Errorf("help overlay should list the attendance form focus toggle, got:\n%s", out)
+	}
+}

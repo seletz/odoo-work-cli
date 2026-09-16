@@ -281,7 +281,18 @@ func (m Model) updateAttendancePick(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateAttendanceForm handles key events in the attendance form.
+//
+// Printable keys always go to the focused text input (issue #41): no key
+// binding, default or configured, may swallow a character the user types.
+// Bindings are only evaluated for non-printable keys. Focus switches on the
+// shared focus_toggle binding (default tab/shift+tab), the same action the
+// add/edit form uses.
 func (m Model) updateAttendanceForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if isTextKey(msg) {
+		return m.updateAttendanceInput(msg)
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Back):
 		if len(m.att.records) > 1 {
@@ -291,7 +302,7 @@ func (m Model) updateAttendanceForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.closeAttendance()
 
-	case msg.Code == tea.KeyTab:
+	case key.Matches(msg, m.keys.FocusToggle):
 		if m.att.focus == 0 {
 			m.att.focus = 1
 			m.att.inInput.Blur()
@@ -305,6 +316,11 @@ func (m Model) updateAttendanceForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.submitAttendance()
 	}
 
+	return m.updateAttendanceInput(msg)
+}
+
+// updateAttendanceInput forwards a key press to the focused attendance input.
+func (m Model) updateAttendanceInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if m.att.focus == 0 {
 		m.att.inInput, cmd = m.att.inInput.Update(msg)
@@ -357,7 +373,7 @@ func attendanceRecordLine(rec odoo.AttendanceRecord, day time.Time) string {
 
 // renderAttendanceOverlay renders the attendance overlay content for the
 // current sub-state.
-func renderAttendanceOverlay(a attendanceState, spin spinner.Model) string {
+func renderAttendanceOverlay(a attendanceState, spin spinner.Model, km KeyMap) string {
 	dayStr := a.day.Format("Mon 02 Jan 2006")
 	var b strings.Builder
 
@@ -382,7 +398,8 @@ func renderAttendanceOverlay(a attendanceState, spin spinner.Model) string {
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(detailHintStyle.Render("↑/↓: select  Enter: edit  Esc: cancel"))
+		b.WriteString(detailHintStyle.Render(fmt.Sprintf("%s %s: select  Enter: edit  Esc: cancel",
+			km.Up.Help().Key, km.Down.Help().Key)))
 
 	default:
 		verb := "Edit attendance"
@@ -415,7 +432,8 @@ func renderAttendanceOverlay(a attendanceState, spin spinner.Model) string {
 		}
 
 		b.WriteString("\n")
-		b.WriteString(detailHintStyle.Render("Enter: save  Esc: cancel  Tab: next field   HH:MM or YYYY-MM-DD HH:MM"))
+		b.WriteString(detailHintStyle.Render(fmt.Sprintf("Enter: save  Esc: cancel  %s: next field   HH:MM or YYYY-MM-DD HH:MM",
+			km.FocusToggle.Help().Key)))
 	}
 
 	return b.String()
