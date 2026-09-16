@@ -603,7 +603,7 @@ func TestModel_AttendanceSavedErrorKeepsFormUsable(t *testing.T) {
 
 func TestRenderAttendanceOverlay_Form(t *testing.T) {
 	m := loadedAttendanceModel(t, &mockClient{}, closedRecord())
-	out := renderAttendanceOverlay(m.att, m.spinner)
+	out := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 
 	for _, want := range []string{"Edit attendance", "Mon 02 Mar 2026", "#11", "08:58", "17:03", "Check-in", "Check-out", "Enter: save"} {
 		if !strings.Contains(out, want) {
@@ -614,7 +614,7 @@ func TestRenderAttendanceOverlay_Form(t *testing.T) {
 
 func TestRenderAttendanceOverlay_CreateForm(t *testing.T) {
 	m := loadedAttendanceModel(t, &mockClient{})
-	out := renderAttendanceOverlay(m.att, m.spinner)
+	out := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 	if !strings.Contains(out, "Add attendance") {
 		t.Errorf("create form should say 'Add attendance'\n%s", out)
 	}
@@ -626,7 +626,7 @@ func TestRenderAttendanceOverlay_CreateForm(t *testing.T) {
 func TestRenderAttendanceOverlay_Pick(t *testing.T) {
 	m := loadedAttendanceModel(t, &mockClient{}, closedRecord(), openRecord())
 	m.att.pickCursor = 1
-	out := renderAttendanceOverlay(m.att, m.spinner)
+	out := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 
 	if !strings.Contains(out, "#11") || !strings.Contains(out, "#12") {
 		t.Errorf("pick list should show both records\n%s", out)
@@ -647,7 +647,7 @@ func TestRenderAttendanceOverlay_Pick(t *testing.T) {
 func TestRenderAttendanceOverlay_Loading(t *testing.T) {
 	m := newAttendanceTestModel(&mockClient{})
 	m.att = attendanceState{sub: attLoading, day: attDay(2)}
-	out := renderAttendanceOverlay(m.att, m.spinner)
+	out := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 	if !strings.Contains(out, "Loading") || !strings.Contains(out, "Mon 02 Mar 2026") {
 		t.Errorf("loading overlay should name the day\n%s", out)
 	}
@@ -668,7 +668,7 @@ func TestRenderAttendanceOverlay_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := loadedAttendanceModel(t, &mockClient{}, closedRecord())
 			m.att.err = tt.err
-			out := renderAttendanceOverlay(m.att, m.spinner)
+			out := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 
 			firstLine := strings.SplitN(tt.err.Error(), "\n", 2)[0]
 			if len(firstLine) > 20 {
@@ -727,7 +727,7 @@ func TestModel_AttendanceDayLoadedSortsByCheckIn(t *testing.T) {
 	if got := m.att.records[0].ID; got != closed.ID {
 		t.Errorf("first record = #%d, want the earlier record #%d", got, closed.ID)
 	}
-	out := renderAttendanceOverlay(m.att, m.spinner)
+	out := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 	if strings.Index(out, "#11") > strings.Index(out, "#12") {
 		t.Errorf("pick list should show #11 (08:58) before #12 (18:00)\n%s", out)
 	}

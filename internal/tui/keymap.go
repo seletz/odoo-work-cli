@@ -25,6 +25,7 @@ type KeyMap struct {
 	Delete         key.Binding
 	Search         key.Binding
 	SearchToggle   key.Binding
+	FocusToggle    key.Binding
 	ClockToggle    key.Binding
 	AttendanceEdit key.Binding
 }
@@ -96,6 +97,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("ctrl+a"),
 			key.WithHelp("C-a", "toggle filter"),
 		),
+		FocusToggle: key.NewBinding(
+			key.WithKeys("tab", "shift+tab"),
+			key.WithHelp("tab", "switch focus"),
+		),
 		ClockToggle: key.NewBinding(
 			key.WithKeys("c"),
 			key.WithHelp("c", "clock in/out"),
@@ -113,6 +118,8 @@ func DefaultKeyMap() KeyMap {
 //   - grid_    : grid view actions
 //   - detail_  : detail view actions
 //   - search_  : search view actions
+//   - focus_   : focus switching between text inputs and lists (search view,
+//     add/edit form)
 //   - global_  : actions available in all non-modal views
 var actionHelpDesc = map[string]string{
 	"cursor_up":            "up",
@@ -126,6 +133,7 @@ var actionHelpDesc = map[string]string{
 	"detail_add":           "add",
 	"detail_delete":        "delete",
 	"search_toggle":        "toggle filter",
+	"focus_toggle":         "switch focus",
 	"global_quit":          "quit",
 	"global_help":          "help",
 	"global_refresh":       "refresh",
@@ -171,6 +179,8 @@ func ApplyKeysConfig(km KeyMap, cfg config.KeysConfig) KeyMap {
 			km.Delete = binding
 		case "search_toggle":
 			km.SearchToggle = binding
+		case "focus_toggle":
+			km.FocusToggle = binding
 		case "global_quit":
 			km.Quit = binding
 		case "global_help":
@@ -204,6 +214,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.NextCol, k.PrevCol},
 		{k.Left, k.Right},
 		{k.Enter, k.Back, k.Edit, k.Add, k.Delete, k.Search, k.AttendanceEdit},
+		{k.SearchToggle, k.FocusToggle},
 		{k.ClockToggle, k.Refresh, k.Help, k.Quit},
 	}
 }

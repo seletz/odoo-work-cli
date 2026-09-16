@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -34,6 +35,14 @@ type searchSubState int
 const (
 	searchLoading searchSubState = iota
 	searchReady
+)
+
+// focusTarget identifies which part of the search view receives key presses.
+type focusTarget int
+
+const (
+	focusInput focusTarget = iota // the search text field
+	focusList                     // the results list
 )
 
 // searchItem represents a unified search result (project or task).
@@ -123,6 +132,7 @@ type Model struct {
 	pendingRows []GridRow // rows added via search that have no server entries yet
 
 	searchSub       searchSubState
+	searchFocus     focusTarget // which part of the search view has focus
 	searchInput     textinput.Model
 	searchItems     []searchItem // full combined list
 	searchFiltered  []searchItem // after text filter
@@ -554,15 +564,31 @@ func (m Model) enterAdd() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// isTextKey reports whether a key press represents a printable character,
+// i.e. something the user is typing rather than a command key.
+// Bubbletea populates Text only for printable characters; the Code check
+// covers synthetic messages that carry a printable rune without Text.
+func isTextKey(msg tea.KeyPressMsg) bool {
+	return msg.Text != "" || (msg.Mod == 0 && unicode.IsPrint(msg.Code))
+}
+
 // updateEdit handles key events in the edit state.
+//
+// Printable keys always go to the focused text input (issue #41): no key
+// binding, default or configured, may swallow a character the user types.
+// Bindings are only evaluated for non-printable keys.
 func (m Model) updateEdit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if isTextKey(msg) {
+		return m.updateEditInput(msg)
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Back):
 		m.state = stateDetail
 		m.editErr = nil
 		return m, nil
 
-	case msg.Code == '\t':
+	case key.Matches(msg, m.keys.FocusToggle):
 		// Toggle focus between hours and description.
 		if m.editFocus == 0 {
 			m.editFocus = 1
@@ -579,7 +605,11 @@ func (m Model) updateEdit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.submitEdit()
 	}
 
-	// Forward to focused input.
+	return m.updateEditInput(msg)
+}
+
+// updateEditInput forwards a key press to the focused edit form input.
+func (m Model) updateEditInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if m.editFocus == 0 {
 		m.editHours, cmd = m.editHours.Update(msg)
@@ -679,12 +709,14 @@ func (m Model) enterSearch() (tea.Model, tea.Cmd) {
 	m.state = stateSearch
 	m.searchSub = searchLoading
 	m.searchUseFilter = true
+	m.searchFocus = focusInput
 	m.searchCursor = 0
 	m.searchItems = nil
 	m.searchFiltered = nil
 	m.searchErr = nil
 
 	m.searchInput = textinput.New()
+	m.searchInput.Prompt = "" // the overlay renders its own, focus-aware prompt
 	m.searchInput.Placeholder = "Type to search..."
 	m.searchInput.SetWidth(40)
 	cmd := m.searchInput.Focus()
@@ -779,11 +811,26 @@ func filterSearchItems(items []searchItem, query string) []searchItem {
 }
 
 // updateSearch handles key events in the search state.
+//
+// Focus model (issue #41): the search field has focus first; FocusToggle
+// (Tab) moves focus to the results list and back. While the field has focus,
+// printable keys always go to the field — no binding, default or configured,
+// may intercept typing — so cursor bindings like j/k only navigate once the
+// list has focus. Non-printable keys (arrows, Enter, Esc, ctrl+…) are matched
+// against bindings in both focus states.
 func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	inputFocused := m.searchFocus == focusInput
+	if inputFocused && isTextKey(msg) {
+		return m.updateSearchInput(msg)
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Back):
 		m.state = stateGrid
 		return m, nil
+
+	case key.Matches(msg, m.keys.FocusToggle):
+		return m.toggleSearchFocus()
 
 	case key.Matches(msg, m.keys.SearchToggle):
 		m.searchUseFilter = !m.searchUseFilter
@@ -816,18 +863,36 @@ func (m Model) updateSearch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Forward to text input.
+	if inputFocused {
+		// Editing keys (backspace, ctrl+w, home/end, …).
+		return m.updateSearchInput(msg)
+	}
+	return m, nil
+}
+
+// toggleSearchFocus switches focus between the search field and the results list.
+func (m Model) toggleSearchFocus() (tea.Model, tea.Cmd) {
+	if m.searchFocus == focusInput {
+		m.searchFocus = focusList
+		m.searchInput.Blur()
+		return m, nil
+	}
+	m.searchFocus = focusInput
+	cmd := m.searchInput.Focus()
+	return m, cmd
+}
+
+// updateSearchInput forwards a key press to the search field and re-filters.
+func (m Model) updateSearchInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.searchInput, cmd = m.searchInput.Update(msg)
 
-	// Re-filter on text change.
 	if m.searchSub == searchReady {
 		m.searchFiltered = filterSearchItems(m.searchItems, m.searchInput.Value())
 		if m.searchCursor >= len(m.searchFiltered) {
 			m.searchCursor = 0
 		}
 	}
-
 	return m, cmd
 }
 
@@ -926,19 +991,19 @@ func (m Model) View() tea.View {
 		if m.state == stateEdit && m.cursor[0] < len(m.grid.Rows) {
 			row := m.grid.Rows[m.cursor[0]]
 			day := m.monday.AddDate(0, 0, m.cursor[1])
-			edit := renderEditForm(row, day, m.editHours, m.editDesc, m.editFocus, m.editErr, m.width, m.editIsNew)
+			edit := renderEditForm(row, day, m.editHours, m.editDesc, m.editFocus, m.editErr, m.width, m.editIsNew, m.keys)
 			s = RenderDetailOverlay(s, edit, m.width, m.height, editBoxStyle)
 		} else if m.state == stateDetail && m.cursor[0] < len(m.grid.Rows) {
 			detail := RenderDetail(m.grid.Rows[m.cursor[0]], m.cursor[1], m.monday.Time, m.detailCursor, m.width, m.companyColors)
 			s = RenderDetailOverlay(s, detail, m.width, m.height, detailBoxStyle)
 		} else if m.state == stateSearch {
-			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height, m.companyColors)
+			search := renderSearchOverlay(m.searchInput, m.searchFiltered, m.searchCursor, m.searchSub, m.searchUseFilter, m.searchErr, m.spinner, m.width, m.height, m.companyColors, m.searchFocus, m.keys)
 			s = RenderDetailOverlay(s, search, m.width, m.height, searchBoxStyle)
 		} else if m.state == stateHelp {
 			helpContent := renderHelpOverlay(m.keys, m.width, m.height)
 			s = RenderDetailOverlay(s, helpContent, m.width, m.height, helpBoxStyle)
 		} else if m.state == stateAttendance {
-			att := renderAttendanceOverlay(m.att, m.spinner)
+			att := renderAttendanceOverlay(m.att, m.spinner, m.keys)
 			s = RenderDetailOverlay(s, att, m.width, m.height, attendanceBoxStyle)
 		}
 	}

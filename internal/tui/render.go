@@ -522,7 +522,7 @@ func formatHoursOrZero(h float64) string {
 }
 
 // renderEditForm renders the edit form overlay content.
-func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.Model, focus int, editErr error, width int, isNew bool) string {
+func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.Model, focus int, editErr error, width int, isNew bool, km KeyMap) string {
 	_ = width // reserved for future layout adjustments
 	var b strings.Builder
 
@@ -561,14 +561,16 @@ func renderEditForm(row GridRow, day time.Time, hoursInput, descInput textinput.
 	}
 
 	b.WriteString("\n")
-	b.WriteString(detailHintStyle.Render("Enter: save  Esc: cancel  Tab: next field"))
+	b.WriteString(detailHintStyle.Render(fmt.Sprintf("Enter: save  Esc: cancel  %s: next field", km.FocusToggle.Help().Key)))
 
 	return b.String()
 }
 
 // renderSearchOverlay renders the search overlay content with a fixed size
 // derived from terminal dimensions so the overlay does not jump while typing.
-func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, sub searchSubState, useFilter bool, searchErr error, spin spinner.Model, width, height int, companyColors map[string]string) string {
+// The focused part (search field or results list) is highlighted so users can
+// see where keystrokes go.
+func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, sub searchSubState, useFilter bool, searchErr error, spin spinner.Model, width, height int, companyColors map[string]string, focus focusTarget, km KeyMap) string {
 	// Fixed inner width: full terminal minus outer padding (8 each side),
 	// border (2), and box padding (4).
 	const outerPad = 8
@@ -616,8 +618,14 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 	b.WriteString("\n")
 	lines += 2
 
-	// Input field.
-	inputLine := "  > " + input.View()
+	// Input field; the prompt is highlighted while the field has focus.
+	prompt := "  > "
+	if focus == focusInput {
+		prompt = editActiveLabelStyle.Render(prompt)
+	} else {
+		prompt = editLabelStyle.Render(prompt)
+	}
+	inputLine := prompt + input.View()
 	b.WriteString(padLine(inputLine))
 	b.WriteString("\n")
 	lines++
@@ -693,8 +701,10 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 				label += " — " + extra
 			}
 
-			if i == cursor {
+			if i == cursor && focus == focusList {
 				label = cursorStyle.Render(padLine(label))
+			} else if i == cursor {
+				label = rowCursorStyle.Render(padLine(label))
 			} else {
 				label = padLine(label)
 			}
@@ -712,7 +722,15 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 		lines++
 	}
 
-	b.WriteString(detailHintStyle.Render("  j/k: navigate  Enter: select  Esc: cancel"))
+	toggle := km.FocusToggle.Help().Key
+	var hint string
+	if focus == focusInput {
+		hint = fmt.Sprintf("  %s: results  ↑/↓: navigate  Enter: select  Esc: cancel", toggle)
+	} else {
+		hint = fmt.Sprintf("  %s: search field  %s %s: navigate  Enter: select  Esc: cancel",
+			toggle, km.Up.Help().Key, km.Down.Help().Key)
+	}
+	b.WriteString(detailHintStyle.Render(hint))
 
 	return b.String()
 }
@@ -761,6 +779,17 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 		}},
 		{"Search", []binding{
 			{km.SearchToggle.Help().Key, km.SearchToggle.Help().Desc},
+			{km.FocusToggle.Help().Key, km.FocusToggle.Help().Desc + " (field/results)"},
+		}},
+		{"Add/Edit Form", []binding{
+			{km.FocusToggle.Help().Key, km.FocusToggle.Help().Desc + " (hours/description)"},
+			{"enter", "save"},
+			{km.Back.Help().Key, "cancel"},
+		}},
+		{"Attendance Form", []binding{
+			{km.FocusToggle.Help().Key, km.FocusToggle.Help().Desc + " (check-in/check-out)"},
+			{"enter", "save"},
+			{km.Back.Help().Key, "cancel"},
 		}},
 		{"Global", []binding{
 			{km.Left.Help().Key, km.Left.Help().Desc},
@@ -771,6 +800,16 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 			{km.Help.Help().Key, km.Help.Help().Desc},
 			{km.Quit.Help().Key, km.Quit.Help().Desc},
 		}},
+	}
+
+	// Key column width: at least 12, wider if a configured key combo needs it.
+	keyWidth := 12
+	for _, sec := range sections {
+		for _, bind := range sec.bindings {
+			if w := runeLen(bind.key); w > keyWidth {
+				keyWidth = w
+			}
+		}
 	}
 
 	var b strings.Builder
@@ -784,7 +823,7 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 		b.WriteString(padLine("  " + searchSectionStyle.Render(sec.name)))
 		b.WriteString("\n")
 		for _, bind := range sec.bindings {
-			line := fmt.Sprintf("    %-12s %s", bind.key, bind.desc)
+			line := fmt.Sprintf("    %-*s %s", keyWidth, bind.key, bind.desc)
 			b.WriteString(padLine(line))
 			b.WriteString("\n")
 		}
