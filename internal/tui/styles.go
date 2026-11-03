@@ -104,6 +104,15 @@ var (
 	// Daily/weekly attendance totals in the header bar.
 	attendanceSummaryStyle = lipgloss.NewStyle().Faint(true)
 
+	// Per-day attendance block below the grid totals (#78).
+	attendanceLabelStyle   = lipgloss.NewStyle().Faint(true)
+	missingAttendanceStyle = lipgloss.NewStyle().Foreground(colorRed).Bold(true)
+	// Attendance − booked: positive = unbooked attendance, negative = more
+	// booked than attended, zero = matches.
+	diffPositiveStyle = lipgloss.NewStyle().Foreground(colorYellow)
+	diffNegativeStyle = lipgloss.NewStyle().Foreground(colorRed)
+	diffZeroStyle     = lipgloss.NewStyle().Foreground(colorGreen)
+
 	detailHintStyle      = lipgloss.NewStyle().Faint(true)
 	editLabelStyle       = lipgloss.NewStyle().Faint(true)
 	editActiveLabelStyle = lipgloss.NewStyle().Bold(true)
