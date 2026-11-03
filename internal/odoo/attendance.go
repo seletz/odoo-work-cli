@@ -1,10 +1,10 @@
 package odoo
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	goOdoo "github.com/skilld-labs/go-odoo"
 )
 
@@ -21,7 +21,7 @@ func (x *XMLRPCClient) findEmployeeID() (int64, error) {
 		return 0, fmt.Errorf("looking up employee: %w", err)
 	}
 	if len(records) == 0 {
-		return 0, fmt.Errorf("no employee record found for user %q", x.login)
+		return 0, apperr.New(apperr.KindNotFound, "no employee record found for user %q", x.login)
 	}
 
 	r := records[0]
@@ -59,7 +59,7 @@ func (x *XMLRPCClient) ClockIn() (int64, error) {
 		return 0, err
 	}
 	if status.ClockedIn {
-		return 0, errors.New("already clocked in")
+		return 0, apperr.New(apperr.KindConflict, "already clocked in")
 	}
 
 	if err := x.attendanceToggle(); err != nil {
@@ -82,7 +82,7 @@ func (x *XMLRPCClient) ClockOut() (*AttendanceRecord, error) {
 		return nil, err
 	}
 	if !status.ClockedIn {
-		return nil, errors.New("not clocked in")
+		return nil, apperr.New(apperr.KindConflict, "not clocked in")
 	}
 
 	recordID := status.CurrentID
@@ -100,7 +100,7 @@ func (x *XMLRPCClient) ClockOut() (*AttendanceRecord, error) {
 		return nil, fmt.Errorf("re-reading attendance record: %w", err)
 	}
 	if len(records) == 0 {
-		return nil, fmt.Errorf("attendance record %d not found after update", recordID)
+		return nil, apperr.New(apperr.KindNotFound, "attendance record %d not found after update", recordID)
 	}
 
 	return parseAttendanceRecord(records[0])

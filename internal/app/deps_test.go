@@ -157,3 +157,7 @@ func TestDepsRequireConfigErrorsWhenUninitialized(t *testing.T) {
 		})
 	}
 }
+
+func (s *stubClient) GetTimesheet(int64) (*odoo.TimesheetEntry, error) { return nil, nil }
+
+func (s *stubClient) GetAttendance(int64) (*odoo.AttendanceRecord, error) { return nil, nil }

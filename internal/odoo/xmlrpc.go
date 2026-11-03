@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	goOdoo "github.com/skilld-labs/go-odoo"
 )
@@ -58,7 +59,7 @@ func (x *XMLRPCClient) Close() {
 // (it passes interactive: true which skips API key checking).
 func (x *XMLRPCClient) jsonSession() (*jsonRPCSession, error) {
 	if x.webPassword == "" {
-		return nil, fmt.Errorf("web_password not configured; required for clock in/out (set via [op_secrets] web_password or ODOO_WEB_PASSWORD env var)")
+		return nil, apperr.New(apperr.KindConfig, "web_password not configured; required for clock in/out (set via [op_secrets] web_password or ODOO_WEB_PASSWORD env var)")
 	}
 	if x.jsonRPC == nil {
 		x.jsonRPC = newJSONRPCSession(x.url, x.database, x.login, x.webPassword, x.totpSecret)
@@ -343,8 +344,7 @@ func (x *XMLRPCClient) ListAllTimesheets(dateFrom, dateTo string) ([]TimesheetEn
 func (x *XMLRPCClient) listTimesheets(dateFrom, dateTo string, applyFilters bool) ([]TimesheetEntry, error) {
 	criteria := x.timesheetCriteria(dateFrom, dateTo, applyFilters)
 
-	fields := []string{"id", "date", "project_id", "task_id", "name", "unit_amount", "employee_id", "validated_status", "company_id"}
-	opts := goOdoo.NewOptions().FetchFields(fields...)
+	opts := goOdoo.NewOptions().FetchFields(timesheetFields...)
 
 	records, err := x.searchReadRaw("account.analytic.line", criteria, opts)
 	if IsNotFound(err) {
@@ -356,34 +356,58 @@ func (x *XMLRPCClient) listTimesheets(dateFrom, dateTo string, applyFilters bool
 
 	result := make([]TimesheetEntry, 0, len(records))
 	for _, r := range records {
-		entry := TimesheetEntry{
-			ProjectID: extractMany2OneID(r["project_id"]),
-			Project:   extractMany2OneName(r["project_id"]),
-			TaskID:    extractMany2OneID(r["task_id"]),
-			Task:      extractMany2OneName(r["task_id"]),
-			Employee:  extractMany2OneName(r["employee_id"]),
-			Company:   extractMany2OneName(r["company_id"]),
-		}
-		if id, ok := r["id"].(int64); ok {
-			entry.ID = id
-		} else if id, ok := r["id"].(float64); ok {
-			entry.ID = int64(id)
-		}
-		if name, ok := r["name"].(string); ok {
-			entry.Name = name
-		}
-		if date, ok := r["date"].(string); ok {
-			entry.Date = date
-		}
-		if hours, ok := r["unit_amount"].(float64); ok {
-			entry.Hours = hours
-		}
-		if status, ok := r["validated_status"].(string); ok {
-			entry.ValidatedStatus = status
-		}
-		result = append(result, entry)
+		result = append(result, parseTimesheetRecord(r))
 	}
 	return result, nil
+}
+
+// timesheetFields are the account.analytic.line fields read for a TimesheetEntry.
+var timesheetFields = []string{"id", "date", "project_id", "task_id", "name", "unit_amount", "employee_id", "validated_status", "company_id"}
+
+// parseTimesheetRecord converts a raw account.analytic.line record.
+func parseTimesheetRecord(r map[string]interface{}) TimesheetEntry {
+	entry := TimesheetEntry{
+		ProjectID: extractMany2OneID(r["project_id"]),
+		Project:   extractMany2OneName(r["project_id"]),
+		TaskID:    extractMany2OneID(r["task_id"]),
+		Task:      extractMany2OneName(r["task_id"]),
+		Employee:  extractMany2OneName(r["employee_id"]),
+		Company:   extractMany2OneName(r["company_id"]),
+	}
+	if id, ok := r["id"].(int64); ok {
+		entry.ID = id
+	} else if id, ok := r["id"].(float64); ok {
+		entry.ID = int64(id)
+	}
+	if name, ok := r["name"].(string); ok {
+		entry.Name = name
+	}
+	if date, ok := r["date"].(string); ok {
+		entry.Date = date
+	}
+	if hours, ok := r["unit_amount"].(float64); ok {
+		entry.Hours = hours
+	}
+	if status, ok := r["validated_status"].(string); ok {
+		entry.ValidatedStatus = status
+	}
+	return entry
+}
+
+// GetTimesheet returns a single timesheet entry by ID. Returns an
+// apperr.KindNotFound error if the entry does not exist or is not visible.
+func (x *XMLRPCClient) GetTimesheet(id int64) (*TimesheetEntry, error) {
+	criteria := goOdoo.NewCriteria().Add("id", "=", id)
+	opts := goOdoo.NewOptions().FetchFields(timesheetFields...)
+	records, err := x.searchReadRaw("account.analytic.line", criteria, opts)
+	if err != nil && !IsNotFound(err) {
+		return nil, fmt.Errorf("fetching timesheet %d: %w", id, err)
+	}
+	if len(records) == 0 {
+		return nil, apperr.New(apperr.KindNotFound, "timesheet entry %d not found", id)
+	}
+	entry := parseTimesheetRecord(records[0])
+	return &entry, nil
 }
 
 // GetFields returns field metadata for the given Odoo model.
@@ -426,7 +450,7 @@ func (x *XMLRPCClient) WhoAmI() (*UserInfo, error) {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
 	if len(records) == 0 {
-		return nil, fmt.Errorf("user %q not found", x.login)
+		return nil, apperr.New(apperr.KindNotFound, "user %q not found", x.login)
 	}
 
 	r := records[0]

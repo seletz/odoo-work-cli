@@ -1,8 +1,9 @@
 package odoo
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 
 	goOdoo "github.com/skilld-labs/go-odoo"
 )
@@ -10,16 +11,16 @@ import (
 // ValidateTimesheetParams validates that the required fields are set.
 func ValidateTimesheetParams(p TimesheetWriteParams) error {
 	if p.ProjectID <= 0 && p.TaskID <= 0 {
-		return errors.New("project ID or task ID is required")
+		return apperr.New(apperr.KindValidation, "project ID or task ID is required")
 	}
 	if p.Date == "" {
-		return errors.New("date is required")
+		return apperr.New(apperr.KindValidation, "date is required")
 	}
 	if p.Name == "" {
-		return errors.New("description is required")
+		return apperr.New(apperr.KindValidation, "description is required")
 	}
 	if p.Hours <= 0 {
-		return errors.New("hours must be greater than zero")
+		return apperr.New(apperr.KindValidation, "hours must be greater than zero")
 	}
 	return nil
 }
@@ -65,10 +66,10 @@ func (x *XMLRPCClient) CreateTimesheet(params TimesheetWriteParams) (int64, erro
 // Only the fields present in the map are sent to Odoo.
 func (x *XMLRPCClient) UpdateTimesheet(id int64, fields map[string]interface{}) error {
 	if id <= 0 {
-		return errors.New("timesheet ID is required")
+		return apperr.New(apperr.KindValidation, "timesheet ID is required")
 	}
 	if len(fields) == 0 {
-		return errors.New("at least one field to update is required")
+		return apperr.New(apperr.KindValidation, "at least one field to update is required")
 	}
 
 	_, err := x.client.ExecuteKw("write", "account.analytic.line",
@@ -82,7 +83,7 @@ func (x *XMLRPCClient) UpdateTimesheet(id int64, fields map[string]interface{}) 
 // DeleteTimesheet deletes a timesheet entry by ID.
 func (x *XMLRPCClient) DeleteTimesheet(id int64) error {
 	if id <= 0 {
-		return errors.New("timesheet ID is required")
+		return apperr.New(apperr.KindValidation, "timesheet ID is required")
 	}
 
 	_, err := x.client.ExecuteKw("unlink", "account.analytic.line",

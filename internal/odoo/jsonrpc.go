@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pquerna/otp/totp"
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 )
 
 // jsonRPCSession manages a JSON-RPC session with Odoo.
@@ -82,16 +83,16 @@ func (s *jsonRPCSession) authenticate() error {
 	case http.StatusSeeOther, http.StatusFound:
 		if strings.Contains(resp.Header.Get("Location"), "/web/login/totp") {
 			if s.totpSecret == "" {
-				return fmt.Errorf("authentication failed: 2FA is enabled but no TOTP secret configured (set totp_secret in [op_secrets] or ODOO_TOTP_SECRET env var)")
+				return apperr.New(apperr.KindAuth, "authentication failed: 2FA is enabled but no TOTP secret configured (set totp_secret in [op_secrets] or ODOO_TOTP_SECRET env var)")
 			}
 			return s.completeTOTP()
 		}
 		s.authenticated = true
 		return nil
 	case http.StatusOK:
-		return fmt.Errorf("authentication failed: Odoo re-rendered the login form (HTTP 200) — either the credentials were rejected (the web session needs the login password, not the API key), or the /web/login form fields (csrf_token, login, password, redirect) were renamed; check the Odoo version")
+		return apperr.New(apperr.KindAuth, "authentication failed: Odoo re-rendered the login form (HTTP 200) — either the credentials were rejected (the web session needs the login password, not the API key), or the /web/login form fields (csrf_token, login, password, redirect) were renamed; check the Odoo version")
 	default:
-		return fmt.Errorf("authentication failed: unexpected HTTP %d from POST /web/login — expected a 303 redirect (success, or /web/login/totp when 2FA is pending) or 200 (rejected); the login redirect semantics may have changed; check the Odoo version", resp.StatusCode)
+		return apperr.New(apperr.KindAuth, "authentication failed: unexpected HTTP %d from POST /web/login — expected a 303 redirect (success, or /web/login/totp when 2FA is pending) or 200 (rejected); the login redirect semantics may have changed; check the Odoo version", resp.StatusCode)
 	}
 }
 
@@ -143,7 +144,7 @@ func (s *jsonRPCSession) completeTOTP() error {
 		return nil
 	}
 
-	return fmt.Errorf("TOTP verification failed (HTTP %d) — either the code was rejected (check totp_secret and the system clock), or the /web/login/totp form fields (csrf_token, totp_token) were renamed; check the Odoo version", totpResp.StatusCode)
+	return apperr.New(apperr.KindAuth, "TOTP verification failed (HTTP %d) — either the code was rejected (check totp_secret and the system clock), or the /web/login/totp form fields (csrf_token, totp_token) were renamed; check the Odoo version", totpResp.StatusCode)
 }
 
 // csrfTokenRe matches the CSRF token hidden input in Odoo HTML forms.

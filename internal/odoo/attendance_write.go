@@ -1,11 +1,11 @@
 package odoo
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	goOdoo "github.com/skilld-labs/go-odoo"
 )
 
@@ -72,17 +72,23 @@ func (x *XMLRPCClient) createAttendance(checkIn time.Time, checkOut *time.Time) 
 	}
 }
 
+// GetAttendance returns a single attendance record by ID. Returns an
+// apperr.KindNotFound error if the record does not exist or is not visible.
+func (x *XMLRPCClient) GetAttendance(id int64) (*AttendanceRecord, error) {
+	return x.readAttendance(id)
+}
+
 // readAttendance fetches a single attendance record by ID.
 func (x *XMLRPCClient) readAttendance(id int64) (*AttendanceRecord, error) {
 	criteria := goOdoo.NewCriteria().Add("id", "=", id)
 	opts := goOdoo.NewOptions().
 		FetchFields("id", "employee_id", "check_in", "check_out", "worked_hours")
 	records, err := x.searchReadRaw("hr.attendance", criteria, opts)
-	if err != nil {
+	if err != nil && !IsNotFound(err) {
 		return nil, fmt.Errorf("reading attendance record: %w", err)
 	}
 	if len(records) == 0 {
-		return nil, fmt.Errorf("attendance record %d not found", id)
+		return nil, apperr.New(apperr.KindNotFound, "attendance record %d not found", id)
 	}
 	return parseAttendanceRecord(records[0])
 }
@@ -97,7 +103,7 @@ func (x *XMLRPCClient) ClockInAt(checkIn time.Time) (int64, error) {
 		return 0, err
 	}
 	if status.ClockedIn {
-		return 0, errors.New("already clocked in")
+		return 0, apperr.New(apperr.KindConflict, "already clocked in")
 	}
 
 	return x.createAttendance(checkIn, nil)
@@ -112,10 +118,10 @@ func (x *XMLRPCClient) ClockOutAt(checkOut time.Time) (*AttendanceRecord, error)
 		return nil, err
 	}
 	if !status.ClockedIn {
-		return nil, errors.New("not clocked in")
+		return nil, apperr.New(apperr.KindConflict, "not clocked in")
 	}
 	if status.CheckIn != nil && !checkOut.After(*status.CheckIn) {
-		return nil, fmt.Errorf("check-out %s is not after check-in %s",
+		return nil, apperr.New(apperr.KindValidation, "check-out %s is not after check-in %s",
 			checkOut.Format("15:04"),
 			status.CheckIn.In(checkOut.Location()).Format("15:04"))
 	}
@@ -136,7 +142,7 @@ func (x *XMLRPCClient) ClockOutAt(checkOut time.Time) (*AttendanceRecord, error)
 // and check-out times via XML-RPC. Requires attendance officer rights.
 func (x *XMLRPCClient) CreateAttendance(checkIn, checkOut time.Time) (int64, error) {
 	if !checkOut.After(checkIn) {
-		return 0, fmt.Errorf("check-out %s is not after check-in %s",
+		return 0, apperr.New(apperr.KindValidation, "check-out %s is not after check-in %s",
 			checkOut.Format("15:04"),
 			checkIn.Format("15:04"))
 	}
@@ -148,13 +154,13 @@ func (x *XMLRPCClient) CreateAttendance(checkIn, checkOut time.Time) (int64, err
 // rights. Returns the updated record.
 func (x *XMLRPCClient) EditAttendance(id int64, checkIn, checkOut *time.Time) (*AttendanceRecord, error) {
 	if id <= 0 {
-		return nil, errors.New("attendance ID is required")
+		return nil, apperr.New(apperr.KindValidation, "attendance ID is required")
 	}
 	if checkIn == nil && checkOut == nil {
-		return nil, errors.New("nothing to update: provide a new check-in and/or check-out time")
+		return nil, apperr.New(apperr.KindValidation, "nothing to update: provide a new check-in and/or check-out time")
 	}
 	if checkIn != nil && checkOut != nil && !checkOut.After(*checkIn) {
-		return nil, fmt.Errorf("check-out %s is not after check-in %s",
+		return nil, apperr.New(apperr.KindValidation, "check-out %s is not after check-in %s",
 			checkOut.Format("15:04"),
 			checkIn.Format("15:04"))
 	}

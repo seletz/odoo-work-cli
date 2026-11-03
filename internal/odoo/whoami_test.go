@@ -165,3 +165,7 @@ func TestXMLRPCClient_ImplementsClient(t *testing.T) {
 	// Compile-time check that XMLRPCClient satisfies the Client interface.
 	var _ Client = (*XMLRPCClient)(nil)
 }
+
+func (m *mockClient) GetTimesheet(_ int64) (*TimesheetEntry, error) { return nil, nil }
+
+func (m *mockClient) GetAttendance(_ int64) (*AttendanceRecord, error) { return nil, nil }
