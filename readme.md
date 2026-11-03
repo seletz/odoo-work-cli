@@ -15,6 +15,9 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 - Search for projects and tasks to add new rows (`/` key), with filter toggle (`Ctrl+A`)
 - German Holidays are marked and coloured
 - Shows attendance state prominently
+- Per-day attendance below the grid: check-in, check-out, attendance
+  duration and the difference to the booked hours, per day and for the week;
+  workdays without attendance are marked
 - Color coded work hour day and week summaries with configurable limits
 - Configurable key bindings via `[keys]` section in config file
 - Company-based color coding for project/task labels via `[company_colors]` config
@@ -118,6 +121,23 @@ Just do:
 ```bash
 odoo-work-cli tui
 ```
+
+#### Attendance per day
+
+Below the totals row the grid shows the attendance of each day:
+
+| Row        | Meaning                                                                    |
+|------------|----------------------------------------------------------------------------|
+| Check-in   | earliest check-in of the day                                               |
+| Check-out  | latest check-out; `now` while clocked in, `HH:MM+` when it is on the next day |
+| Attendance | summed attendance of all records of the day; red `—` on a past workday (not weekend/holiday) without any record |
+| Diff       | attendance − booked hours: yellow `+` = attended but not booked, red `-` = booked more than attended, green `0:00` = matches |
+
+Attendance uses Odoo's `worked_hours`, which already excludes the lunch break
+of your working calendar, so a fully booked day shows a difference of `0:00`.
+While you are clocked in, the running record counts the time elapsed so far
+(without lunch deduction, like the header totals). A record that runs past
+midnight counts on the day of its check-in.
 
 #### Editing attendance
 
