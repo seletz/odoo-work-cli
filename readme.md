@@ -4,7 +4,7 @@ CLI tool for managing Odoo 17 timesheets and projects from the terminal, as well
 
 ## Features
 
-- **CLI:** CLI commands for scripting
+- **CLI:** CLI commands for scripting, with `--json`/`--format jsonl` output and stable error kinds for scripts and agents
 - **TUI:** Terminal UI for fast interactive usage
 - **Clock in/out:** Works for non-admin users, including accounts with 2FA (TOTP) enabled
 - **Config bootstrapping:** `config install` creates a default config file
@@ -196,10 +196,82 @@ Examples:
 ./odoo-work-cli clock edit --in 08:00 --out 12:30
 ./odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30
 ./odoo-work-cli clock edit --id 15 --out 13:45
+./odoo-work-cli entries --json
+./odoo-work-cli clock status --format jsonl
 ./odoo-work-cli config
 ./odoo-work-cli config --merged
 ./odoo-work-cli config install
 ```
+
+### Machine-readable output (`--json`)
+
+Scripts and agents should not parse the tables: long project and task
+names shift the columns. Every reading command, and every write command,
+accepts `--format table|json|jsonl` and the shorthand `--json`
+(= `--format json`):
+
+| Command                                  | JSON output                                   | Schema                     |
+| ---------------------------------------- | --------------------------------------------- | -------------------------- |
+| `projects`                               | array of projects                             | `project.schema.json`      |
+| `tasks [project-id]`                     | array of tasks                                | `task.schema.json`         |
+| `entries`, `timesheets`                  | array of timesheet entries                    | `entry.schema.json`        |
+| `entries add` / `update ID`              | the created / updated entry                   | `entry.schema.json`        |
+| `entries delete ID`                      | the entry as it was before deletion           | `entry.schema.json`        |
+| `whoami`                                 | the current user                              | `user.schema.json`         |
+| `clock status`                           | clock state with today's periods              | `clock_status.schema.json` |
+| `clock in` / `clock out` / `clock edit`  | the created, closed or edited attendance      | `attendance.schema.json`   |
+| any command, on failure                  | error envelope (see below)                    | `error.schema.json`        |
+
+The JSON Schemas (draft 2020-12) live in
+[`internal/output/schemas/`](internal/output/schemas/) and are the
+contract. A test checks the output of every command against them.
+
+```bash
+odoo-work-cli entries --week 2026-W29 --json | jq '.[] | {id, project, minutes}'
+odoo-work-cli clock status --json | jq .clocked_in
+odoo-work-cli entries add --project-id 42 --hours 1:30 --description "Review" --json | jq .id
+```
+
+Conventions:
+
+- **Field names are stable** (`snake_case`). New fields may be added. Existing
+  fields are never renamed or removed.
+- **IDs are numbers.** An optional relation that is not set (no task, no
+  customer) is `null`, never `0` or `""`. The same applies to optional
+  strings such as `status` or `email`.
+- **Durations are given twice:** as fractional `hours` (Odoo's value) and as
+  whole `minutes` (rounded). Attendance uses `worked_hours`/`worked_minutes`;
+  `clock status` adds `elapsed_minutes` for the running period.
+- **Timestamps** (`check_in`, `check_out`) are RFC 3339 with the local UTC
+  offset, e.g. `2026-07-14T08:00:00+02:00`. Dates are `YYYY-MM-DD`.
+- **An empty result is `[]`**, never empty output. This also holds for
+  `jsonl`, where it is the only line. Otherwise `jsonl` prints one
+  compact object per line, and `json` prints one indented document.
+- In the table format nothing changes.
+
+#### Errors
+
+When `--json` or `--format json|jsonl` is set, a failure prints exactly one
+JSON object on **stdout**, nothing else on stdout, and exits with code `1`:
+
+```json
+{"error":{"kind":"auth","message":"connecting to odoo: client authentication error: please verify client configuration"}}
+```
+
+`kind` is stable and meant for branching. `message` is for humans and may
+change. Without JSON output, errors go to stderr as `Error: …` (also exit
+code `1`).
+
+| Kind            | Meaning                                                                                              |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| `auth`          | Authentication failed: wrong API key or login password, TOTP rejected                                 |
+| `access_denied` | Authenticated, but Odoo's access rules forbid it (e.g. `clock edit` without Attendance Officer rights) |
+| `not_found`     | The record does not exist or is not visible (entry ID, attendance record, employee)                  |
+| `validation`    | Invalid input: unknown flag, bad argument, malformed date/time/hours, value rejected by Odoo           |
+| `conflict`      | Contradicts the current state: `clock in` while clocked in, `clock out` while not clocked in          |
+| `network`       | Odoo could not be reached: DNS, connection refused, timeout, TLS                                     |
+| `config`        | The local configuration is missing or invalid (no config file, missing URL, `web_password` not set)  |
+| `internal`      | Anything else: an unexpected Odoo response or a bug. Please report it                                |
 
 ### Attendance: backdated clock in/out and editing
 

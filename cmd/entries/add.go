@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +13,14 @@ func addCmd(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Create a new timesheet entry",
+		Long: `Create a new timesheet entry.
+
+With --json (or --format json|jsonl) the created entry is printed.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := output.FormatOf(cmd)
+			if err != nil {
+				return err
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -32,7 +40,15 @@ func addCmd(deps *app.Deps) *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Created entry %d\n", id)
+			w := cmd.OutOrStdout()
+			if format.IsMachine() {
+				entry, err := client.GetTimesheet(id)
+				if err != nil {
+					return fmt.Errorf("entry %d was created, but reading it back failed: %w", id, err)
+				}
+				return output.WriteObject(w, format, output.NewEntry(*entry))
+			}
+			_, _ = fmt.Fprintf(w, "Created entry %d\n", id)
 			return nil
 		},
 	}

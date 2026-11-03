@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,10 @@ func CMD(deps *app.Deps) *cobra.Command {
 		Use:   "projects",
 		Short: "List Odoo projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := output.FormatOf(cmd)
+			if err != nil {
+				return err
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -25,6 +30,10 @@ func CMD(deps *app.Deps) *cobra.Command {
 			projects, err := client.ListProjects()
 			if err != nil {
 				return err
+			}
+			w := cmd.OutOrStdout()
+			if format.IsMachine() {
+				return output.WriteList(w, format, output.NewProjects(projects))
 			}
 
 			// Build dynamic column headers from config extra fields.
@@ -47,8 +56,8 @@ func CMD(deps *app.Deps) *cobra.Command {
 			}
 			header += fmt.Sprintf(" %s", "Active")
 			sep += fmt.Sprintf(" %s", "------")
-			fmt.Println(header)
-			fmt.Println(sep)
+			_, _ = fmt.Fprintln(w, header)
+			_, _ = fmt.Fprintln(w, sep)
 
 			for _, p := range projects {
 				line := fmt.Sprintf("%-6d %-30s %-20s %-15s %-15s %-20s",
@@ -57,10 +66,11 @@ func CMD(deps *app.Deps) *cobra.Command {
 					line += fmt.Sprintf(" %-20s", p.ExtraFields[name])
 				}
 				line += fmt.Sprintf(" %v", p.Active)
-				fmt.Println(line)
+				_, _ = fmt.Fprintln(w, line)
 			}
 			return nil
 		},
 	}
+	output.AddFlags(cmd.Flags())
 	return cmd
 }
