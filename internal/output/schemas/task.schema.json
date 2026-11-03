@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "task.schema.json",
+  "title": "Task (tasks)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "project_id", "project", "company", "stage", "active"],
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/id" },
+    "name": { "type": "string" },
+    "project_id": { "$ref": "defs.schema.json#/$defs/optional_id" },
+    "project": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "company": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "stage": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "active": { "type": "boolean" }
+  }
+}

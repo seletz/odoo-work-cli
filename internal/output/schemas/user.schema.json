@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "user.schema.json",
+  "title": "User (whoami)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "login", "email", "company"],
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/id" },
+    "name": { "type": "string" },
+    "login": { "type": "string" },
+    "email": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "company": { "$ref": "defs.schema.json#/$defs/optional_string" }
+  }
+}

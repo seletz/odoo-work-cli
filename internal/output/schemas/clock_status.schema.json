@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "clock_status.schema.json",
+  "title": "Attendance status (clock status)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["clocked_in", "current_id", "check_in", "elapsed_minutes", "periods", "total_hours", "total_minutes"],
+  "properties": {
+    "clocked_in": { "type": "boolean" },
+    "current_id": { "$ref": "defs.schema.json#/$defs/optional_id" },
+    "check_in": { "$ref": "defs.schema.json#/$defs/optional_datetime" },
+    "elapsed_minutes": { "type": ["integer", "null"], "minimum": 0 },
+    "periods": { "type": "array", "items": { "$ref": "attendance.schema.json" } },
+    "total_hours": { "$ref": "defs.schema.json#/$defs/hours" },
+    "total_minutes": { "$ref": "defs.schema.json#/$defs/minutes" }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "project.schema.json",
+  "title": "Project (projects)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "active", "customer", "company", "stage", "project_manager", "extra_fields"],
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/id" },
+    "name": { "type": "string" },
+    "active": { "type": "boolean" },
+    "customer": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "company": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "stage": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "project_manager": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "extra_fields": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}
