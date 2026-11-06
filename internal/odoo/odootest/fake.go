@@ -159,10 +159,32 @@ func (f *Fake) CreateAttendance(in, out time.Time) (int64, error) {
 	return f.NextID, nil
 }
 
-// EditAttendance implements odoo.Client and returns the matching record.
-func (f *Fake) EditAttendance(id int64, in, _ *time.Time) (*odoo.AttendanceRecord, error) {
+// EditAttendance implements odoo.Client: it applies the new times to the
+// matching record and returns the updated record.
+func (f *Fake) EditAttendance(id int64, in, out *time.Time) (*odoo.AttendanceRecord, error) {
 	f.EditedIn = in
-	return f.GetAttendance(id)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	for i := range f.Attendances {
+		r := &f.Attendances[i]
+		if r.ID != id {
+			continue
+		}
+		if in != nil {
+			r.CheckIn = *in
+		}
+		if out != nil {
+			o := *out
+			r.CheckOut = &o
+		}
+		if r.CheckOut != nil {
+			r.WorkedHours = r.CheckOut.Sub(r.CheckIn).Hours()
+		}
+		c := *r
+		return &c, nil
+	}
+	return nil, apperr.New(apperr.KindNotFound, "attendance record %d not found", id)
 }
 
 // GetAttendance implements odoo.Client.

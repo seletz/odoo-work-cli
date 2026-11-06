@@ -119,6 +119,45 @@ func writeAttendanceByID(w io.Writer, format output.Format, client odoo.Client, 
 	return output.WriteObject(w, format, output.NewAttendance(*rec))
 }
 
+// describeChange renders the old and new values of an edited record, so a
+// change is never silent.
+func describeChange(before, after *odoo.AttendanceRecord) string {
+	line := func(label string, r *odoo.AttendanceRecord) string {
+		if r.CheckOut == nil {
+			return fmt.Sprintf("  %s: %s - --:-- (running)", label, r.CheckIn.Local().Format(dayTimeLayout))
+		}
+		return fmt.Sprintf("  %s: %s - %s (%s)", label, r.CheckIn.Local().Format(dayTimeLayout),
+			formatCheckOut(r), tui.FormatHours(r.WorkedHours))
+	}
+	return fmt.Sprintf("Updated attendance #%d\n%s\n%s", after.ID, line("was", before), line("now", after))
+}
+
+// existingOnDay returns the records whose check-in falls on day. An open
+// record from an earlier day, which the range query also returns, does not
+// count as a record of that day.
+func existingOnDay(records []odoo.AttendanceRecord, day time.Time) []odoo.AttendanceRecord {
+	end := day.AddDate(0, 0, 1)
+	var out []odoo.AttendanceRecord
+	for _, r := range records {
+		if !r.CheckIn.Before(day) && r.CheckIn.Before(end) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// createOnlyConflict is the error for --create-only on a day that already
+// has attendance. It lists the records so nothing needs a second lookup.
+func createOnlyConflict(day time.Time, existing []odoo.AttendanceRecord) error {
+	var lines []string
+	for i := range existing {
+		lines = append(lines, "  "+formatRecord(&existing[i]))
+	}
+	return apperr.New(apperr.KindConflict,
+		"attendance record already exists on %s (id %d); nothing was changed. Existing records:\n%s",
+		day.Format("2006-01-02"), existing[0].ID, strings.Join(lines, "\n"))
+}
+
 // formatRecord renders an attendance record for terminal output.
 func formatRecord(rec *odoo.AttendanceRecord) string {
 	checkIn := rec.CheckIn.Local().Format("2006-01-02 15:04")
@@ -132,6 +171,7 @@ func formatRecord(rec *odoo.AttendanceRecord) string {
 func editCMD(deps *app.Deps) *cobra.Command {
 	var dateStr, inStr, outStr string
 	var id int64
+	var createOnly bool
 
 	cmd := &cobra.Command{
 		Use:   "edit",
@@ -140,7 +180,12 @@ func editCMD(deps *app.Deps) *cobra.Command {
 
 By default the record of the given day (--date, default today) is edited.
 If the day has several records, select one with --id. If the day has no
-record yet, one is created when both --in and --out are given.
+record yet, one is created when both --in and --out are given. The old and
+the new values are printed. Use 'clock list' to see the existing records first.
+
+With --create-only the command only ever creates: if the day already has a
+record it aborts with a "conflict" error and changes nothing. Use it when
+backfilling days, so that an existing record is never overwritten.
 
 Editing attendance over the API requires the 'Attendance Officer' access
 right, with you set as your own attendance manager.`,
@@ -154,6 +199,15 @@ right, with you set as your own attendance manager.`,
 				return err
 			}
 
+			if createOnly {
+				if id > 0 {
+					return apperr.New(apperr.KindValidation, "--create-only cannot be combined with --id")
+				}
+				if req.checkIn == nil || req.checkOut == nil {
+					return apperr.New(apperr.KindValidation, "--create-only needs both --in and --out")
+				}
+			}
+
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -163,6 +217,12 @@ right, with you set as your own attendance manager.`,
 			records, err := client.ListAttendance(req.day.UTC(), req.day.AddDate(0, 0, 1).UTC())
 			if err != nil {
 				return err
+			}
+
+			if createOnly {
+				if existing := existingOnDay(records, req.day); len(existing) > 0 {
+					return createOnlyConflict(req.day, existing)
+				}
 			}
 
 			target, err := pickEditTarget(records, id)
@@ -180,7 +240,11 @@ right, with you set as your own attendance manager.`,
 					return err
 				}
 				if format.IsMachine() {
-					return writeAttendanceByID(w, format, client, newID, "created")
+					created, err := client.GetAttendance(newID)
+					if err != nil {
+						return fmt.Errorf("attendance #%d was created, but reading it back failed: %w", newID, err)
+					}
+					return output.WriteObject(w, format, output.NewAttendanceEdit(nil, *created))
 				}
 				_, _ = fmt.Fprintf(w, "Created attendance #%d: %s - %s\n", newID,
 					req.checkIn.Format("2006-01-02 15:04"), req.checkOut.Format("15:04"))
@@ -192,9 +256,9 @@ right, with you set as your own attendance manager.`,
 				return err
 			}
 			if format.IsMachine() {
-				return output.WriteObject(w, format, output.NewAttendance(*rec))
+				return output.WriteObject(w, format, output.NewAttendanceEdit(target, *rec))
 			}
-			_, _ = fmt.Fprintf(w, "Updated attendance %s\n", formatRecord(rec))
+			_, _ = fmt.Fprintln(w, describeChange(target, rec))
 			return nil
 		},
 	}
@@ -202,6 +266,7 @@ right, with you set as your own attendance manager.`,
 	cmd.Flags().StringVar(&dateStr, "date", "", "day of the record to edit (YYYY-MM-DD, default today)")
 	cmd.Flags().StringVar(&inStr, "in", "", "new check-in time (HH:MM or YYYY-MM-DD HH:MM)")
 	cmd.Flags().StringVar(&outStr, "out", "", "new check-out time (HH:MM or YYYY-MM-DD HH:MM)")
+	cmd.Flags().BoolVar(&createOnly, "create-only", false, "only create; abort with a conflict error if the day already has a record")
 	cmd.Flags().Int64Var(&id, "id", 0, "attendance record ID (required if the day has several records)")
 
 	return cmd
