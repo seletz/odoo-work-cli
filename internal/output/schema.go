@@ -11,11 +11,12 @@ var Schemas embed.FS
 
 // Schema names, one per output shape.
 const (
-	SchemaProject     = "project"
-	SchemaTask        = "task"
-	SchemaEntry       = "entry"
-	SchemaUser        = "user"
-	SchemaAttendance  = "attendance"
-	SchemaClockStatus = "clock_status"
-	SchemaError       = "error"
+	SchemaProject        = "project"
+	SchemaTask           = "task"
+	SchemaEntry          = "entry"
+	SchemaUser           = "user"
+	SchemaAttendance     = "attendance"
+	SchemaClockStatus    = "clock_status"
+	SchemaAttendanceEdit = "attendance_edit"
+	SchemaError          = "error"
 )

@@ -102,8 +102,9 @@ func TestJSONOutput_Schemas(t *testing.T) {
 		{name: "clock in --at", args: []string{"clock", "in", "--json", "--at", "2026-07-14 13:00"}, schema: output.SchemaAttendance, shape: object},
 		{name: "clock out", args: []string{"clock", "out", "--json"}, schema: output.SchemaAttendance, shape: object},
 		{name: "clock out --at", args: []string{"clock", "out", "--json", "--at", "2026-07-14 12:00"}, schema: output.SchemaAttendance, shape: object},
-		{name: "clock edit existing", args: []string{"clock", "edit", "--json", "--date", "2026-07-14", "--in", "08:15"}, schema: output.SchemaAttendance, shape: object},
-		{name: "clock edit creates", args: []string{"clock", "edit", "--json", "--date", "2026-07-13", "--in", "08:00", "--out", "16:00"}, schema: output.SchemaAttendance, shape: object},
+		{name: "clock edit existing", args: []string{"clock", "edit", "--json", "--date", "2026-07-14", "--in", "08:15"}, schema: output.SchemaAttendanceEdit, shape: object},
+		{name: "clock edit creates", args: []string{"clock", "edit", "--json", "--date", "2026-07-13", "--in", "08:00", "--out", "16:00"}, schema: output.SchemaAttendanceEdit, shape: object},
+		{name: "clock list", args: []string{"clock", "list", "--json", "--date", "2026-07-14"}, schema: output.SchemaAttendance, shape: list, wantItems: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -361,4 +362,160 @@ func TestTableOutput_UnknownCommandHasNoUsage(t *testing.T) {
 	if !strings.HasPrefix(stderr, `Error: unknown command "bogus"`) || strings.Contains(stderr, "Usage:") {
 		t.Errorf("stderr = %q", stderr)
 	}
+}
+
+func TestClockList_JSON(t *testing.T) {
+	fake := populated()
+	// An overnight record on 2026-07-14 (22:00 → 01:30 next day).
+	night := day.Add(22 * time.Hour)
+	nightOut := day.Add(25*time.Hour + 30*time.Minute)
+	fake.Attendances = append(fake.Attendances, odoo.AttendanceRecord{ID: 22, CheckIn: night, CheckOut: &nightOut, WorkedHours: 3.5})
+
+	tests := []struct {
+		name      string
+		args      []string
+		wantItems int
+	}{
+		{name: "date", args: []string{"clock", "list", "--json", "--date", "2026-07-14"}, wantItems: 2},
+		{name: "week", args: []string{"clock", "list", "--json", "--week", "2026-W29"}, wantItems: 2},
+		{name: "empty day", args: []string{"clock", "list", "--json", "--date", "2026-07-15"}, wantItems: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, stderr := execute(t, fakeSetup(fake), tt.args...)
+			if code != 0 {
+				t.Fatalf("exit code %d, stdout %s, stderr %s", code, out, stderr)
+			}
+			if n := outputtest.AssertList(t, output.SchemaAttendance, out); n != tt.wantItems {
+				t.Errorf("got %d items, want %d", n, tt.wantItems)
+			}
+		})
+	}
+}
+
+func TestClockList_RejectsDateWithWeek(t *testing.T) {
+	code, out, _ := execute(t, fakeSetup(populated()), "clock", "list", "--json", "--date", "2026-07-14", "--week", "2026-W29")
+	if code == 0 {
+		t.Fatal("expected failure")
+	}
+	if kind := errorKind(t, out); kind != apperr.KindValidation {
+		t.Errorf("kind = %q, want validation", kind)
+	}
+}
+
+func TestClockEdit_JSONHasBeforeAndAfter(t *testing.T) {
+	fake := populated()
+	code, out, stderr := execute(t, fakeSetup(fake), "clock", "edit", "--json", "--date", "2026-07-14", "--in", "08:15")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr %s", code, stderr)
+	}
+	outputtest.AssertObject(t, output.SchemaAttendanceEdit, out)
+	var got map[string]any
+	_ = json.Unmarshal(out, &got)
+	before, ok := got["before"].(map[string]any)
+	if !ok {
+		t.Fatalf("before missing or not an object: %s", out)
+	}
+	if before["id"] != 20.0 || !strings.Contains(before["check_in"].(string), "T08:00:00") {
+		t.Errorf("before = %v, want record 20 at 08:00", before)
+	}
+	if got["id"] != 20.0 || !strings.Contains(got["check_in"].(string), "T08:15:00") {
+		t.Errorf("after fields = %v, want record 20 at 08:15", got)
+	}
+}
+
+func TestClockEdit_JSONCreatedHasNullBefore(t *testing.T) {
+	code, out, stderr := execute(t, fakeSetup(populated()), "clock", "edit", "--json", "--date", "2026-07-13", "--in", "08:00", "--out", "16:00")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr %s", code, stderr)
+	}
+	outputtest.AssertObject(t, output.SchemaAttendanceEdit, out)
+	var got map[string]any
+	_ = json.Unmarshal(out, &got)
+	if v, present := got["before"]; !present || v != nil {
+		t.Errorf("before = %v (present %v), want null", v, present)
+	}
+}
+
+func TestClockEdit_TableShowsOldAndNew(t *testing.T) {
+	code, out, stderr := execute(t, fakeSetup(populated()), "clock", "edit", "--date", "2026-07-14", "--in", "08:15")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr %s", code, stderr)
+	}
+	for _, w := range []string{"was", "08:00", "now", "08:15"} {
+		if !strings.Contains(string(out), w) {
+			t.Errorf("output missing %q:\n%s", w, out)
+		}
+	}
+}
+
+func TestClockEdit_CreateOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantCode int
+		wantKind apperr.Kind
+		wantNew  bool
+	}{
+		{
+			name:     "existing record aborts with conflict",
+			args:     []string{"clock", "edit", "--json", "--create-only", "--date", "2026-07-14", "--in", "07:00", "--out", "09:00"},
+			wantCode: 1, wantKind: apperr.KindConflict,
+		},
+		{
+			name:    "empty day creates",
+			args:    []string{"clock", "edit", "--json", "--create-only", "--date", "2026-07-13", "--in", "08:00", "--out", "16:00"},
+			wantNew: true,
+		},
+		{
+			name:     "needs both times",
+			args:     []string{"clock", "edit", "--json", "--create-only", "--date", "2026-07-13", "--in", "08:00"},
+			wantCode: 1, wantKind: apperr.KindValidation,
+		},
+		{
+			name:     "cannot be combined with --id",
+			args:     []string{"clock", "edit", "--json", "--create-only", "--id", "20", "--date", "2026-07-14", "--in", "07:00", "--out", "09:00"},
+			wantCode: 1, wantKind: apperr.KindValidation,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := populated()
+			code, out, stderr := execute(t, fakeSetup(fake), tt.args...)
+			if code != tt.wantCode {
+				t.Fatalf("exit code %d, want %d (stdout %s, stderr %s)", code, tt.wantCode, out, stderr)
+			}
+			if tt.wantKind != "" {
+				if kind := errorKind(t, out); kind != tt.wantKind {
+					t.Errorf("kind = %q, want %q (%s)", kind, tt.wantKind, out)
+				}
+				if tt.wantKind == apperr.KindConflict && !strings.Contains(string(out), "id 20") {
+					t.Errorf("conflict message should name the record: %s", out)
+				}
+			}
+			if fake.EditedIn != nil {
+				t.Error("an existing record was edited")
+			}
+			if tt.wantCode != 0 && len(fake.Attendances) != 1 {
+				t.Errorf("records changed on failure: %d", len(fake.Attendances))
+			}
+			if tt.wantNew && len(fake.Attendances) != 2 {
+				t.Errorf("expected a created record, have %d", len(fake.Attendances))
+			}
+		})
+	}
+}
+
+// errorKind extracts error.kind from a JSON error envelope.
+func errorKind(t *testing.T, out []byte) apperr.Kind {
+	t.Helper()
+	var env struct {
+		Error struct {
+			Kind apperr.Kind `json:"kind"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		t.Fatalf("not a JSON error envelope: %s", out)
+	}
+	return env.Error.Kind
 }

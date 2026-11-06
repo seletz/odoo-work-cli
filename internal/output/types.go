@@ -76,6 +76,15 @@ type Attendance struct {
 	WorkedMinutes int64   `json:"worked_minutes"`
 }
 
+// AttendanceEdit is the result of clock edit: the attendance record as it
+// is now (the same fields as Attendance, so existing consumers keep
+// working) plus Before, the record as it was before the change. Before is
+// null when the edit created the record.
+type AttendanceEdit struct {
+	Attendance
+	Before *Attendance `json:"before"`
+}
+
 // ClockStatus is the attendance state as printed by clock status.
 type ClockStatus struct {
 	ClockedIn      bool         `json:"clocked_in"`
@@ -190,6 +199,17 @@ func NewAttendance(r odoo.AttendanceRecord) Attendance {
 		a.CheckOut = &s
 	}
 	return a
+}
+
+// NewAttendanceEdit converts the records around a clock edit. before is nil
+// when the edit created the record.
+func NewAttendanceEdit(before *odoo.AttendanceRecord, after odoo.AttendanceRecord) AttendanceEdit {
+	e := AttendanceEdit{Attendance: NewAttendance(after)}
+	if before != nil {
+		b := NewAttendance(*before)
+		e.Before = &b
+	}
+	return e
 }
 
 // NewClockStatus converts an odoo.AttendanceStatus. now is used for the

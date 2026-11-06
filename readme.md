@@ -182,7 +182,8 @@ Commands:
 | `clock in [--at "HH:MM"]`                                | Clock in (start attendance period). Works for non-admin users via JSON-RPC; supports 2FA (TOTP). `--at` backdates the check-in (see [Attendance editing](#attendance-backdated-clock-inout-and-editing)) |
 | `clock out [--at "HH:MM"]`                               | Clock out (end attendance period, shows duration). Works for non-admin users via JSON-RPC; supports 2FA (TOTP). `--at` backdates the check-out |
 | `clock status`                                           | Show current attendance state and today's periods                                                                   |
-| `clock edit --in HH:MM [--out HH:MM] [--date D] [--id N]` | Fix a day's attendance record (check-in and/or check-out); creates the record for a missed day. Requires Attendance Officer rights |
+| `clock list [--date D \| --week YYYY-Www]`                | List the attendance records of a day (default today) or week with ID, check-in, check-out and duration; overnight records show the check-out date |
+| `clock edit --in HH:MM [--out HH:MM] [--date D] [--id N] [--create-only]` | Fix a day's attendance record (check-in and/or check-out) and print the old and new values; creates the record for a missed day. `--create-only` never overwrites. Requires Attendance Officer rights |
 | `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
@@ -216,6 +217,8 @@ Examples:
 ./odoo-work-cli clock edit --in 08:00 --out 12:30
 ./odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30
 ./odoo-work-cli clock edit --id 15 --out 13:45
+./odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30 --create-only
+./odoo-work-cli clock list --week 2026-W38
 ./odoo-work-cli entries --json
 ./odoo-work-cli clock status --format jsonl
 ./odoo-work-cli config
@@ -239,7 +242,9 @@ accepts `--format table|json|jsonl` and the shorthand `--json`
 | `entries delete ID`                      | the entry as it was before deletion           | `entry.schema.json`        |
 | `whoami`                                 | the current user                              | `user.schema.json`         |
 | `clock status`                           | clock state with today's periods              | `clock_status.schema.json` |
-| `clock in` / `clock out` / `clock edit`  | the created, closed or edited attendance      | `attendance.schema.json`   |
+| `clock list`                             | array of attendance records, oldest first     | `attendance.schema.json`   |
+| `clock in` / `clock out`                 | the created or closed attendance              | `attendance.schema.json`   |
+| `clock edit`                             | the attendance as it is now, plus `before` (its previous state, `null` if the edit created it) | `attendance_edit.schema.json` |
 | any command, on failure                  | error envelope (see below)                    | `error.schema.json`        |
 
 The JSON Schemas (draft 2020-12) live in
@@ -288,7 +293,7 @@ code `1`).
 | `access_denied` | Authenticated, but Odoo's access rules forbid it (e.g. `clock edit` without Attendance Officer rights) |
 | `not_found`     | The record does not exist or is not visible (entry ID, attendance record, employee)                  |
 | `validation`    | Invalid input: unknown flag, bad argument, malformed date/time/hours, value rejected by Odoo           |
-| `conflict`      | Contradicts the current state: `clock in` while clocked in, `clock out` while not clocked in          |
+| `conflict`      | Contradicts the current state: `clock in` while clocked in, `clock out` while not clocked in, `clock edit --create-only` on a day that already has a record |
 | `network`       | Odoo could not be reached: DNS, connection refused, timeout, TLS                                     |
 | `config`        | The local configuration is missing or invalid (no config file, missing URL, `web_password` not set)  |
 | `secrets_locked` | 1Password is locked or not reachable, so `op://` secrets could not be resolved (fails after 5 s, see below) |
@@ -317,7 +322,41 @@ odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30
 
 # several records on the same day: pick one by ID
 odoo-work-cli clock edit --id 15 --out 13:45
+
+# backfilling: create only, never overwrite an existing record
+odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30 --create-only
+
+# see what is recorded before you change anything
+odoo-work-cli clock list --date 2026-09-14
+odoo-work-cli clock list --week 2026-W38
 ```
+
+`clock edit` is not silent: it prints the old and the new values.
+
+```
+Updated attendance #4667
+  was: 2026-09-14 08:00 - 12:00 (4:00)
+  now: 2026-09-14 08:15 - 12:00 (3:45)
+```
+
+With `--json` the result is the record as it is now (the same fields as
+`clock in`/`clock out`) plus `before`, the record as it was. `before` is
+`null` when the edit created the record.
+
+**Backfilling several days safely:** run `clock list --week …` first, then
+use `clock edit --create-only` for every day. If a day already has a record,
+the command changes nothing, exits with code `1` and reports the error kind
+`conflict` (message names the existing record ID). A plain `clock edit` on a
+day with exactly one record overwrites that record; the printed old values
+are your only trace of it.
+
+`clock list` attributes a record to the day of its **check-in**: a shift from
+22:00 to 01:30 is listed on the first day and shows its check-out with a date
+(`2026-09-14 22:00  2026-09-15 01:30`). Duration is Odoo's `worked_hours`,
+which excludes the lunch break of the working calendar, so it can be shorter
+than check-out minus check-in. A still running record shows the elapsed time.
+The same rule applies to `--create-only`: only records checking in on that
+day count as existing.
 
 How times are interpreted:
 

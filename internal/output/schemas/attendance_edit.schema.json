@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "attendance_edit.schema.json",
+  "title": "Result of clock edit: the record as it is now, plus its previous state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "employee_id", "employee", "check_in", "check_out", "running", "worked_hours", "worked_minutes", "before"],
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/id" },
+    "employee_id": { "$ref": "defs.schema.json#/$defs/optional_id" },
+    "employee": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "check_in": { "$ref": "defs.schema.json#/$defs/datetime" },
+    "check_out": { "$ref": "defs.schema.json#/$defs/optional_datetime" },
+    "running": { "type": "boolean" },
+    "worked_hours": { "$ref": "defs.schema.json#/$defs/hours" },
+    "worked_minutes": { "$ref": "defs.schema.json#/$defs/minutes" },
+    "before": {
+      "description": "The record before the edit; null when the edit created it.",
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "attendance.schema.json" }
+      ]
+    }
+  }
+}
