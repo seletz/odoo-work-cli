@@ -1,0 +1,116 @@
+---
+name: odoo-work-cli
+description: Read and write Odoo 17 timesheets (project/task bookings) and attendance (clock in/out) with the odoo-work-cli CLI. Use when the user asks to book hours, backfill or check working time, or look up Odoo projects and tasks.
+---
+
+# odoo-work-cli
+
+`odoo-work-cli` manages Odoo timesheet entries and attendance records. This guide is printed by `odoo-work-cli llm --skill`; it matches the installed binary.
+
+## Ground rules
+
+- **Always pass `--json`** and parse stdout only. Table output is for humans.
+- Exit code is `0` on success and `1` on any error. With `--json` (or `--format json|jsonl`) an error is printed on **stdout** as `{"error":{"kind":"…","message":"…"}}`, and nothing goes to stderr. Branch on `kind`, not on the message.
+- Look IDs up, never guess them: project and task IDs via `projects` / `tasks`, entry IDs via `entries`, attendance IDs via `clock list`.
+- Check state before you write (`clock list`, `entries --date`), and show the user what you are about to change when it overwrites something.
+- Never retry a failing write in a loop. Read the error kind (see below) and decide.
+- Do not use the `tui` command: it is interactive.
+
+## Commands
+
+Global flag on every command: `--config FILE` (config file path, skips discovery). Almost nobody needs it.
+
+Dates are `YYYY-MM-DD`, weeks are ISO weeks `YYYY-Www` (`2026-W38`). Hours are decimal (`2.5`) or `H:MM` (`2:30`). Times are entered in the **local** timezone.
+
+### Reading
+
+- `odoo-work-cli whoami --json`: the current user.
+- `odoo-work-cli projects --json`: all projects with their IDs.
+- `odoo-work-cli tasks [project-id] --json`: tasks, optionally of one project. Example: `odoo-work-cli tasks 42 --json`.
+- `odoo-work-cli timesheets [--week YYYY-Www] --json`: weekly summary (default: current week).
+- `odoo-work-cli entries [--week YYYY-Www | --date D] [--project NAME] [--task NAME] [--status S] --json`: individual timesheet entries. `--date` overrides `--week`. `--project` and `--task` are case-insensitive substrings; `--status` is the validation status (`draft`, `validated`, …). Example: `odoo-work-cli entries --date 2026-09-14 --json`.
+- `odoo-work-cli fields MODEL`: field metadata of an Odoo model (debugging only), e.g. `odoo-work-cli fields project.project`.
+
+### Timesheet entries
+
+- `odoo-work-cli entries add --project-id N --hours H --description "…" [--task-id N] [--date D] --json`: create an entry. `--project-id`, `--hours` and `--description` are required; `--date` defaults to today. Example: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "Code review" --json`.
+- `odoo-work-cli entries update ID [--hours H] [--description "…"] [--date D] [--project-id N] [--task-id N] --json`: change an entry; only the flags you set are sent. Example: `odoo-work-cli entries update 100 --hours 1:15 --json`.
+- `odoo-work-cli entries delete ID --json`: delete an entry. Prints the entry as it was before deletion. A wrong ID gives `not_found` before anything is written.
+
+### Attendance
+
+- `odoo-work-cli clock status --json`: is the user clocked in, and today's periods.
+- `odoo-work-cli clock in [--at TIME] --json`: start an attendance period now. `--at` backdates it (`HH:MM` today, or `YYYY-MM-DD HH:MM`); `--at` needs Attendance Officer rights.
+- `odoo-work-cli clock out [--at TIME] --json`: end the running period; same `--at` rules. Example: `odoo-work-cli clock out --at "2026-09-14 17:15" --json`.
+- `odoo-work-cli clock list [--date D | --week YYYY-Www] --json`: the records of a day (default today) or week, oldest first, each with ID, check-in, check-out and `worked_hours`. A record belongs to the day of its **check-in**. `--date` and `--week` together is a `validation` error. No records gives `[]`.
+- `odoo-work-cli clock edit [--in TIME] [--out TIME] [--date D] [--id N] [--create-only] --json`: change or create a day's record. Needs at least one of `--in`/`--out`. Rules:
+  - exactly one record on the day: it is **updated**;
+  - no record: it is **created**, but only if both `--in` and `--out` are given;
+  - several records: fails with `validation`; repeat with `--id N`;
+  - `--create-only`: never overwrites. If the day already has a record the command changes nothing and fails with `conflict` (the message names the existing record). Requires both `--in` and `--out`; cannot be combined with `--id`.
+  - `TIME` is `HH:MM` (on `--date`, default today) or `YYYY-MM-DD HH:MM`. Future times are rejected. Check-out must be after check-in.
+  - Example: `odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30 --create-only --json`.
+
+### Setup and meta
+
+- `odoo-work-cli config [--merged]`: show discovered config files, or the merged config (secrets omitted). `odoo-work-cli config install` writes a default config file. Do not edit config on your own; ask the user.
+- `odoo-work-cli llm --skill`: print this guide. Needs no config or connection.
+- `odoo-work-cli tui [--week YYYY-Www]`: interactive terminal UI. Not for agents.
+- `odoo-work-cli completion`: shell completion scripts (not useful for agents).
+
+## Output formats
+
+Commands that list or write data (`projects`, `tasks`, `timesheets`, `entries` and its subcommands, `whoami`, `clock in|out|status|list|edit`) accept `--format table|json|jsonl` and `--json` (same as `--format json`). `--json` together with `--format table` is a `validation` error. `fields`, `config`, `llm` and `tui` have no JSON output.
+
+- `json`: one JSON value. List commands print a top-level array, write commands the written object.
+- `jsonl`: one object per line.
+- **An empty result is `[]`** in both `json` and `jsonl`, never empty output.
+- Names are snake_case. Fields may be added but are never renamed or removed. IDs are numbers; an unset optional value is `null`, never `0` or `""`. Durations come as `hours` and rounded `minutes`. Times are RFC 3339 with the local offset.
+- `clock edit --json` returns the record as it is **now**, plus `before`: the record as it was, or `null` if the edit created it. Use `before` to tell the user what you overwrote.
+
+Fields per object (`?` = may be absent):
+
+{{SCHEMAS}}
+
+## Errors
+
+Envelope: `{"error":{"kind":"<kind>","message":"<text>"}}`, exit code 1. Kinds:
+
+{{ERROR_KINDS}}
+
+## Workflows
+
+### Check what is booked
+
+```sh
+odoo-work-cli clock list --week 2026-W38 --json
+odoo-work-cli entries --week 2026-W38 --json
+```
+
+### Backfill attendance for a day
+
+1. `odoo-work-cli clock list --date 2026-09-14 --json`. `[]` means nothing is recorded.
+2. `odoo-work-cli clock edit --create-only --date 2026-09-14 --in 08:00 --out 16:30 --json`.
+3. On `conflict` the day already has a record: nothing was changed. Show the user the existing record (`clock list` output) and ask whether to keep it. Only if they say to replace it, run `clock edit --id N --in … --out …` (this overwrites; report `before`).
+
+Always use `--create-only` when backfilling; do several days one by one and stop on the first unexpected error.
+
+### Book timesheet entries
+
+1. Find the project: `odoo-work-cli projects --json`, pick the `id`.
+2. Find the task: `odoo-work-cli tasks PROJECT_ID --json`, pick the `id` (optional).
+3. Check for what is already booked that day: `odoo-work-cli entries --date 2026-09-14 --json`, to avoid duplicates.
+4. Book: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "…" --json`.
+5. Fix a mistake with `entries update ID …`, remove with `entries delete ID`.
+
+Ask the user when the project or task is ambiguous; do not pick one.
+
+## Pitfalls
+
+- **`clock edit` changes an existing record** instead of adding a new one when the day already has exactly one. To add without risk of overwriting, use `--create-only`.
+- **A check-out after midnight** (a shift that ends the next day) only works with the full format on `--out`: `--in "2026-09-14 22:00" --out "2026-09-15 01:30"`. A bare `HH:MM` means the same day as `--date`, and check-out must be after check-in. `clock list` shows such a record on its check-in day.
+- **Attendance writes need rights.** `clock edit` and `clock in|out --at` write `hr.attendance` directly and require the Attendance Officer access right **and** the user set as their own attendance manager (`attendance_manager_id` on the employee). Without it you get `access_denied`. This is an Odoo admin task: tell the user, do not try to work around it. Plain `clock in`/`clock out` (no `--at`) work for everyone.
+- **Locked 1Password**: secrets come from 1Password. When it is locked the CLI fails after about 5 s (`ODOO_OP_TIMEOUT` changes that) with `secrets_locked`. Stop and ask the user to unlock it. Do not retry in a loop.
+- `worked_hours` excludes the lunch break of the working calendar, so it can be shorter than check-out minus check-in.
+- Future times are rejected; plain `clock in` records "now".
+- Use the dev environment only for experiments; never touch other environments unless the user told you to.
