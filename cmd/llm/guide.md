@@ -113,4 +113,4 @@ Ask the user when the project or task is ambiguous; do not pick one.
 - **Locked 1Password**: secrets come from 1Password. When it is locked the CLI fails after about 5 s (`ODOO_OP_TIMEOUT` changes that) with `secrets_locked`. Stop and ask the user to unlock it. Do not retry in a loop.
 - `worked_hours` excludes the lunch break of the working calendar, so it can be shorter than check-out minus check-in.
 - Future times are rejected; plain `clock in` records "now".
-- Use the dev environment only for experiments; never touch other environments unless the user told you to.
+- The CLI talks to whatever Odoo instance the config points to; writes are real bookings. Confirm with the user before bulk changes.
