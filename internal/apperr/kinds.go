@@ -29,6 +29,9 @@ const (
 	KindNetwork Kind = "network"
 	// KindConfig: the local configuration is missing or invalid.
 	KindConfig Kind = "config"
+	// KindSecretsLocked: the secret store (1Password) is locked or not
+	// reachable, so op:// references could not be resolved.
+	KindSecretsLocked Kind = "secrets_locked"
 	// KindInternal: anything not classified otherwise (bug, unexpected
 	// Odoo response, server error).
 	KindInternal Kind = "internal"
@@ -44,6 +47,7 @@ func Kinds() []Kind {
 		KindConflict,
 		KindNetwork,
 		KindConfig,
+		KindSecretsLocked,
 		KindInternal,
 	}
 }

@@ -291,6 +291,7 @@ code `1`).
 | `conflict`      | Contradicts the current state: `clock in` while clocked in, `clock out` while not clocked in          |
 | `network`       | Odoo could not be reached: DNS, connection refused, timeout, TLS                                     |
 | `config`        | The local configuration is missing or invalid (no config file, missing URL, `web_password` not set)  |
+| `secrets_locked` | 1Password is locked or not reachable, so `op://` secrets could not be resolved (fails after 5 s, see below) |
 | `internal`      | Anything else: an unexpected Odoo response or a bug. Please report it                                |
 
 ### Attendance: backdated clock in/out and editing
@@ -447,6 +448,12 @@ Values without the `op://` prefix are used as-is (useful for non-secret fields
 like database name). If `op` is not installed or the `[op_secrets]` section is
 absent, the section is skipped and the CLI falls back to environment variables.
 If `op` **is** installed but not signed in, resolution fails with an error.
+
+If 1Password is locked, `op inject` would hang for about 60 s. The CLI bounds
+the call instead (default 5 s, override with `ODOO_OP_TIMEOUT`, a Go duration
+such as `10s`) and fails with the error kind `secrets_locked`: "1Password is
+locked or not reachable: unlock it and retry". Other `op` failures (for
+example an invalid reference) stay `config`.
 
 Plain-text passwords in config files are rejected at load time — a `password`
 key outside `[op_secrets]` is an error. Secrets must come from `[op_secrets]`

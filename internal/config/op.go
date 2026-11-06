@@ -2,9 +2,15 @@ package config
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
+
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 )
 
 // OPSecrets holds 1Password vault references (op:// URIs) for config fields.
@@ -22,17 +28,66 @@ type OPSecrets struct {
 // It takes a template string and returns the resolved output.
 type opInjectRunner func(template string) (string, error)
 
-// defaultOPInjectRunner calls the real op inject CLI.
-func defaultOPInjectRunner(template string) (string, error) {
-	cmd := exec.Command("op", "inject")
-	cmd.Stdin = strings.NewReader(template)
+// defaultOPTimeout bounds the op inject call. A locked 1Password otherwise
+// blocks for about 60 s before op gives up with "authorization timeout".
+const defaultOPTimeout = 5 * time.Second
+
+// errOPLocked marks an op failure caused by a locked or unreachable
+// 1Password (timeout or an explicit "not signed in"/"authorization" error).
+var errOPLocked = errors.New("1password locked or unreachable")
+
+// opTimeout returns the op inject timeout: ODOO_OP_TIMEOUT (a Go duration
+// such as "10s") if set and valid, else defaultOPTimeout.
+func opTimeout() time.Duration {
+	if v := os.Getenv("ODOO_OP_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
+		}
+	}
+	return defaultOPTimeout
+}
+
+// lockedMarkers are lowercase stderr fragments by which op reports a locked
+// or signed-out vault.
+var lockedMarkers = []string{
+	"authorization timeout",
+	"not signed in",
+	"no accounts configured",
+	"locked",
+}
+
+// runOPCommand runs bin with args, feeding stdin, and kills it after
+// timeout. A timeout or a lock-related stderr wraps errOPLocked.
+func runOPCommand(timeout time.Duration, bin string, args []string, stdin string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	// Do not wait on pipes held open by grandchildren after the kill.
+	cmd.WaitDelay = time.Second
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("op inject: %s: %w", strings.TrimSpace(stderr.String()), err)
+		msg := strings.TrimSpace(stderr.String())
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", fmt.Errorf("op inject: no answer within %s: %w", timeout, errOPLocked)
+		}
+		low := strings.ToLower(msg)
+		for _, m := range lockedMarkers {
+			if strings.Contains(low, m) {
+				return "", fmt.Errorf("op inject: %s: %w", msg, errOPLocked)
+			}
+		}
+		return "", fmt.Errorf("op inject: %s: %w", msg, err)
 	}
 	return stdout.String(), nil
+}
+
+// defaultOPInjectRunner calls the real op inject CLI with a timeout, so a
+// locked 1Password fails fast instead of hanging.
+func defaultOPInjectRunner(template string) (string, error) {
+	return runOPCommand(opTimeout(), "op", []string{"inject"}, template)
 }
 
 // opAvailable checks whether the op CLI is on the PATH.
@@ -88,6 +143,10 @@ func resolveOPSecrets(cfg *Config, runner opInjectRunner) error {
 
 	out, err := runner(tmpl.String())
 	if err != nil {
+		if errors.Is(err, errOPLocked) {
+			return apperr.Wrapf(apperr.KindSecretsLocked, err,
+				"1Password is locked or not reachable: unlock it and retry")
+		}
 		return err
 	}
 

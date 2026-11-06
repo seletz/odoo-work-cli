@@ -97,14 +97,15 @@ func TestKinds_AreStableStrings(t *testing.T) {
 	// These strings are a public contract (readme, #74 skill docs);
 	// renaming one is a breaking change.
 	want := map[Kind]string{
-		KindAuth:         "auth",
-		KindAccessDenied: "access_denied",
-		KindNotFound:     "not_found",
-		KindValidation:   "validation",
-		KindConflict:     "conflict",
-		KindNetwork:      "network",
-		KindConfig:       "config",
-		KindInternal:     "internal",
+		KindAuth:          "auth",
+		KindAccessDenied:  "access_denied",
+		KindNotFound:      "not_found",
+		KindValidation:    "validation",
+		KindConflict:      "conflict",
+		KindNetwork:       "network",
+		KindConfig:        "config",
+		KindSecretsLocked: "secrets_locked",
+		KindInternal:      "internal",
 	}
 	for k, s := range want {
 		if string(k) != s {
