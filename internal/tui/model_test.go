@@ -2146,3 +2146,7 @@ func TestModel_ClockToggleReloadsWeekAttendance(t *testing.T) {
 		t.Fatal("expected ListAttendance to be called after clock toggle")
 	}
 }
+
+func (c *mockClient) GetTimesheet(int64) (*odoo.TimesheetEntry, error) { return nil, nil }
+
+func (c *mockClient) GetAttendance(int64) (*odoo.AttendanceRecord, error) { return nil, nil }

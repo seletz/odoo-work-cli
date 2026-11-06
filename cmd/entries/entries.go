@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/filter"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
@@ -36,6 +38,10 @@ func CMD(deps *app.Deps) *cobra.Command {
 		Use:   "entries",
 		Short: "List individual timesheet entries with full detail",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := output.FormatOf(cmd)
+			if err != nil {
+				return err
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -48,7 +54,7 @@ func CMD(deps *app.Deps) *cobra.Command {
 				dateFrom, dateTo, err = parsing.WeekDateRange(ops.week)
 			}
 			if err != nil {
-				return err
+				return apperr.Wrap(apperr.KindValidation, err)
 			}
 
 			entries, err := client.ListTimesheets(dateFrom, dateTo)
@@ -58,25 +64,30 @@ func CMD(deps *app.Deps) *cobra.Command {
 
 			entries = filter.Entries(entries, ops.project, ops.task, ops.status)
 
-			if ops.date != "" {
-				fmt.Printf("Date: %s\n\n", dateFrom)
-			} else {
-				fmt.Printf("Week: %s to %s\n\n", dateFrom, dateTo)
+			w := cmd.OutOrStdout()
+			if format.IsMachine() {
+				return output.WriteList(w, format, output.NewEntries(entries))
 			}
 
-			fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
+			if ops.date != "" {
+				_, _ = fmt.Fprintf(w, "Date: %s\n\n", dateFrom)
+			} else {
+				_, _ = fmt.Fprintf(w, "Week: %s to %s\n\n", dateFrom, dateTo)
+			}
+
+			_, _ = fmt.Fprintf(w, "%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
 				"ID", "Date", "ProjID", "Project", "TaskID", "Task", "Hours", "Status", "Description")
-			fmt.Printf("%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
+			_, _ = fmt.Fprintf(w, "%-8s %-12s %-8s %-25s %-8s %-25s %-6s %-10s %s\n",
 				"--------", "------------", "--------", "-------------------------", "--------", "-------------------------", "------", "----------", "------------------------------")
 
 			var total float64
 			for _, e := range entries {
-				fmt.Printf("%-8d %-12s %-8d %-25s %-8d %-25s %-6s %-10s %s\n",
+				_, _ = fmt.Fprintf(w, "%-8d %-12s %-8d %-25s %-8d %-25s %-6s %-10s %s\n",
 					e.ID, e.Date, e.ProjectID, e.Project, e.TaskID, e.Task, tui.FormatHours(e.Hours), e.ValidatedStatus, e.Name)
 				total += e.Hours
 			}
 
-			fmt.Printf("\nTotal: %s (%d entries)\n", tui.FormatHours(total), len(entries))
+			_, _ = fmt.Fprintf(w, "\nTotal: %s (%d entries)\n", tui.FormatHours(total), len(entries))
 			return nil
 		},
 	}
@@ -87,6 +98,9 @@ func CMD(deps *app.Deps) *cobra.Command {
 	cmd.Flags().StringVar(&ops.project, "project", "", "filter by project name (substring, case-insensitive)")
 	cmd.Flags().StringVar(&ops.task, "task", "", "filter by task name (substring, case-insensitive)")
 	cmd.Flags().StringVar(&ops.status, "status", "", "filter by validation status (e.g. draft, validated)")
+
+	// --format/--json apply to the list and to add/update/delete.
+	output.AddFlags(cmd.PersistentFlags())
 
 	// Set Subcommands
 	cmd.AddCommand(addCmd(deps))
@@ -103,12 +117,12 @@ func buildTimesheetWriteParams(projectID, taskID int64, date, description, hours
 		date = time.Now().Format("2006-01-02")
 	} else {
 		if _, err := time.Parse("2006-01-02", date); err != nil {
-			return odoo.TimesheetWriteParams{}, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", date)
+			return odoo.TimesheetWriteParams{}, apperr.New(apperr.KindValidation, "invalid date %q: expected YYYY-MM-DD", date)
 		}
 	}
 	hours, err := tui.ParseHours(hoursStr)
 	if err != nil {
-		return odoo.TimesheetWriteParams{}, err
+		return odoo.TimesheetWriteParams{}, apperr.Wrap(apperr.KindValidation, err)
 	}
 	p := odoo.TimesheetWriteParams{
 		ProjectID: projectID,
@@ -135,25 +149,25 @@ func buildUpdateFields(cmd *cobra.Command, ops *subOps) (map[string]interface{},
 	}
 	if cmd.Flags().Changed("date") {
 		if _, err := time.Parse("2006-01-02", ops.date); err != nil {
-			return nil, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", ops.date)
+			return nil, apperr.New(apperr.KindValidation, "invalid date %q: expected YYYY-MM-DD", ops.date)
 		}
 		fields["date"] = ops.date
 	}
 	if cmd.Flags().Changed("hours") {
 		h, err := tui.ParseHours(ops.hours)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(apperr.KindValidation, err)
 		}
 		fields["unit_amount"] = h
 	}
 	if cmd.Flags().Changed("description") {
 		if ops.description == "" {
-			return nil, fmt.Errorf("description must not be empty")
+			return nil, apperr.New(apperr.KindValidation, "description must not be empty")
 		}
 		fields["name"] = ops.description
 	}
 	if len(fields) == 0 {
-		return nil, fmt.Errorf("at least one flag is required (--project-id, --task-id, --date, --hours, --description)")
+		return nil, apperr.New(apperr.KindValidation, "at least one flag is required (--project-id, --task-id, --date, --hours, --description)")
 	}
 	return fields, nil
 }
@@ -162,10 +176,10 @@ func buildUpdateFields(cmd *cobra.Command, ops *subOps) (map[string]interface{},
 func parseEntryID(s string) (int64, error) {
 	id, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid entry ID %q: must be a positive integer", s)
+		return 0, apperr.New(apperr.KindValidation, "invalid entry ID %q: must be a positive integer", s)
 	}
 	if id <= 0 {
-		return 0, fmt.Errorf("invalid entry ID %q: must be a positive integer", s)
+		return 0, apperr.New(apperr.KindValidation, "invalid entry ID %q: must be a positive integer", s)
 	}
 	return id, nil
 }

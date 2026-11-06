@@ -1,13 +1,15 @@
 package clock
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
+	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
@@ -21,14 +23,14 @@ const futureGrace = time.Minute
 func parseAtFlag(at string, now time.Time) (time.Time, error) {
 	day, err := parsing.ParseDay("", now)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, apperr.Wrap(apperr.KindValidation, err)
 	}
 	t, err := parsing.ParseClockTime(at, day)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, apperr.Wrap(apperr.KindValidation, err)
 	}
 	if t.After(now.Add(futureGrace)) {
-		return time.Time{}, fmt.Errorf("time %s is in the future", t.Format("2006-01-02 15:04"))
+		return time.Time{}, apperr.New(apperr.KindValidation, "time %s is in the future", t.Format("2006-01-02 15:04"))
 	}
 	return t, nil
 }
@@ -43,12 +45,12 @@ type editTimes struct {
 // resolveEditTimes parses and validates the clock edit flags against now.
 func resolveEditTimes(dateStr, inStr, outStr string, now time.Time) (*editTimes, error) {
 	if inStr == "" && outStr == "" {
-		return nil, errors.New("nothing to change: provide --in and/or --out")
+		return nil, apperr.New(apperr.KindValidation, "nothing to change: provide --in and/or --out")
 	}
 
 	day, err := parsing.ParseDay(dateStr, now)
 	if err != nil {
-		return nil, err
+		return nil, apperr.Wrap(apperr.KindValidation, err)
 	}
 
 	result := &editTimes{day: day}
@@ -58,10 +60,10 @@ func resolveEditTimes(dateStr, inStr, outStr string, now time.Time) (*editTimes,
 		}
 		t, err := parsing.ParseClockTime(s, day)
 		if err != nil {
-			return nil, err
+			return nil, apperr.Wrap(apperr.KindValidation, err)
 		}
 		if t.After(now.Add(futureGrace)) {
-			return nil, fmt.Errorf("time %s is in the future", t.Format("2006-01-02 15:04"))
+			return nil, apperr.New(apperr.KindValidation, "time %s is in the future", t.Format("2006-01-02 15:04"))
 		}
 		return &t, nil
 	}
@@ -73,7 +75,7 @@ func resolveEditTimes(dateStr, inStr, outStr string, now time.Time) (*editTimes,
 		return nil, err
 	}
 	if result.checkIn != nil && result.checkOut != nil && !result.checkOut.After(*result.checkIn) {
-		return nil, fmt.Errorf("check-out %s is not after check-in %s",
+		return nil, apperr.New(apperr.KindValidation, "check-out %s is not after check-in %s",
 			result.checkOut.Format("15:04"), result.checkIn.Format("15:04"))
 	}
 	return result, nil
@@ -89,7 +91,7 @@ func pickEditTarget(records []odoo.AttendanceRecord, id int64) (*odoo.Attendance
 				return &records[i], nil
 			}
 		}
-		return nil, fmt.Errorf("no attendance record with ID %d on that date", id)
+		return nil, apperr.New(apperr.KindNotFound, "no attendance record with ID %d on that date", id)
 	}
 
 	switch len(records) {
@@ -102,9 +104,19 @@ func pickEditTarget(records []odoo.AttendanceRecord, id int64) (*odoo.Attendance
 		for _, r := range records {
 			lines = append(lines, "  "+formatRecord(&r))
 		}
-		return nil, fmt.Errorf("multiple attendance records on that date, select one with --id:\n%s",
+		return nil, apperr.New(apperr.KindValidation, "multiple attendance records on that date, select one with --id:\n%s",
 			strings.Join(lines, "\n"))
 	}
+}
+
+// writeAttendanceByID reads back a just-written attendance record and
+// prints it in a machine format.
+func writeAttendanceByID(w io.Writer, format output.Format, client odoo.Client, id int64, action string) error {
+	rec, err := client.GetAttendance(id)
+	if err != nil {
+		return fmt.Errorf("attendance #%d was %s, but reading it back failed: %w", id, action, err)
+	}
+	return output.WriteObject(w, format, output.NewAttendance(*rec))
 }
 
 // formatRecord renders an attendance record for terminal output.
@@ -133,6 +145,10 @@ record yet, one is created when both --in and --out are given.
 Editing attendance over the API requires the 'Attendance Officer' access
 right, with you set as your own attendance manager.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := output.FormatOf(cmd)
+			if err != nil {
+				return err
+			}
 			req, err := resolveEditTimes(dateStr, inStr, outStr, time.Now())
 			if err != nil {
 				return err
@@ -142,6 +158,7 @@ right, with you set as your own attendance manager.`,
 			if err != nil {
 				return err
 			}
+			w := cmd.OutOrStdout()
 
 			records, err := client.ListAttendance(req.day.UTC(), req.day.AddDate(0, 0, 1).UTC())
 			if err != nil {
@@ -155,14 +172,17 @@ right, with you set as your own attendance manager.`,
 
 			if target == nil {
 				if req.checkIn == nil || req.checkOut == nil {
-					return fmt.Errorf("no attendance record on %s: provide both --in and --out to create one",
+					return apperr.New(apperr.KindNotFound, "no attendance record on %s: provide both --in and --out to create one",
 						req.day.Format("2006-01-02"))
 				}
 				newID, err := client.CreateAttendance(*req.checkIn, *req.checkOut)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Created attendance #%d: %s - %s\n", newID,
+				if format.IsMachine() {
+					return writeAttendanceByID(w, format, client, newID, "created")
+				}
+				_, _ = fmt.Fprintf(w, "Created attendance #%d: %s - %s\n", newID,
 					req.checkIn.Format("2006-01-02 15:04"), req.checkOut.Format("15:04"))
 				return nil
 			}
@@ -171,7 +191,10 @@ right, with you set as your own attendance manager.`,
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Updated attendance %s\n", formatRecord(rec))
+			if format.IsMachine() {
+				return output.WriteObject(w, format, output.NewAttendance(*rec))
+			}
+			_, _ = fmt.Fprintf(w, "Updated attendance %s\n", formatRecord(rec))
 			return nil
 		},
 	}

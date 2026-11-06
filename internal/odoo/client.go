@@ -110,6 +110,8 @@ type Client interface {
 	// ListAllTimesheets returns timesheet entries for the given date range,
 	// ignoring configured filters.
 	ListAllTimesheets(dateFrom, dateTo string) ([]TimesheetEntry, error)
+	// GetTimesheet returns a single timesheet entry by ID.
+	GetTimesheet(id int64) (*TimesheetEntry, error)
 	// GetFields returns field metadata for the given Odoo model.
 	GetFields(model string) ([]FieldInfo, error)
 	// CreateTimesheet creates a new timesheet entry and returns its ID.
@@ -136,6 +138,8 @@ type Client interface {
 	// record; nil times are left unchanged. Returns the updated record.
 	// Requires attendance officer rights.
 	EditAttendance(id int64, checkIn, checkOut *time.Time) (*AttendanceRecord, error)
+	// GetAttendance returns a single attendance record by ID.
+	GetAttendance(id int64) (*AttendanceRecord, error)
 	// AttendanceStatus returns the current clock state and today's periods.
 	AttendanceStatus() (*AttendanceStatus, error)
 	// ListAttendance returns attendance records with check_in in [from, to),

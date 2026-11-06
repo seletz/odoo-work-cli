@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -14,11 +15,20 @@ func inCMD(deps *app.Deps) *cobra.Command {
 	InCmd := &cobra.Command{
 		Use:   "in",
 		Short: "Clock in (start attendance)",
+		Long: `Clock in (start attendance).
+
+With --json (or --format json|jsonl) the new, running attendance record is
+printed.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := output.FormatOf(cmd)
+			if err != nil {
+				return err
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
 			}
+			w := cmd.OutOrStdout()
 
 			if at != "" {
 				t, err := parseAtFlag(at, time.Now())
@@ -29,16 +39,21 @@ func inCMD(deps *app.Deps) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Clocked in at %s (#%d)\n", t.Format("2006-01-02 15:04"), id)
+				if format.IsMachine() {
+					return writeAttendanceByID(w, format, client, id, "created")
+				}
+				_, _ = fmt.Fprintf(w, "Clocked in at %s (#%d)\n", t.Format("2006-01-02 15:04"), id)
 				return nil
 			}
 
-			_, err = client.ClockIn()
+			id, err := client.ClockIn()
 			if err != nil {
 				return err
 			}
-
-			fmt.Printf("Clocked in at %s\n", time.Now().Format("15:04"))
+			if format.IsMachine() {
+				return writeAttendanceByID(w, format, client, id, "created")
+			}
+			_, _ = fmt.Fprintf(w, "Clocked in at %s\n", time.Now().Format("15:04"))
 			return nil
 		},
 	}

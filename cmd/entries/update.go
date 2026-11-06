@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -12,8 +13,15 @@ func updateCmd(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update ID",
 		Short: "Update an existing timesheet entry",
-		Args:  cobra.ExactArgs(1),
+		Long: `Update an existing timesheet entry.
+
+With --json (or --format json|jsonl) the updated entry is printed.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			format, err := output.FormatOf(cmd)
+			if err != nil {
+				return err
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -29,11 +37,23 @@ func updateCmd(deps *app.Deps) *cobra.Command {
 				return err
 			}
 
+			// A missing entry fails as not_found before any write.
+			if _, err := client.GetTimesheet(id); err != nil {
+				return err
+			}
 			if err := client.UpdateTimesheet(id, fields); err != nil {
 				return err
 			}
 
-			fmt.Printf("Updated entry %d\n", id)
+			w := cmd.OutOrStdout()
+			if format.IsMachine() {
+				entry, err := client.GetTimesheet(id)
+				if err != nil {
+					return fmt.Errorf("entry %d was updated, but reading it back failed: %w", id, err)
+				}
+				return output.WriteObject(w, format, output.NewEntry(*entry))
+			}
+			_, _ = fmt.Fprintf(w, "Updated entry %d\n", id)
 			return nil
 		},
 	}

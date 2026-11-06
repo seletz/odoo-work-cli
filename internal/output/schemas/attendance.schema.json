@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "attendance.schema.json",
+  "title": "Attendance record (clock in/out/edit, clock status periods)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "employee_id", "employee", "check_in", "check_out", "running", "worked_hours", "worked_minutes"],
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/id" },
+    "employee_id": { "$ref": "defs.schema.json#/$defs/optional_id" },
+    "employee": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "check_in": { "$ref": "defs.schema.json#/$defs/datetime" },
+    "check_out": { "$ref": "defs.schema.json#/$defs/optional_datetime" },
+    "running": { "type": "boolean" },
+    "worked_hours": { "$ref": "defs.schema.json#/$defs/hours" },
+    "worked_minutes": { "$ref": "defs.schema.json#/$defs/minutes" }
+  }
+}

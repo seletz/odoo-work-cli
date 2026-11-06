@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "entry.schema.json",
+  "title": "Timesheet entry (entries, timesheets, entries add/update/delete)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "date", "project_id", "project", "task_id", "task", "description", "hours", "minutes", "employee", "status", "company"],
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/id" },
+    "date": { "$ref": "defs.schema.json#/$defs/date" },
+    "project_id": { "$ref": "defs.schema.json#/$defs/optional_id" },
+    "project": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "task_id": { "$ref": "defs.schema.json#/$defs/optional_id" },
+    "task": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "description": { "type": "string" },
+    "hours": { "$ref": "defs.schema.json#/$defs/hours" },
+    "minutes": { "$ref": "defs.schema.json#/$defs/minutes" },
+    "employee": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "status": { "$ref": "defs.schema.json#/$defs/optional_string" },
+    "company": { "$ref": "defs.schema.json#/$defs/optional_string" }
+  }
+}
