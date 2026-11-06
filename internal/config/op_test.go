@@ -1,10 +1,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fakeOPInjectRunner returns a runner that resolves op:// references in templates.
@@ -350,5 +353,98 @@ func TestParseKeyValues_EmptyInput(t *testing.T) {
 	got := parseKeyValues("")
 	if len(got) != 0 {
 		t.Errorf("expected empty map, got %v", got)
+	}
+}
+
+func TestResolveOPSecrets_ErrorKinds(t *testing.T) {
+	tests := []struct {
+		name     string
+		runErr   error
+		wantKind apperr.Kind
+		wantAny  bool // whether a kind is expected from apperr at all
+	}{
+		{"locked", fmt.Errorf("op inject: authorization timeout: %w", errOPLocked), apperr.KindSecretsLocked, true},
+		{"other", fmt.Errorf("op inject: invalid reference"), "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{OPSecrets: &OPSecrets{URL: "op://Work/odoo/url"}}
+			err := resolveOPSecrets(cfg, func(string) (string, error) { return "", tt.runErr })
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			var ae *apperr.Error
+			got := errors.As(err, &ae)
+			if got != tt.wantAny {
+				t.Fatalf("typed apperr = %v, want %v (err: %v)", got, tt.wantAny, err)
+			}
+			if tt.wantAny {
+				if ae.Kind != tt.wantKind {
+					t.Errorf("kind = %q, want %q", ae.Kind, tt.wantKind)
+				}
+				if !strings.Contains(err.Error(), "1Password is locked or not reachable: unlock it and retry") {
+					t.Errorf("message = %q", err.Error())
+				}
+				if !errors.Is(err, errOPLocked) {
+					t.Error("original error not wrapped")
+				}
+			}
+		})
+	}
+}
+
+func TestRunOPCommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		bin        string
+		args       []string
+		timeout    time.Duration
+		wantLocked bool
+		wantErr    bool
+		wantOut    string
+	}{
+		{"success", "cat", nil, 5 * time.Second, false, false, "in"},
+		{"timeout", "sleep", []string{"5"}, 100 * time.Millisecond, true, true, ""},
+		{"locked stderr", "sh", []string{"-c", "echo 'authorization timeout' >&2; exit 1"}, 5 * time.Second, true, true, ""},
+		{"not signed in", "sh", []string{"-c", "echo '[ERROR] You are not signed in' >&2; exit 1"}, 5 * time.Second, true, true, ""},
+		{"other failure", "sh", []string{"-c", "echo 'invalid secret reference' >&2; exit 1"}, 5 * time.Second, false, true, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start := time.Now()
+			out, err := runOPCommand(tt.timeout, tt.bin, tt.args, "in")
+			if time.Since(start) > 3*time.Second {
+				t.Fatal("did not fail fast")
+			}
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if errors.Is(err, errOPLocked) != tt.wantLocked {
+				t.Errorf("locked = %v, want %v (err: %v)", errors.Is(err, errOPLocked), tt.wantLocked, err)
+			}
+			if out != tt.wantOut {
+				t.Errorf("out = %q, want %q", out, tt.wantOut)
+			}
+		})
+	}
+}
+
+func TestOPTimeout(t *testing.T) {
+	tests := []struct {
+		env  string
+		want time.Duration
+	}{
+		{"", defaultOPTimeout},
+		{"2s", 2 * time.Second},
+		{"garbage", defaultOPTimeout},
+		{"-1s", defaultOPTimeout},
+	}
+	for _, tt := range tests {
+		t.Run(tt.env, func(t *testing.T) {
+			t.Setenv("ODOO_OP_TIMEOUT", tt.env)
+			if got := opTimeout(); got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
