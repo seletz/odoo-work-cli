@@ -11,6 +11,7 @@ import (
 	configcmd "github.com/seletz/odoo-work-cli/cmd/config"
 	"github.com/seletz/odoo-work-cli/cmd/entries"
 	"github.com/seletz/odoo-work-cli/cmd/fields"
+	"github.com/seletz/odoo-work-cli/cmd/llm"
 	"github.com/seletz/odoo-work-cli/cmd/project"
 	"github.com/seletz/odoo-work-cli/cmd/tasks"
 	"github.com/seletz/odoo-work-cli/cmd/timesheet"
@@ -153,6 +154,7 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 	rootCmd.AddCommand(tui.CMD(deps))
 	rootCmd.AddCommand(entries.CMD(deps))
 	rootCmd.AddCommand(clock.CMD(deps))
+	rootCmd.AddCommand(llm.CMD())
 
 	return rootCmd, started
 }
@@ -162,7 +164,7 @@ func isNoneSetupCommand(cmd *cobra.Command) bool {
 		switch current.Name() {
 		case "completion", "__complete", "__completeNoDesc":
 			return true
-		case "config":
+		case "config", "llm":
 			return true
 		}
 	}

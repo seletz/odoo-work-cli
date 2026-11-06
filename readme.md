@@ -189,6 +189,7 @@ Commands:
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
 | `config --merged`                                        | Print the fully merged TOML config (password omitted)                                                               |
 | `config install`                                         | Create a default config file at the platform config directory                                                       |
+| `llm --skill`                                            | Print a guide for LLM agents (commands, flags, output formats, error kinds, workflows, pitfalls); needs no config or connection |
 
 Examples:
 
@@ -225,6 +226,16 @@ Examples:
 ./odoo-work-cli config --merged
 ./odoo-work-cli config install
 ```
+
+### Agent guide (`llm --skill`)
+
+`odoo-work-cli llm --skill` prints a Markdown guide on stdout that tells a
+coding agent how to use the CLI: every command and flag, `--json` output and
+its fields, the error kinds, typical workflows (backfilling attendance,
+booking entries) and the pitfalls. The error kinds and field lists are
+generated from the code; a test fails when a command or flag is missing from
+the guide. Save it as a skill, e.g.
+`odoo-work-cli llm --skill > ~/.claude/skills/odoo-work-cli/SKILL.md`.
 
 ### Machine-readable output (`--json`)
 
