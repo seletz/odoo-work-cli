@@ -135,7 +135,10 @@ func buildGridSeparatorBottom(labelWidth, colWidth int) string {
 // holidays is a [7]string with holiday names per day (empty = no holiday).
 // companyColors maps company name to lipgloss color string for row label coloring.
 // todayCol is the column index (0-6) for today, or -1 if not in this week.
-func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string, todayCol int) string {
+// att is the week's attendance summary; once loaded, check-in, check-out,
+// attendance and the attendance − booked difference are rendered below the
+// totals row.
+func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string, todayCol int, att WeekAttendance) string {
 	minColWidth := 7
 	minLabelWidth := 20
 	maxLabelWidth := 40
@@ -285,6 +288,10 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	totalsLine += gridSepStyle.Render(boxV) + weekTotalBoldStyle.Render(weekTotalStyle(grid.WeekTotal, limits).Bold(true).Render(weekCell))
 	b.WriteString(totalsLine)
 	b.WriteString("\n")
+
+	if att.Loaded {
+		b.WriteString(renderAttendanceRows(att, grid, labelWidth, colWidth, holidays))
+	}
 
 	return b.String()
 }

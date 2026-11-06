@@ -18,7 +18,7 @@ func TestRenderGrid_ContainsLabels(t *testing.T) {
 		{Date: "2026-03-03", Project: "Beta", Task: "QA", Hours: 2.5},
 	}
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{})
 
 	if !strings.Contains(out, "Acme / Dev") {
 		t.Error("output should contain 'Acme / Dev'")
@@ -40,7 +40,7 @@ func TestRenderGrid_ShowsCompanyPrefix(t *testing.T) {
 	}
 
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{})
 
 	if !strings.Contains(out, "[DIG] Acme / Dev") {
 		t.Error("output should contain prefixed company label '[DIG] Acme / Dev'")
@@ -49,7 +49,7 @@ func TestRenderGrid_ShowsCompanyPrefix(t *testing.T) {
 
 func TestRenderGrid_EmptyGrid(t *testing.T) {
 	g := BuildWeekGrid(nil, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{})
 
 	if !strings.Contains(out, "Company Prefix / Project / Task") {
 		t.Error("output should contain header")
@@ -147,7 +147,7 @@ func TestRenderGrid_CorrectLineCount(t *testing.T) {
 		{Date: "2026-03-02", Project: "C", Task: "T3", Hours: 3.0},
 	}
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+	out := RenderGrid(g, 0, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{})
 
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	// header + sep + 3 data rows + sep + totals = 7
@@ -162,7 +162,7 @@ func TestRenderGrid_WrapsLongLabels(t *testing.T) {
 	}
 
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 0, 0, 90, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+	out := RenderGrid(g, 0, 0, 90, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{})
 
 	if strings.Contains(out, "…") {
 		t.Fatal("output should wrap long labels instead of truncating with ellipsis")
@@ -198,7 +198,7 @@ func TestRenderGrid_HighlightsWholeSelectedRow(t *testing.T) {
 	}
 
 	g := BuildWeekGrid(entries, monday(2026, 3, 2))
-	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1)
+	out := RenderGrid(g, 1, 0, 120, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{})
 
 	var selectedLine string
 	for _, line := range strings.Split(out, "\n") {

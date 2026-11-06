@@ -68,7 +68,10 @@ type timesheetsLoadedMsg struct {
 type attendanceLoadedMsg struct {
 	status *odoo.AttendanceStatus
 	week   []odoo.AttendanceRecord // displayed week's attendance records
-	err    error
+	// weekStart is the week the records were requested for; a reply for a
+	// week the user has navigated away from is dropped.
+	weekStart time.Time
+	err       error
 }
 
 // editSavedMsg is sent when an edit save operation completes.
@@ -124,6 +127,10 @@ type Model struct {
 	editFocus      int             // 0=hours, 1=description
 	editErr        error           // last edit error
 	editIsNew      bool            // true = creating new entry, false = editing existing
+
+	// weekAttendanceLoaded is true once weekAttendance holds the displayed
+	// week's records (gates the per-day attendance rows, #78).
+	weekAttendanceLoaded bool
 
 	helpPrevState uiState // state to return to when exiting help
 
@@ -208,15 +215,17 @@ func (m Model) loadTimesheets() tea.Cmd {
 
 func (m Model) loadAttendance() tea.Cmd {
 	client := m.client
-	from := time.Date(m.monday.Year(), m.monday.Month(), m.monday.Day(), 0, 0, 0, 0, time.UTC)
+	// Local midnights: the per-day attendance rows bucket records by local
+	// day, so the single week request must cover exactly those days.
+	from := time.Date(m.monday.Year(), m.monday.Month(), m.monday.Day(), 0, 0, 0, 0, m.monday.Location())
 	to := from.AddDate(0, 0, 7)
 	return func() tea.Msg {
 		status, err := client.AttendanceStatus()
 		if err != nil {
-			return attendanceLoadedMsg{err: err}
+			return attendanceLoadedMsg{err: err, weekStart: from}
 		}
 		week, err := client.ListAttendance(from, to)
-		return attendanceLoadedMsg{status: status, week: week, err: err}
+		return attendanceLoadedMsg{status: status, week: week, weekStart: from, err: err}
 	}
 }
 
@@ -297,7 +306,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case attendanceLoadedMsg:
 		if msg.err == nil {
 			m.attendance = msg.status
-			m.weekAttendance = msg.week
+			if msg.weekStart.Equal(m.monday.Time) {
+				m.weekAttendance = msg.week
+				m.weekAttendanceLoaded = true
+			}
 		}
 		if m.attendance != nil && m.attendance.ClockedIn {
 			return m, attendanceTick()
@@ -427,6 +439,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateGrid
 			}
 			m.monday = MondayTime{m.monday.AddDate(0, 0, -7)}
+			m.weekAttendance, m.weekAttendanceLoaded = nil, false
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
 
@@ -435,6 +448,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateGrid
 			}
 			m.monday = MondayTime{m.monday.AddDate(0, 0, 7)}
+			m.weekAttendance, m.weekAttendanceLoaded = nil, false
 			m.loading = true
 			return m, tea.Batch(m.spinner.Tick, m.loadTimesheets(), m.loadAttendance())
 		}
@@ -982,7 +996,11 @@ func (m Model) View() tea.View {
 
 	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp, stateAttendance:
 		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.weekAttendance, m.loading, m.spinner, m.width)
-		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors, todayCol)
+		var weekAtt WeekAttendance
+		if m.weekAttendanceLoaded {
+			weekAtt = SummarizeWeekAttendance(m.weekAttendance, m.monday.Time, m.now())
+		}
+		grid := RenderGrid(m.grid, m.cursor[0], m.cursor[1], m.width-4, m.limits, m.weekHols, m.companyColors, todayCol, weekAtt)
 		statusBar := RenderStatusBar(m.state, m.grid.WeekTotal, m.limits, m.attendance, m.width)
 
 		helpView := m.help.View(m.keys)

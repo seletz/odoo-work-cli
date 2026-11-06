@@ -2076,6 +2076,7 @@ func TestModel_AttendanceLoadedStoresWeekRecords(t *testing.T) {
 		week: []odoo.AttendanceRecord{
 			{ID: 1, CheckIn: out.Add(-8 * time.Hour), CheckOut: &out, WorkedHours: 8.0},
 		},
+		weekStart: m.monday.Time,
 	}
 	updated, _ := m.Update(msg)
 	um := updated.(Model)
