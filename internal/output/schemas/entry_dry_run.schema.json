@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "entry_dry_run.schema.json",
+  "title": "Proposed timesheet entry (entries add/update --dry-run): the entry that would be written, nothing was written",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "date",
+    "project_id",
+    "project",
+    "task_id",
+    "task",
+    "description",
+    "hours",
+    "minutes",
+    "employee",
+    "status",
+    "company",
+    "dry_run",
+    "duplicates"
+  ],
+  "properties": {
+    "id": {
+      "oneOf": [
+        {
+          "$ref": "defs.schema.json#/$defs/id"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null for add: the entry does not exist yet"
+    },
+    "date": {
+      "$ref": "defs.schema.json#/$defs/date"
+    },
+    "project_id": {
+      "$ref": "defs.schema.json#/$defs/optional_id"
+    },
+    "project": {
+      "$ref": "defs.schema.json#/$defs/optional_string"
+    },
+    "task_id": {
+      "$ref": "defs.schema.json#/$defs/optional_id"
+    },
+    "task": {
+      "$ref": "defs.schema.json#/$defs/optional_string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "hours": {
+      "$ref": "defs.schema.json#/$defs/hours"
+    },
+    "minutes": {
+      "$ref": "defs.schema.json#/$defs/minutes"
+    },
+    "employee": {
+      "$ref": "defs.schema.json#/$defs/optional_string"
+    },
+    "status": {
+      "$ref": "defs.schema.json#/$defs/optional_string"
+    },
+    "company": {
+      "$ref": "defs.schema.json#/$defs/optional_string"
+    },
+    "dry_run": {
+      "const": true
+    },
+    "duplicates": {
+      "type": "array",
+      "items": {
+        "$ref": "entry.schema.json"
+      },
+      "description": "Entries of the same day with the same project, task and description"
+    }
+  }
+}

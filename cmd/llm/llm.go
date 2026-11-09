@@ -63,6 +63,7 @@ var schemaOrder = []struct{ name, used string }{
 	{output.SchemaAttendance, "`clock in/out`, `clock list` (array)"},
 	{output.SchemaClockStatus, "`clock status`"},
 	{output.SchemaAttendanceEdit, "`clock edit`"},
+	{output.SchemaEntryDryRun, "`entries add/update --dry-run`"},
 }
 
 // schemaSummary lists the top-level fields of each embedded JSON Schema.

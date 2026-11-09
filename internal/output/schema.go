@@ -14,6 +14,7 @@ const (
 	SchemaProject        = "project"
 	SchemaTask           = "task"
 	SchemaEntry          = "entry"
+	SchemaEntryDryRun    = "entry_dry_run"
 	SchemaUser           = "user"
 	SchemaAttendance     = "attendance"
 	SchemaClockStatus    = "clock_status"

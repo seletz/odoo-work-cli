@@ -31,6 +31,9 @@ type Fake struct {
 	TaskSearch        string
 	TaskSearchProject int64
 
+	// TaskQueries records the project ID of every ListAllTasks call.
+	TaskQueries []int64
+
 	Created  []odoo.TimesheetWriteParams
 	Updated  map[int64]map[string]interface{}
 	Deleted  []int64
@@ -76,7 +79,10 @@ func (f *Fake) SearchTasks(projectID int64, text string) ([]odoo.TaskInfo, error
 }
 
 // ListAllTasks implements odoo.Client.
-func (f *Fake) ListAllTasks(int64) ([]odoo.TaskInfo, error) { return f.Tasks, f.Err }
+func (f *Fake) ListAllTasks(projectID int64) ([]odoo.TaskInfo, error) {
+	f.TaskQueries = append(f.TaskQueries, projectID)
+	return f.Tasks, f.Err
+}
 
 // ListTimesheets implements odoo.Client.
 func (f *Fake) ListTimesheets(string, string) ([]odoo.TimesheetEntry, error) {
@@ -118,7 +124,7 @@ func (f *Fake) CreateTimesheet(p odoo.TimesheetWriteParams) (int64, error) {
 	return f.NextID, nil
 }
 
-// UpdateTimesheet implements odoo.Client and applies name/unit_amount.
+// UpdateTimesheet implements odoo.Client and applies name, unit_amount, project_id, task_id and date.
 func (f *Fake) UpdateTimesheet(id int64, fields map[string]interface{}) error {
 	if f.Err != nil {
 		return f.Err
@@ -136,6 +142,15 @@ func (f *Fake) UpdateTimesheet(id int64, fields map[string]interface{}) error {
 		}
 		if v, ok := fields["unit_amount"].(float64); ok {
 			f.Timesheets[i].Hours = v
+		}
+		if v, ok := fields["project_id"].(int64); ok {
+			f.Timesheets[i].ProjectID = v
+		}
+		if v, ok := fields["task_id"].(int64); ok {
+			f.Timesheets[i].TaskID = v
+		}
+		if v, ok := fields["date"].(string); ok {
+			f.Timesheets[i].Date = v
 		}
 		return nil
 	}
