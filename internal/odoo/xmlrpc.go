@@ -199,20 +199,57 @@ func (x *XMLRPCClient) applyCriteriaFilters(criteria *goOdoo.Criteria, modelKey 
 
 // ListProjects returns projects from Odoo with configured filters applied.
 func (x *XMLRPCClient) ListProjects() ([]ProjectInfo, error) {
-	return x.listProjects(true)
+	return x.listProjects(true, "")
+}
+
+// SearchProjects returns projects whose name or customer contains text
+// (case-insensitive, evaluated by Odoo), with configured filters applied.
+func (x *XMLRPCClient) SearchProjects(text string) ([]ProjectInfo, error) {
+	return x.listProjects(true, text)
 }
 
 // ListAllProjects returns all projects from Odoo, ignoring configured filters.
 func (x *XMLRPCClient) ListAllProjects() ([]ProjectInfo, error) {
-	return x.listProjects(false)
+	return x.listProjects(false, "")
 }
 
-// listProjects is the shared implementation for ListProjects and ListAllProjects.
-func (x *XMLRPCClient) listProjects(filtered bool) ([]ProjectInfo, error) {
+// projectCriteria builds the project search domain. Configured filters are
+// only added when filtered is true. A non-empty search adds a
+// case-insensitive match on the name OR the customer, ANDed with the rest.
+func (x *XMLRPCClient) projectCriteria(filtered bool, search string) *goOdoo.Criteria {
 	criteria := goOdoo.NewCriteria()
 	if filtered {
 		x.applyCriteriaFilters(criteria, "project")
 	}
+	if search != "" {
+		criteria.Or(
+			goOdoo.NewCriterion("name", "ilike", search),
+			goOdoo.NewCriterion("partner_id", "ilike", search),
+		)
+	}
+	return criteria
+}
+
+// taskCriteria builds the task search domain. Configured filters are only
+// added when filtered is true; projectID <= 0 means all projects; a
+// non-empty search adds a case-insensitive name match.
+func (x *XMLRPCClient) taskCriteria(projectID int64, filtered bool, search string) *goOdoo.Criteria {
+	criteria := goOdoo.NewCriteria()
+	if filtered {
+		x.applyCriteriaFilters(criteria, "task")
+	}
+	if projectID > 0 {
+		criteria.Add("project_id", "=", projectID)
+	}
+	if search != "" {
+		criteria.Add("name", "ilike", search)
+	}
+	return criteria
+}
+
+// listProjects is the shared implementation for the project list methods.
+func (x *XMLRPCClient) listProjects(filtered bool, search string) ([]ProjectInfo, error) {
+	criteria := x.projectCriteria(filtered, search)
 
 	// Build field list: standard fields + configured extra fields.
 	fields := []string{"id", "name", "active", "partner_id", "company_id", "stage_id", "user_id"}
@@ -259,24 +296,25 @@ func (x *XMLRPCClient) listProjects(filtered bool) ([]ProjectInfo, error) {
 // ListTasks returns tasks from Odoo with configured filters applied.
 // Pass projectID <= 0 to list all tasks.
 func (x *XMLRPCClient) ListTasks(projectID int64) ([]TaskInfo, error) {
-	return x.listTasks(projectID, true)
+	return x.listTasks(projectID, true, "")
+}
+
+// SearchTasks returns tasks whose name contains text (case-insensitive,
+// evaluated by Odoo), with configured filters applied. Pass projectID <= 0
+// to search all projects.
+func (x *XMLRPCClient) SearchTasks(projectID int64, text string) ([]TaskInfo, error) {
+	return x.listTasks(projectID, true, text)
 }
 
 // ListAllTasks returns tasks from Odoo, ignoring configured filters.
 // Pass projectID <= 0 to list all tasks.
 func (x *XMLRPCClient) ListAllTasks(projectID int64) ([]TaskInfo, error) {
-	return x.listTasks(projectID, false)
+	return x.listTasks(projectID, false, "")
 }
 
-// listTasks is the shared implementation for ListTasks and ListAllTasks.
-func (x *XMLRPCClient) listTasks(projectID int64, filtered bool) ([]TaskInfo, error) {
-	criteria := goOdoo.NewCriteria()
-	if filtered {
-		x.applyCriteriaFilters(criteria, "task")
-	}
-	if projectID > 0 {
-		criteria.Add("project_id", "=", projectID)
-	}
+// listTasks is the shared implementation for the task list methods.
+func (x *XMLRPCClient) listTasks(projectID int64, filtered bool, search string) ([]TaskInfo, error) {
+	criteria := x.taskCriteria(projectID, filtered, search)
 
 	fields := []string{"id", "name", "active", "project_id", "stage_id", "company_id"}
 	opts := goOdoo.NewOptions().FetchFields(fields...)

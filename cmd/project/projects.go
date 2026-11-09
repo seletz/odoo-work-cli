@@ -5,11 +5,13 @@ import (
 	"strings"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
 func CMD(deps *app.Deps) *cobra.Command {
+	var search string
 	cmd := &cobra.Command{
 		Use:   "projects",
 		Short: "List Odoo projects",
@@ -27,13 +29,23 @@ func CMD(deps *app.Deps) *cobra.Command {
 				return err
 			}
 
-			projects, err := client.ListProjects()
+			var projects []odoo.ProjectInfo
+			if search != "" {
+				projects, err = client.SearchProjects(search)
+			} else {
+				projects, err = client.ListProjects()
+			}
 			if err != nil {
 				return err
 			}
 			w := cmd.OutOrStdout()
 			if format.IsMachine() {
 				return output.WriteList(w, format, output.NewProjects(projects))
+			}
+
+			if len(projects) == 0 && search != "" {
+				_, _ = fmt.Fprintf(w, "No projects match %q\n", search)
+				return nil
 			}
 
 			// Build dynamic column headers from config extra fields.
@@ -71,6 +83,7 @@ func CMD(deps *app.Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&search, "search", "", "only projects whose name or customer contains TEXT (case-insensitive)")
 	output.AddFlags(cmd.Flags())
 	return cmd
 }
