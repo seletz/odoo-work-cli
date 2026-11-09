@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/seletz/odoo-work-cli/internal/config"
@@ -227,5 +228,26 @@ func TestFakeBackend_UnknownProjectSameMessageWithAndWithoutDryRun(t *testing.T)
 	}
 	if real.Error.Kind != "validation" {
 		t.Errorf("kind = %q, want validation", real.Error.Kind)
+	}
+}
+
+// TestFakeBackend_UnknownProjectPlainText: the plain-text path prints the
+// same clean message (cobra must not print the raw error first) (#95).
+func TestFakeBackend_UnknownProjectPlainText(t *testing.T) {
+	useFakeBackend(t)
+	setup := noSetup(t)
+	args := []string{"entries", "add", "--project-id", "424242", "--date", "2026-01-07", "--hours", "1", "--description", "x"}
+
+	for _, extra := range [][]string{nil, {"--dry-run"}} {
+		code, stdout, stderr := execute(t, setup, append(append([]string{}, args...), extra...)...)
+		if code != 1 {
+			t.Fatalf("%v: exit %d", extra, code)
+		}
+		if got, want := strings.TrimSpace(string(stderr)), "Error: project 424242 does not exist"; got != want {
+			t.Errorf("%v: stderr = %q, want %q", extra, got, want)
+		}
+		if len(stdout) != 0 {
+			t.Errorf("%v: stdout = %q, want empty", extra, stdout)
+		}
 	}
 }

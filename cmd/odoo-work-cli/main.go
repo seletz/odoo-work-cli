@@ -53,11 +53,11 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 	rootCmd.SetArgs(args)
 	rootCmd.SetOut(stdout)
 	rootCmd.SetErr(stderr)
-	// In table mode cobra prints "Error: …" (and usage for usage errors)
-	// to stderr as before. In machine mode stderr stays quiet and the
-	// error is rendered as JSON below.
+	// cobra never prints errors itself: run() renders every error in one
+	// place, after FriendlyError, as "Error: …" on stderr (table mode) or
+	// as JSON on stdout (machine mode).
 	machine := output.RequestedInArgs(args).IsMachine()
-	rootCmd.SilenceErrors = machine
+	rootCmd.SilenceErrors = true
 	// cobra would print usage to the Out writer (stdout here); usage is
 	// printed to stderr below instead.
 	rootCmd.SilenceUsage = true
@@ -73,6 +73,12 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 		if !errors.As(err, &typed) {
 			err = apperr.Wrap(apperr.KindValidation, err)
 		}
+	}
+	err = odoo.FriendlyError(err)
+	if !machine {
+		_, _ = fmt.Fprintln(stderr, "Error: "+err.Error())
+	}
+	if !*started {
 		// As cobra does: usage after errors from flag/arg validation, but
 		// not for an unknown command (flags never parsed), whose message
 		// already points to --help.
@@ -80,7 +86,6 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 			_, _ = fmt.Fprintln(stderr, cmd.UsageString())
 		}
 	}
-	err = odoo.FriendlyError(err)
 	format := output.Requested(cmd, args)
 	if !format.IsMachine() && machine {
 		// The resolved command has no output flags ("fields --json",
