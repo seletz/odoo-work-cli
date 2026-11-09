@@ -165,7 +165,7 @@ func formatRecord(rec *odoo.AttendanceRecord) string {
 		return fmt.Sprintf("#%d %s - --:-- (running)", rec.ID, checkIn)
 	}
 	return fmt.Sprintf("#%d %s - %s (%s)", rec.ID, checkIn,
-		rec.CheckOut.Local().Format("15:04"), tui.FormatHours(rec.WorkedHours))
+		formatCheckOut(rec), tui.FormatHours(rec.WorkedHours))
 }
 
 func editCMD(deps *app.Deps) *cobra.Command {

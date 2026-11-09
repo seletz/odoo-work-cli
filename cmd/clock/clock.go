@@ -20,6 +20,7 @@ func CMD(deps *app.Deps) *cobra.Command {
 	cmd.AddCommand(statusCMD(deps))
 	cmd.AddCommand(listCMD(deps))
 	cmd.AddCommand(editCMD(deps))
+	cmd.AddCommand(addCMD(deps))
 
 	return cmd
 }

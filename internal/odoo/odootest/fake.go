@@ -230,14 +230,17 @@ func (f *Fake) AttendanceStatus() (*odoo.AttendanceStatus, error) {
 	return &s, nil
 }
 
-// ListAttendance implements odoo.Client: records with check-in in [from, to).
+// ListAttendance implements odoo.Client like the real client: records with
+// check-in in [from, to), plus running records that started before from.
 func (f *Fake) ListAttendance(from, to time.Time) ([]odoo.AttendanceRecord, error) {
 	if f.Err != nil {
 		return nil, f.Err
 	}
 	var out []odoo.AttendanceRecord
 	for _, r := range f.Attendances {
-		if !r.CheckIn.Before(from) && r.CheckIn.Before(to) {
+		inRange := !r.CheckIn.Before(from) && r.CheckIn.Before(to)
+		openBefore := r.CheckOut == nil && r.CheckIn.Before(from)
+		if inRange || openBefore {
 			out = append(out, r)
 		}
 	}

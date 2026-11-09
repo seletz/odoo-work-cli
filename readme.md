@@ -184,6 +184,7 @@ Commands:
 | `clock status`                                           | Show current attendance state and today's periods                                                                   |
 | `clock list [--date D \| --week YYYY-Www]`                | List the attendance records of a day (default today) or week with ID, check-in, check-out and duration; overnight records show the check-out date |
 | `clock edit --in HH:MM [--out HH:MM] [--date D] [--id N] [--create-only]` | Fix a day's attendance record (check-in and/or check-out) and print the old and new values; creates the record for a missed day. `--create-only` never overwrites. Requires Attendance Officer rights |
+| `clock add --in HH:MM --out HH:MM [--date D]`            | Add a new attendance record, also on a day that already has records (day with a break). Fails with `conflict` on overlap and changes nothing. Requires Attendance Officer rights |
 | `tui`                                                    | Weekly timesheet TUI with detail view (auto-reloads from Odoo), inline editing/adding, and live clock-in/out status |
 | `fields <model>`                                         | Inspect field metadata for any Odoo model                                                                           |
 | `config`                                                 | Show discovered config file paths (merge order)                                                                     |
@@ -222,6 +223,7 @@ Examples:
 ./odoo-work-cli clock edit --id 15 --out 13:45
 ./odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30 --create-only
 ./odoo-work-cli clock list --week 2026-W38
+./odoo-work-cli clock add --date 2026-09-14 --in 13:00 --out 17:30
 ./odoo-work-cli entries --json
 ./odoo-work-cli clock status --format jsonl
 ./odoo-work-cli config
@@ -257,6 +259,7 @@ accepts `--format table|json|jsonl` and the shorthand `--json`
 | `clock status`                           | clock state with today's periods              | `clock_status.schema.json` |
 | `clock list`                             | array of attendance records, oldest first     | `attendance.schema.json`   |
 | `clock in` / `clock out`                 | the created or closed attendance              | `attendance.schema.json`   |
+| `clock add`                              | the created attendance                        | `attendance.schema.json`   |
 | `clock edit`                             | the attendance as it is now, plus `before` (its previous state, `null` if the edit created it) | `attendance_edit.schema.json` |
 | any command, on failure                  | error envelope (see below)                    | `error.schema.json`        |
 
@@ -311,7 +314,7 @@ code `1`).
 | `access_denied` | Authenticated, but Odoo's access rules forbid it (e.g. `clock edit` without Attendance Officer rights) |
 | `not_found`     | The record does not exist or is not visible (entry ID, attendance record, employee)                  |
 | `validation`    | Invalid input: unknown flag, bad argument, malformed date/time/hours, value rejected by Odoo           |
-| `conflict`      | Contradicts the current state: `clock in` while clocked in, `clock out` while not clocked in, `clock edit --create-only` on a day that already has a record |
+| `conflict`      | Contradicts the current state: `clock in` while clocked in, `clock out` while not clocked in, `clock edit --create-only` on a day that already has a record, `clock add` overlapping an existing record |
 | `network`       | Odoo could not be reached: DNS, connection refused, timeout, TLS                                     |
 | `config`        | The local configuration is missing or invalid (no config file, missing URL, `web_password` not set)  |
 | `secrets_locked` | 1Password is locked or not reachable, so `op://` secrets could not be resolved (fails after 5 s, see below) |
@@ -399,6 +402,40 @@ How `clock edit` picks the record:
   `multiple attendance records on that date, select one with --id`. Re-run with
   `--id N` using the `#N` shown in that list (a plain `clock in --at` also
   prints the ID of the record it created).
+
+#### Several records per day: `clock add`
+
+`clock edit` changes *the* record of a day, and `--create-only` refuses a day
+that already has one. For a day with a break, add each part with
+`clock add`; it always creates a new record:
+
+```bash
+odoo-work-cli clock add --date 2026-09-14 --in 08:00 --out 12:00
+odoo-work-cli clock add --date 2026-09-14 --in 13:00 --out 17:30
+odoo-work-cli clock list --date 2026-09-14     # both records, total 8:30
+```
+
+Before writing, `clock add` checks the new span against every record it
+could overlap: the records of that day, a record from the day before that
+runs past midnight, and a running record (no check-out yet). On overlap it
+changes nothing, exits with code `1` (`conflict`) and names the record:
+
+```
+Error: 2026-09-14 11:00 - 14:00 overlaps attendance record #4667; nothing was changed. Overlapping records:
+  #4667 2026-09-14 08:00 - 12:00 (4:00)
+```
+
+Records that only touch (12:00 out, 12:00 in) do not overlap. `--json`
+returns the created record (`attendance.schema.json`). Like `clock edit`,
+it needs the Attendance Officer rights described below.
+
+Which command to use:
+
+| Goal                                                     | Command                    |
+| -------------------------------------------------------- | -------------------------- |
+| Add a record and keep what is there (break, half day)    | `clock add`                |
+| Fill a day that must be empty, never touch an existing day | `clock edit --create-only` |
+| Correct the times of an existing record                  | `clock edit` (`--id N` if the day has several) |
 
 #### Permissions: Attendance Officer
 
