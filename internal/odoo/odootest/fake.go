@@ -31,6 +31,9 @@ type Fake struct {
 	TaskSearch        string
 	TaskSearchProject int64
 
+	// TaskQueries records the project ID of every ListAllTasks call.
+	TaskQueries []int64
+
 	Created  []odoo.TimesheetWriteParams
 	Updated  map[int64]map[string]interface{}
 	Deleted  []int64
@@ -76,7 +79,10 @@ func (f *Fake) SearchTasks(projectID int64, text string) ([]odoo.TaskInfo, error
 }
 
 // ListAllTasks implements odoo.Client.
-func (f *Fake) ListAllTasks(int64) ([]odoo.TaskInfo, error) { return f.Tasks, f.Err }
+func (f *Fake) ListAllTasks(projectID int64) ([]odoo.TaskInfo, error) {
+	f.TaskQueries = append(f.TaskQueries, projectID)
+	return f.Tasks, f.Err
+}
 
 // ListTimesheets implements odoo.Client.
 func (f *Fake) ListTimesheets(string, string) ([]odoo.TimesheetEntry, error) {

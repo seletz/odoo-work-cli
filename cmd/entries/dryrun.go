@@ -20,7 +20,9 @@ const dryRunFlagUsage = "validate and print the entry that would be written, wit
 // to the project; a task-only entry takes the task's project.
 func resolveProposal(client odoo.Client, e odoo.TimesheetEntry) (odoo.TimesheetEntry, error) {
 	if e.TaskID > 0 {
-		tasks, err := client.ListAllTasks(0)
+		// Scope the lookup to the project when it is known: the full task list
+		// can hold thousands of entries.
+		tasks, err := client.ListAllTasks(e.ProjectID)
 		if err != nil {
 			return e, err
 		}
@@ -32,6 +34,9 @@ func resolveProposal(client odoo.Client, e odoo.TimesheetEntry) (odoo.TimesheetE
 			}
 		}
 		if task == nil {
+			if e.ProjectID > 0 {
+				return e, apperr.New(apperr.KindValidation, "task %d does not exist in project %d", e.TaskID, e.ProjectID)
+			}
 			return e, apperr.New(apperr.KindValidation, "task %d does not exist", e.TaskID)
 		}
 		if e.ProjectID <= 0 {

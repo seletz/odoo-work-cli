@@ -184,3 +184,27 @@ func TestDryRun_TableOutput(t *testing.T) {
 	}
 	assertNoWrites(t, fake)
 }
+
+func TestDryRun_TaskLookupIsScopedToProject(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want []int64
+	}{
+		{"add with project", []string{"entries", "add", "--project-id", "3", "--task-id", "5", "--hours", "1", "--description", "x"}, []int64{3}},
+		{"update keeps project of entry", []string{"entries", "update", "11", "--task-id", "5"}, []int64{3}},
+		{"task-only add needs the full list", []string{"entries", "add", "--task-id", "5", "--hours", "1", "--description", "x"}, []int64{0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := populated()
+			code, out, _ := execute(t, fakeSetup(fake), append(tt.args, "--json", "--dry-run")...)
+			if code != 0 {
+				t.Fatalf("exit %d: %s", code, out)
+			}
+			if !reflect.DeepEqual(fake.TaskQueries, tt.want) {
+				t.Errorf("ListAllTasks called with %v, want %v", fake.TaskQueries, tt.want)
+			}
+		})
+	}
+}
