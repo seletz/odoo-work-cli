@@ -51,6 +51,22 @@ Dates are `YYYY-MM-DD`, weeks are ISO weeks `YYYY-Www` (`2026-W38`). Hours are d
   - `TIME` is `HH:MM` (on `--date`, default today) or `YYYY-MM-DD HH:MM`. Future times are rejected. Check-out must be after check-in.
   - Example: `odoo-work-cli clock edit --date 2026-09-14 --in 08:00 --out 16:30 --create-only --json`.
 
+### Attendance: several records per day (`clock add`)
+
+- `odoo-work-cli clock add --in TIME --out TIME [--date D] --json`: **always creates a new record**, also on a day that already has records (a day with a break is two records). Needs both `--in` and `--out`; `TIME` rules as for `clock edit`. Accepts `--format`/`--json`; returns the created record (`attendance` fields).
+  - If the new span overlaps an existing record it fails with `conflict`, changes nothing, and the message names the overlapping record (ID and times). Checked: the day's records, a record from the day before that runs past midnight, and a running record (no check-out).
+  - Touching edges are fine: `--out 12:00` on one record and `--in 12:00` on the next do not overlap.
+  - Needs Attendance Officer rights, like `clock edit` (`access_denied` otherwise).
+  - Example: `odoo-work-cli clock add --date 2026-09-14 --in 13:00 --out 17:30 --json`.
+
+Which attendance write to use:
+
+| Goal | Command |
+| --- | --- |
+| Add a record, keep what is there (day with a break, a missing half day) | `clock add` |
+| Fill a day that must be empty; never touch an existing day | `clock edit --create-only` |
+| Correct the times of an existing record | `clock edit` (with `--id N` when the day has several) |
+
 ### Setup and meta
 
 - `odoo-work-cli config [--merged]`: show discovered config files, or the merged config (secrets omitted). `odoo-work-cli config install` writes a default config file. Do not edit config on your own; ask the user.
@@ -94,6 +110,15 @@ odoo-work-cli entries --week 2026-W38 --json
 3. On `conflict` the day already has a record: nothing was changed. Show the user the existing record (`clock list` output) and ask whether to keep it. Only if they say to replace it, run `clock edit --id N --in … --out …` (this overwrites; report `before`).
 
 Always use `--create-only` when backfilling; do several days one by one and stop on the first unexpected error.
+
+### Day with a break
+
+1. `odoo-work-cli clock list --date 2026-09-14 --json` to see what is there.
+2. `odoo-work-cli clock add --date 2026-09-14 --in 08:00 --out 12:00 --json`.
+3. `odoo-work-cli clock add --date 2026-09-14 --in 13:00 --out 17:30 --json`.
+4. `odoo-work-cli clock list --date 2026-09-14 --json` shows both records.
+
+On `conflict` nothing was written: show the user the record named in the message and ask. Do not "fix" an overlap with `clock edit` unless the user says which record is wrong. If the day already has one record (e.g. 08:00–12:00), only step 3 is needed.
 
 ### Book timesheet entries
 

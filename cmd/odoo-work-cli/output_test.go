@@ -105,6 +105,7 @@ func TestJSONOutput_Schemas(t *testing.T) {
 		{name: "clock edit existing", args: []string{"clock", "edit", "--json", "--date", "2026-07-14", "--in", "08:15"}, schema: output.SchemaAttendanceEdit, shape: object},
 		{name: "clock edit creates", args: []string{"clock", "edit", "--json", "--date", "2026-07-13", "--in", "08:00", "--out", "16:00"}, schema: output.SchemaAttendanceEdit, shape: object},
 		{name: "clock list", args: []string{"clock", "list", "--json", "--date", "2026-07-14"}, schema: output.SchemaAttendance, shape: list, wantItems: 1},
+		{name: "clock add", args: []string{"clock", "add", "--json", "--date", "2026-07-14", "--in", "13:00", "--out", "17:30"}, schema: output.SchemaAttendance, shape: object},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

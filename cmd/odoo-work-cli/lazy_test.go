@@ -37,6 +37,9 @@ var inputErrorCases = []inputErrorCase{
 	{"entries add missing required", []string{"entries", "add", "--json", "--project-id", "1"}},
 	{"entries delete no arg", []string{"entries", "delete", "--json"}},
 	{"json with format table", []string{"whoami", "--json", "--format", "table"}},
+	{"clock add missing out", []string{"clock", "add", "--json", "--in", "08:00"}},
+	{"clock add future", []string{"clock", "add", "--json", "--in", "2999-01-01 08:00", "--out", "2999-01-01 09:00"}},
+	{"clock add out before in", []string{"clock", "add", "--json", "--date", "2026-07-14", "--in", "12:00", "--out", "08:00"}},
 }
 
 func assertInputErrorsBeforeSecrets(t *testing.T, tests []inputErrorCase) {
