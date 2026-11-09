@@ -42,10 +42,6 @@ func CMD(deps *app.Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client, err := deps.RequireClient()
-			if err != nil {
-				return err
-			}
 
 			var dateFrom, dateTo string
 			if ops.date != "" {
@@ -55,6 +51,10 @@ func CMD(deps *app.Deps) *cobra.Command {
 			}
 			if err != nil {
 				return apperr.Wrap(apperr.KindValidation, err)
+			}
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
 			}
 
 			entries, err := client.ListTimesheets(dateFrom, dateTo)

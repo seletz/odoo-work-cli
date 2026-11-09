@@ -22,17 +22,16 @@ With --json (or --format json|jsonl) the updated entry is printed.`,
 			if err != nil {
 				return err
 			}
-			client, err := deps.RequireClient()
-			if err != nil {
-				return err
-			}
-
 			id, err := parseEntryID(args[0])
 			if err != nil {
 				return err
 			}
 
 			fields, err := buildUpdateFields(cmd, ops)
+			if err != nil {
+				return err
+			}
+			client, err := deps.RequireClient()
 			if err != nil {
 				return err
 			}

@@ -16,30 +16,21 @@ func TestInputErrorsBeforeSecrets(t *testing.T) {
 	assertInputErrorsBeforeSecrets(t, inputErrorCases)
 }
 
-// pendingInputErrorCases are commands that still call RequireClient before
-// validating their input; reordering them is tracked in #85 (clock), #86
-// (projects/tasks) and #87 (entries). Enable by moving them to
-// inputErrorCases once fixed.
-func TestPendingInputErrorsBeforeSecrets(t *testing.T) {
-	t.Skip("commands still validate after RequireClient: #85, #86, #87")
-	assertInputErrorsBeforeSecrets(t, pendingInputErrorCases)
-}
-
 type inputErrorCase = struct {
 	name string
 	args []string
 }
 
-var pendingInputErrorCases = []inputErrorCase{
+var inputErrorCases = []inputErrorCase{
 	{"entries bad week", []string{"entries", "--week", "nope", "--json"}},
 	{"entries bad date", []string{"entries", "--date", "nope", "--json"}},
 	{"entries add bad hours", []string{"entries", "add", "--json", "--project-id", "1", "--hours", "x", "--description", "d"}},
 	{"entries delete bad id", []string{"entries", "delete", "abc", "--json"}},
 	{"tasks bad project id", []string{"tasks", "x", "--json"}},
 	{"clock in future", []string{"clock", "in", "--json", "--at", "2999-01-01 08:00"}},
-}
-
-var inputErrorCases = []inputErrorCase{
+	{"entries update bad id", []string{"entries", "update", "abc", "--json", "--hours", "1"}},
+	{"entries update no flags", []string{"entries", "update", "5", "--json"}},
+	{"clock out future", []string{"clock", "out", "--json", "--at", "2999-01-01 08:00"}},
 	{"clock list date and week", []string{"clock", "list", "--date", "2026-11-06", "--week", "2026-W45", "--json"}},
 	{"clock list bad date", []string{"clock", "list", "--date", "nope", "--json"}},
 	{"clock list bad week", []string{"clock", "list", "--week", "nope", "--json"}},
