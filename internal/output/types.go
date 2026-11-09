@@ -53,6 +53,43 @@ type Entry struct {
 	Company     *string `json:"company"`
 }
 
+// EntryDryRun is the result of entries add/update --dry-run: the entry as it
+// would be written (ID is nil for add: it does not exist yet), DryRun is
+// always true and Duplicates lists entries of the same day with the same
+// project, task and description. Employee, Status and Company are only
+// known once Odoo stored the entry; they are filled in where the existing
+// entry or the project provides them.
+type EntryDryRun struct {
+	ID          *int64  `json:"id"`
+	Date        string  `json:"date"`
+	ProjectID   *int64  `json:"project_id"`
+	Project     *string `json:"project"`
+	TaskID      *int64  `json:"task_id"`
+	Task        *string `json:"task"`
+	Description string  `json:"description"`
+	Hours       float64 `json:"hours"`
+	Minutes     int64   `json:"minutes"`
+	Employee    *string `json:"employee"`
+	Status      *string `json:"status"`
+	Company     *string `json:"company"`
+	DryRun      bool    `json:"dry_run"`
+	Duplicates  []Entry `json:"duplicates"`
+}
+
+// NewEntryDryRun converts the proposed entry. e.ID 0 means "not created yet".
+func NewEntryDryRun(e odoo.TimesheetEntry, duplicates []odoo.TimesheetEntry) EntryDryRun {
+	base := NewEntry(e)
+	d := EntryDryRun{
+		Date: base.Date, ProjectID: base.ProjectID, Project: base.Project,
+		TaskID: base.TaskID, Task: base.Task, Description: base.Description,
+		Hours: base.Hours, Minutes: base.Minutes, Employee: base.Employee,
+		Status: base.Status, Company: base.Company,
+		DryRun: true, Duplicates: NewEntries(duplicates),
+	}
+	d.ID = optID(e.ID)
+	return d
+}
+
 // User is the current user as printed by whoami.
 type User struct {
 	ID      int64   `json:"id"`

@@ -10,12 +10,18 @@ import (
 
 func updateCmd(deps *app.Deps) *cobra.Command {
 	ops := &subOps{}
+	var dryRun bool
 	cmd := &cobra.Command{
 		Use:   "update ID",
 		Short: "Update an existing timesheet entry",
 		Long: `Update an existing timesheet entry.
 
-With --json (or --format json|jsonl) the updated entry is printed.`,
+With --json (or --format json|jsonl) the updated entry is printed.
+
+With --dry-run the entry is read, the flags are merged into it and validated
+(project and task are resolved), and the resulting entry is printed. Nothing
+is written. With --json it is the same object as the real call plus
+"dry_run": true and "duplicates".`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
@@ -38,8 +44,12 @@ With --json (or --format json|jsonl) the updated entry is printed.`,
 			}
 
 			// A missing entry fails as not_found before any write.
-			if _, err := client.GetTimesheet(id); err != nil {
+			existing, err := client.GetTimesheet(id)
+			if err != nil {
 				return err
+			}
+			if dryRun {
+				return writeDryRun(cmd.OutOrStdout(), format, client, "update", mergeFields(*existing, fields))
 			}
 			if err := client.UpdateTimesheet(id, fields); err != nil {
 				return err
@@ -63,6 +73,8 @@ With --json (or --format json|jsonl) the updated entry is printed.`,
 	cmd.Flags().StringVar(&ops.date, "date", "", "entry date YYYY-MM-DD")
 	cmd.Flags().StringVar(&ops.hours, "hours", "", "hours worked (e.g. 2.5 or 2:30)")
 	cmd.Flags().StringVar(&ops.description, "description", "", "work description")
+
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, dryRunFlagUsage)
 
 	return cmd
 }

@@ -33,8 +33,9 @@ Dates are `YYYY-MM-DD`, weeks are ISO weeks `YYYY-Www` (`2026-W38`). Hours are d
 
 ### Timesheet entries
 
-- `odoo-work-cli entries add --project-id N --hours H --description "…" [--task-id N] [--date D] --json`: create an entry. `--project-id`, `--hours` and `--description` are required; `--date` defaults to today. Example: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "Code review" --json`.
-- `odoo-work-cli entries update ID [--hours H] [--description "…"] [--date D] [--project-id N] [--task-id N] --json`: change an entry; only the flags you set are sent. Example: `odoo-work-cli entries update 100 --hours 1:15 --json`.
+- `odoo-work-cli entries add --project-id N --hours H --description "…" [--task-id N] [--date D] --json`: create an entry. `--project-id`, `--hours` and `--description` are required; `--date` defaults to today. Example: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "Code review" --json`. Add `--dry-run` to show the proposal without writing it (see below).
+- `odoo-work-cli entries update ID [--hours H] [--description "…"] [--date D] [--project-id N] [--task-id N] --json`: change an entry; only the flags you set are sent. Example: `odoo-work-cli entries update 100 --hours 1:15 --json`. `--dry-run` shows the merged result without writing.
+- `--dry-run` (on `entries add` and `entries update`): runs the full validation, resolves project and task (an unknown ID gives the same error kind as the real call) and prints the entry that would be written; **nothing is written**. With `--json` it is the `entry` object plus `"dry_run": true` and `duplicates` (entries of the same day with the same project, task and description; `[]` if none); `id` is `null` for `add`. `employee`, `status` and `company` are only known after Odoo stored the entry and may be `null`.
 - `odoo-work-cli entries delete ID --json`: delete an entry. Prints the entry as it was before deletion. A wrong ID gives `not_found` before anything is written.
 
 ### Attendance
@@ -100,8 +101,9 @@ Always use `--create-only` when backfilling; do several days one by one and stop
 1. Find the project: `odoo-work-cli projects --json`, pick the `id`.
 2. Find the task: `odoo-work-cli tasks PROJECT_ID --json`, pick the `id` (optional).
 3. Check for what is already booked that day: `odoo-work-cli entries --date 2026-09-14 --json`, to avoid duplicates.
-4. Book: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "…" --json`.
-5. Fix a mistake with `entries update ID …`, remove with `entries delete ID`.
+4. Show a proposal: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "…" --dry-run --json`. Nothing is written. Show the user the project, task, hours and description, and any `duplicates`, and wait for their approval.
+5. Book: run the same command without `--dry-run`.
+6. Fix a mistake with `entries update ID …` (preview it with `--dry-run`), remove with `entries delete ID`.
 
 Ask the user when the project or task is ambiguous; do not pick one.
 

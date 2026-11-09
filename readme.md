@@ -209,6 +209,11 @@ Examples:
 ./odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-03-09 --hours 1.5 --description "Code review"
 ./odoo-work-cli entries update 100 --hours 1:15
 ./odoo-work-cli entries update 100 --description "Updated description" --hours 2.5
+
+# Show the proposal first, then book: --dry-run validates, resolves project and
+# task, prints the entry that would be written and writes nothing
+./odoo-work-cli entries add --project-id 42 --task-id 10 --hours 2:30 --description "Code review" --dry-run
+./odoo-work-cli entries update 100 --hours 1:15 --dry-run --json
 ./odoo-work-cli entries delete 100
 ./odoo-work-cli clock in
 ./odoo-work-cli clock out
@@ -251,6 +256,7 @@ accepts `--format table|json|jsonl` and the shorthand `--json`
 | `entries`, `timesheets`                  | array of timesheet entries                    | `entry.schema.json`        |
 | `entries add` / `update ID`              | the created / updated entry                   | `entry.schema.json`        |
 | `entries delete ID`                      | the entry as it was before deletion           | `entry.schema.json`        |
+| `entries add` / `update ID` with `--dry-run` | the entry that would be written, plus `dry_run: true` and `duplicates` (`id` is `null` for add) | `entry_dry_run.schema.json` |
 | `whoami`                                 | the current user                              | `user.schema.json`         |
 | `clock status`                           | clock state with today's periods              | `clock_status.schema.json` |
 | `clock list`                             | array of attendance records, oldest first     | `attendance.schema.json`   |
@@ -267,6 +273,15 @@ odoo-work-cli entries --week 2026-W29 --json | jq '.[] | {id, project, minutes}'
 odoo-work-cli clock status --json | jq .clocked_in
 odoo-work-cli entries add --project-id 42 --hours 1:30 --description "Review" --json | jq .id
 ```
+
+`--dry-run` (on `entries add` and `entries update`) runs the same validation as
+the real call, so an unknown project or task gives the same error kind, and then
+prints the entry instead of writing it. For `update` the flags are merged into
+the existing entry. With `--json` the output is the `entry` object plus
+`"dry_run": true` and `duplicates`, the entries of the same day with the same
+project, task and description (`[]` if none; the table output prints a warning
+per duplicate). `id` is `null` for `add`. `employee` and `status` are only known
+once Odoo has stored the entry, so they are `null` for `add`.
 
 Conventions:
 

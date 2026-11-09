@@ -98,6 +98,8 @@ func TestJSONOutput_Schemas(t *testing.T) {
 		{name: "entries add", args: []string{"entries", "add", "--json", "--project-id", "3", "--date", "2026-07-14", "--hours", "2:30", "--description", "x"}, schema: output.SchemaEntry, shape: object},
 		{name: "entries update", args: []string{"entries", "update", "11", "--json", "--hours", "2"}, schema: output.SchemaEntry, shape: object},
 		{name: "entries delete", args: []string{"entries", "delete", "11", "--json"}, schema: output.SchemaEntry, shape: object},
+		{name: "entries add dry-run", args: []string{"entries", "add", "--json", "--dry-run", "--project-id", "3", "--date", "2026-07-14", "--hours", "2:30", "--description", "x"}, schema: output.SchemaEntryDryRun, shape: object},
+		{name: "entries update dry-run", args: []string{"entries", "update", "11", "--json", "--dry-run", "--hours", "2"}, schema: output.SchemaEntryDryRun, shape: object},
 		{name: "clock in", args: []string{"clock", "in", "--json"}, schema: output.SchemaAttendance, shape: object},
 		{name: "clock in --at", args: []string{"clock", "in", "--json", "--at", "2026-07-14 13:00"}, schema: output.SchemaAttendance, shape: object},
 		{name: "clock out", args: []string{"clock", "out", "--json"}, schema: output.SchemaAttendance, shape: object},
