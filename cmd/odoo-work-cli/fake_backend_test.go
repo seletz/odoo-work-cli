@@ -200,3 +200,32 @@ func jsonID(id int64) string {
 	b, _ := json.Marshal(id)
 	return string(b)
 }
+
+// TestFakeBackend_UnknownProjectSameMessageWithAndWithoutDryRun: the real
+// create path answers with Odoo's MissingError text, the dry run with its
+// own check; both must read the same (#95).
+func TestFakeBackend_UnknownProjectSameMessageWithAndWithoutDryRun(t *testing.T) {
+	useFakeBackend(t)
+	setup := noSetup(t)
+	args := []string{"entries", "add", "--project-id", "424242", "--date", "2026-01-07", "--hours", "1", "--description", "x", "--json"}
+
+	type env struct {
+		Error struct {
+			Kind    string `json:"kind"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	var real, dry env
+	runJSON(t, setup, 1, &real, args...)
+	runJSON(t, setup, 1, &dry, append(args, "--dry-run")...)
+
+	if real.Error.Message != "project 424242 does not exist" {
+		t.Errorf("real message = %q", real.Error.Message)
+	}
+	if real.Error != dry.Error {
+		t.Errorf("real %+v != dry-run %+v", real.Error, dry.Error)
+	}
+	if real.Error.Kind != "validation" {
+		t.Errorf("kind = %q, want validation", real.Error.Kind)
+	}
+}

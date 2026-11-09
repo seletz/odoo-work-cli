@@ -72,3 +72,60 @@ func TestClassifyError(t *testing.T) {
 		})
 	}
 }
+
+func TestFriendlyMissingError(t *testing.T) {
+	defer apperr.RegisterClassifier(ClassifyError)()
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"project fault 2", errors.New("Fault(2): Record does not exist or has been deleted.\n(Record: project.project(67,), User: 2)"), "project 67 does not exist"},
+		{"project short form", errors.New("Record does not exist or has been deleted. (Record: project.project(67,))"), "project 67 does not exist"},
+		{"task", errors.New("Fault(2): Record does not exist or has been deleted. (Record: project.task(12,))"), "task 12 does not exist"},
+		{"timesheet entry", errors.New("Record does not exist or has been deleted. (Record: account.analytic.line(5,))"), "timesheet entry 5 does not exist"},
+		{"attendance", errors.New("Record does not exist or has been deleted. (Record: hr.attendance(9,))"), "attendance record 9 does not exist"},
+		{"unknown model keeps model name", errors.New("Record does not exist or has been deleted. (Record: res.partner(3,))"), "res.partner 3 does not exist"},
+		{"multiple ids", errors.New("Record does not exist or has been deleted. (Record: project.project(67, 68))"), "project 67, 68 does not exist"},
+		{"wrapped", fmt.Errorf("creating: %w", errors.New("Record does not exist or has been deleted. (Record: project.task(1,))")), "task 1 does not exist"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FriendlyError(tt.err)
+			if got.Error() != tt.want {
+				t.Errorf("message = %q, want %q", got.Error(), tt.want)
+			}
+			if !errors.Is(got, tt.err) {
+				t.Error("original error is not wrapped")
+			}
+			if k, want := apperr.KindOf(got), apperr.KindOf(tt.err); k != want {
+				t.Errorf("kind = %q, want unchanged %q", k, want)
+			}
+		})
+	}
+}
+
+func TestFriendlyError_Fault2StaysValidation(t *testing.T) {
+	defer apperr.RegisterClassifier(ClassifyError)()
+	orig := errors.New("Fault(2): Record does not exist or has been deleted. (Record: project.project(67,))")
+	if k := apperr.KindOf(FriendlyError(orig)); k != apperr.KindValidation {
+		t.Errorf("kind = %q, want validation", k)
+	}
+}
+
+func TestFriendlyError_Passthrough(t *testing.T) {
+	if FriendlyError(nil) != nil {
+		t.Error("nil must stay nil")
+	}
+	orig := errors.New("Fault(2): something else")
+	if got := FriendlyError(orig); got != orig {
+		t.Errorf("unrelated error changed: %v", got)
+	}
+}
+
+func TestFriendlyError_KeepsExistingKind(t *testing.T) {
+	orig := apperr.New(apperr.KindNotFound, "Record does not exist or has been deleted. (Record: project.task(1,))")
+	if k := apperr.KindOf(FriendlyError(orig)); k != apperr.KindNotFound {
+		t.Errorf("kind = %q, want not_found", k)
+	}
+}

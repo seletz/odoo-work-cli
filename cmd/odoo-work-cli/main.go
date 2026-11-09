@@ -80,6 +80,7 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 			_, _ = fmt.Fprintln(stderr, cmd.UsageString())
 		}
 	}
+	err = odoo.FriendlyError(err)
 	format := output.Requested(cmd, args)
 	if !format.IsMachine() && machine {
 		// The resolved command has no output flags ("fields --json",

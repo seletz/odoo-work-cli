@@ -74,6 +74,7 @@ Which attendance write to use:
 - `odoo-work-cli llm --skill`: print this guide. Needs no config or connection.
 - `odoo-work-cli tui [--week YYYY-Www]`: interactive terminal UI. Not for agents.
 - `odoo-work-cli completion`: shell completion scripts (not useful for agents).
+- `odoo-work-cli --version`: print the installed version. To update a Homebrew install run `brew update && brew upgrade odoo-work-cli`; `brew upgrade` alone does not see a new release until `brew update` has refreshed the tap. Check the version afterwards with `odoo-work-cli --version`. Ask the user before updating.
 
 ## Output formats
 
