@@ -39,8 +39,15 @@ brew tap seletz/tap
 brew install odoo-work-cli
 ```
 
+To update, refresh the tap first, then upgrade (`brew upgrade` alone does not
+see a new release until `brew update` has run):
+
+```bash
+brew update && brew upgrade odoo-work-cli
+```
+
 > [!TIP]
-> If `brew upgrade` doesn't pick up a new version, untap and re-tap:
+> If that still doesn't pick up a new version, untap and re-tap:
 >
 > ```bash
 > brew untap seletz/tap

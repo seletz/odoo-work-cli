@@ -65,6 +65,7 @@ func TestGuide_CoversPitfalls(t *testing.T) {
 	for _, want := range []string{
 		"secrets_locked", "ODOO_OP_TIMEOUT", "--create-only", "YYYY-MM-DD HH:MM",
 		"attendance_manager_id", "Attendance Officer",
+		"brew update && brew upgrade odoo-work-cli", "odoo-work-cli --version",
 	} {
 		if !strings.Contains(g, want) {
 			t.Errorf("guide does not mention %q", want)
