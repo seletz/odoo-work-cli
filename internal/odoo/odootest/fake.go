@@ -25,6 +25,12 @@ type Fake struct {
 	// NextID is returned by create calls.
 	NextID int64
 
+	// ProjectSearch and TaskSearch record the last search text; TaskSearchProject
+	// the project ID of the last task search.
+	ProjectSearch     string
+	TaskSearch        string
+	TaskSearchProject int64
+
 	Created  []odoo.TimesheetWriteParams
 	Updated  map[int64]map[string]interface{}
 	Deleted  []int64
@@ -49,11 +55,25 @@ func (f *Fake) WhoAmI() (*odoo.UserInfo, error) {
 // ListProjects implements odoo.Client.
 func (f *Fake) ListProjects() ([]odoo.ProjectInfo, error) { return f.Projects, f.Err }
 
+// SearchProjects implements odoo.Client. Filtering happens in Odoo, so the
+// fake records the text and returns the configured projects.
+func (f *Fake) SearchProjects(text string) ([]odoo.ProjectInfo, error) {
+	f.ProjectSearch = text
+	return f.Projects, f.Err
+}
+
 // ListAllProjects implements odoo.Client.
 func (f *Fake) ListAllProjects() ([]odoo.ProjectInfo, error) { return f.Projects, f.Err }
 
 // ListTasks implements odoo.Client.
 func (f *Fake) ListTasks(int64) ([]odoo.TaskInfo, error) { return f.Tasks, f.Err }
+
+// SearchTasks implements odoo.Client. See SearchProjects.
+func (f *Fake) SearchTasks(projectID int64, text string) ([]odoo.TaskInfo, error) {
+	f.TaskSearchProject = projectID
+	f.TaskSearch = text
+	return f.Tasks, f.Err
+}
 
 // ListAllTasks implements odoo.Client.
 func (f *Fake) ListAllTasks(int64) ([]odoo.TaskInfo, error) { return f.Tasks, f.Err }

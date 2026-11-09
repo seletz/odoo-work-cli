@@ -29,16 +29,15 @@ description).`,
 			if err != nil {
 				return err
 			}
-			client, err := deps.RequireClient()
-			if err != nil {
-				return err
-			}
-
 			params, err := buildTimesheetWriteParams(ops.projectID,
 				ops.taskID,
 				ops.date,
 				ops.description,
 				ops.hours)
+			if err != nil {
+				return err
+			}
+			client, err := deps.RequireClient()
 			if err != nil {
 				return err
 			}

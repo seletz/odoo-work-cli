@@ -1,6 +1,7 @@
 package odoo
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/seletz/odoo-work-cli/internal/config"
@@ -107,4 +108,79 @@ func TestTimesheetCriteria(t *testing.T) {
 			}
 		}
 	})
+}
+
+// criteriaString renders a domain as Odoo sees it, e.g.
+// `["|", ["name","ilike","x"], ...]`, so tests can pin the exact structure.
+func criteriaString(t *testing.T, criteria *goOdoo.Criteria) string {
+	t.Helper()
+	b, err := json.Marshal(*criteria)
+	if err != nil {
+		t.Fatalf("marshal criteria: %v", err)
+	}
+	return string(b)
+}
+
+// Issue #86: --search is an ilike match evaluated by Odoo. For projects it
+// matches the name OR the customer; it is ANDed with the configured filters.
+func TestProjectCriteria(t *testing.T) {
+	x := &XMLRPCClient{
+		models: map[string]config.ModelConfig{
+			"project": {Filters: []config.Filter{{Field: "active", Op: "=", Value: "true"}}},
+		},
+	}
+	tests := []struct {
+		name     string
+		filtered bool
+		search   string
+		want     string
+	}{
+		{"no search, filtered", true, "", `[["active","=","true"]]`},
+		{"no search, unfiltered", false, "", `[]`},
+		{"search, filtered", true, "ab-1",
+			`[["active","=","true"],"|",["name","ilike","ab-1"],["partner_id","ilike","ab-1"]]`},
+		{"search, unfiltered", false, "ab-1",
+			`["|",["name","ilike","ab-1"],["partner_id","ilike","ab-1"]]`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := criteriaString(t, x.projectCriteria(tt.filtered, tt.search))
+			if got != tt.want {
+				t.Errorf("domain = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTaskCriteria(t *testing.T) {
+	x := &XMLRPCClient{
+		models: map[string]config.ModelConfig{
+			"task": {Filters: []config.Filter{{Field: "stage_id.fold", Op: "=", Value: "false"}}},
+		},
+	}
+	tests := []struct {
+		name      string
+		projectID int64
+		filtered  bool
+		search    string
+		want      string
+	}{
+		{"nothing, filtered", 0, true, "", `[["stage_id.fold","=","false"]]`},
+		{"nothing, unfiltered", 0, false, "", `[]`},
+		{"project only", 7, true, "", `[["stage_id.fold","=","false"],["project_id","=",7]]`},
+		{"search only", 0, true, "bug",
+			`[["stage_id.fold","=","false"],["name","ilike","bug"]]`},
+		{"search and project", 7, true, "bug",
+			`[["stage_id.fold","=","false"],["project_id","=",7],["name","ilike","bug"]]`},
+		{"search, unfiltered", 7, false, "bug",
+			`[["project_id","=",7],["name","ilike","bug"]]`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := criteriaString(t, x.taskCriteria(tt.projectID, tt.filtered, tt.search))
+			if got != tt.want {
+				t.Errorf("domain = %s, want %s", got, tt.want)
+			}
+		})
+	}
 }

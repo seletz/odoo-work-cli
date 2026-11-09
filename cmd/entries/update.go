@@ -28,17 +28,16 @@ is written. With --json it is the same object as the real call plus
 			if err != nil {
 				return err
 			}
-			client, err := deps.RequireClient()
-			if err != nil {
-				return err
-			}
-
 			id, err := parseEntryID(args[0])
 			if err != nil {
 				return err
 			}
 
 			fields, err := buildUpdateFields(cmd, ops)
+			if err != nil {
+				return err
+			}
+			client, err := deps.RequireClient()
 			if err != nil {
 				return err
 			}

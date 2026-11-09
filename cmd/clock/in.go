@@ -24,6 +24,13 @@ printed.`,
 			if err != nil {
 				return err
 			}
+			var atTime time.Time
+			if at != "" {
+				var err error
+				if atTime, err = parseAtFlag(at, time.Now()); err != nil {
+					return err
+				}
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -31,10 +38,7 @@ printed.`,
 			w := cmd.OutOrStdout()
 
 			if at != "" {
-				t, err := parseAtFlag(at, time.Now())
-				if err != nil {
-					return err
-				}
+				t := atTime
 				id, err := client.ClockInAt(t)
 				if err != nil {
 					return err

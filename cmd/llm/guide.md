@@ -25,8 +25,8 @@ Dates are `YYYY-MM-DD`, weeks are ISO weeks `YYYY-Www` (`2026-W38`). Hours are d
 ### Reading
 
 - `odoo-work-cli whoami --json`: the current user.
-- `odoo-work-cli projects --json`: all projects with their IDs.
-- `odoo-work-cli tasks [project-id] --json`: tasks, optionally of one project. Example: `odoo-work-cli tasks 42 --json`.
+- `odoo-work-cli projects [--search TEXT] --json`: projects with their IDs. `--search` is a case-insensitive substring match on the project name or the customer, done by Odoo. Prefer it over fetching all projects and filtering yourself. No match gives `[]`. Example: `odoo-work-cli projects --search 2026-0042 --json`.
+- `odoo-work-cli tasks [project-id] [--search TEXT] --json`: tasks, optionally of one project. `--search` is a case-insensitive substring match on the task name, combined with the project ID. Examples: `odoo-work-cli tasks 42 --json`, `odoo-work-cli tasks 42 --search review --json`.
 - `odoo-work-cli timesheets [--week YYYY-Www] --json`: weekly summary (default: current week).
 - `odoo-work-cli entries [--week YYYY-Www | --date D] [--project NAME] [--task NAME] [--status S] --json`: individual timesheet entries. `--date` overrides `--week`. `--project` and `--task` are case-insensitive substrings; `--status` is the validation status (`draft`, `validated`, …). Example: `odoo-work-cli entries --date 2026-09-14 --json`.
 - `odoo-work-cli fields MODEL`: field metadata of an Odoo model (debugging only), e.g. `odoo-work-cli fields project.project`.
@@ -98,8 +98,8 @@ Always use `--create-only` when backfilling; do several days one by one and stop
 
 ### Book timesheet entries
 
-1. Find the project: `odoo-work-cli projects --json`, pick the `id`.
-2. Find the task: `odoo-work-cli tasks PROJECT_ID --json`, pick the `id` (optional).
+1. Find the project: `odoo-work-cli projects --search TEXT --json` (TEXT is part of the project name or customer, e.g. an order number), pick the `id`. Do not fetch all projects.
+2. Find the task: `odoo-work-cli tasks PROJECT_ID --json`, or narrow it with `--search TEXT`, pick the `id` (optional).
 3. Check for what is already booked that day: `odoo-work-cli entries --date 2026-09-14 --json`, to avoid duplicates.
 4. Show a proposal: `odoo-work-cli entries add --project-id 42 --task-id 10 --date 2026-09-14 --hours 2:30 --description "…" --dry-run --json`. Nothing is written. Show the user the project, task, hours and description, and any `duplicates`, and wait for their approval.
 5. Book: run the same command without `--dry-run`.

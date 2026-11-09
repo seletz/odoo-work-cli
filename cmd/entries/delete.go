@@ -22,12 +22,11 @@ is printed.`,
 			if err != nil {
 				return err
 			}
-			client, err := deps.RequireClient()
+			id, err := parseEntryID(args[0])
 			if err != nil {
 				return err
 			}
-
-			id, err := parseEntryID(args[0])
+			client, err := deps.RequireClient()
 			if err != nil {
 				return err
 			}

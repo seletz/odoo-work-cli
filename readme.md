@@ -172,8 +172,8 @@ Commands:
 | Command                                                  | Description                                                                                                         |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `whoami`                                                 | Show current Odoo user info (ID, name, login, email, company)                                                       |
-| `projects`                                               | List Odoo projects (with customer, company, phase, project manager)                                                 |
-| `tasks [project-id]`                                     | List Odoo tasks, optionally filtered by project ID                                                                  |
+| `projects [--search TEXT]`                               | List Odoo projects (with customer, company, phase, project manager); `--search` keeps projects whose name or customer contains TEXT (case-insensitive, matched by Odoo) |
+| `tasks [project-id] [--search TEXT]`                     | List Odoo tasks, optionally filtered by project ID; `--search` keeps tasks whose name contains TEXT (case-insensitive, matched by Odoo) |
 | `timesheets [--week YYYY-Www]`                           | List timesheets for a week (defaults to current week)                                                               |
 | `entries [--week\|--date] [--project\|--task\|--status]` | List individual timesheet entries with full detail (description, hours, validation status)                          |
 | `entries add --project-id N --hours H --description "…"` | Create a new timesheet entry (hours: `2.5` or `2:30`, date defaults to today, task-id optional)                     |
@@ -198,6 +198,8 @@ Examples:
 ./odoo-work-cli projects
 ./odoo-work-cli tasks
 ./odoo-work-cli tasks 42
+./odoo-work-cli projects --search acme --json
+./odoo-work-cli tasks 42 --search review
 ./odoo-work-cli timesheets
 ./odoo-work-cli timesheets --week 2026-W10
 ./odoo-work-cli fields project.project
@@ -263,6 +265,11 @@ accepts `--format table|json|jsonl` and the shorthand `--json`
 | `clock in` / `clock out`                 | the created or closed attendance              | `attendance.schema.json`   |
 | `clock edit`                             | the attendance as it is now, plus `before` (its previous state, `null` if the edit created it) | `attendance_edit.schema.json` |
 | any command, on failure                  | error envelope (see below)                    | `error.schema.json`        |
+
+`projects --search TEXT` and `tasks [project-id] --search TEXT` filter in Odoo
+(`ilike`, case-insensitive substring; projects match the name or the customer,
+tasks the name) and are ANDed with the configured `[models.*] filters` and the
+project ID. No match prints `[]` in `json` and `jsonl`, and a message in the table.
 
 The JSON Schemas (draft 2020-12) live in
 [`internal/output/schemas/`](internal/output/schemas/) and are the

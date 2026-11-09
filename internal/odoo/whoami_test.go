@@ -47,11 +47,19 @@ func (m *mockClient) ListProjects() ([]ProjectInfo, error) {
 	return m.projects, m.projErr
 }
 
+func (m *mockClient) SearchProjects(_ string) ([]ProjectInfo, error) {
+	return m.projects, m.projErr
+}
+
 func (m *mockClient) ListAllProjects() ([]ProjectInfo, error) {
 	return m.projects, m.projErr
 }
 
 func (m *mockClient) ListTasks(_ int64) ([]TaskInfo, error) {
+	return m.tasks, m.taskErr
+}
+
+func (m *mockClient) SearchTasks(_ int64, _ string) ([]TaskInfo, error) {
 	return m.tasks, m.taskErr
 }
 
