@@ -98,10 +98,17 @@ type Client interface {
 	WhoAmI() (*UserInfo, error)
 	// ListProjects returns projects from Odoo, applying configured filters.
 	ListProjects() ([]ProjectInfo, error)
+	// SearchProjects returns projects whose name or customer contains text
+	// (case-insensitive, matched by Odoo), applying configured filters.
+	SearchProjects(text string) ([]ProjectInfo, error)
 	// ListAllProjects returns all projects from Odoo, ignoring configured filters.
 	ListAllProjects() ([]ProjectInfo, error)
 	// ListTasks returns tasks, optionally filtered by project ID, applying configured filters.
 	ListTasks(projectID int64) ([]TaskInfo, error)
+	// SearchTasks returns tasks whose name contains text (case-insensitive,
+	// matched by Odoo), optionally filtered by project ID, applying
+	// configured filters.
+	SearchTasks(projectID int64, text string) ([]TaskInfo, error)
 	// ListAllTasks returns tasks ignoring configured filters, optionally filtered by project ID.
 	ListAllTasks(projectID int64) ([]TaskInfo, error)
 	// ListTimesheets returns timesheet entries for the given date range,

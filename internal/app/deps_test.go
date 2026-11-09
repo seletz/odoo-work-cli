@@ -22,11 +22,19 @@ func (s *stubClient) ListProjects() ([]odoo.ProjectInfo, error) {
 	return nil, nil
 }
 
+func (s *stubClient) SearchProjects(string) ([]odoo.ProjectInfo, error) {
+	return nil, nil
+}
+
 func (s *stubClient) ListAllProjects() ([]odoo.ProjectInfo, error) {
 	return nil, nil
 }
 
 func (s *stubClient) ListTasks(int64) ([]odoo.TaskInfo, error) {
+	return nil, nil
+}
+
+func (s *stubClient) SearchTasks(int64, string) ([]odoo.TaskInfo, error) {
 	return nil, nil
 }
 
