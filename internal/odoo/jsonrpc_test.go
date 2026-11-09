@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/pquerna/otp/totp"
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 )
 
 const (
@@ -35,16 +36,54 @@ type mockOdooServer struct {
 	password   string
 	callError  bool // make the attendance endpoint return a JSON-RPC error
 
+	// Session-expiry simulation (#73). alwaysExpired makes the attendance
+	// endpoint answer "session expired" even right after a fresh login.
+	alwaysExpired bool
+	logins        int // successful POST /web/login submissions
+	attCalls      int // requests to the attendance endpoint
+
 	// Version-drift simulation (#57): serve a login page without the
 	// csrf_token input, or answer POST /web/login with an unexpected status.
 	noCSRF          bool
 	loginPostStatus int
 
-	mu            sync.Mutex
-	dbBound       bool
-	totpPending   bool
-	authenticated bool
-	loginForm     url.Values // last POST /web/login form values
+	mu              sync.Mutex
+	dbBound         bool
+	totpPending     bool
+	authenticated   bool
+	redirectToLogin bool       // attendance endpoint redirects to /web/login (proxy/SSO variant)
+	loginForm       url.Values // last POST /web/login form values
+}
+
+// expiryMode is a way an Odoo web session can end server-side.
+type expiryMode int
+
+const (
+	// expiryLogout: the session still exists and is bound to the database
+	// but carries no user (logout, failed session-token check). Odoo
+	// answers JSON-RPC error code 100 SessionExpiredException.
+	expiryLogout expiryMode = iota
+	// expiryGone: the session no longer exists (garbage-collected after
+	// inactivity, server restart). The cookie maps to a fresh, unbound
+	// session and the multi-db server answers 404 HTML.
+	expiryGone
+	// expiryRedirect: the request is redirected to the login page (e.g.
+	// by a proxy), so the client ends up with HTML instead of JSON.
+	expiryRedirect
+)
+
+// expire ends the server-side session in the given way.
+func (m *mockOdooServer) expire(mode expiryMode) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.authenticated = false
+	m.totpPending = false
+	switch mode {
+	case expiryGone:
+		m.dbBound = false
+	case expiryRedirect:
+		m.redirectToLogin = true
+	}
 }
 
 func newMockOdooServer(t *testing.T, m *mockOdooServer) *mockOdooServer {
@@ -120,12 +159,15 @@ func (m *mockOdooServer) handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if m.totpSecret != "" {
+			m.logins++
 			m.totpPending = true
 			w.Header().Set("Location", "/web/login/totp")
 			w.WriteHeader(http.StatusSeeOther)
 			return
 		}
+		m.logins++
 		m.authenticated = true
+		m.redirectToLogin = false
 		w.Header().Set("Location", "/web")
 		w.WriteHeader(http.StatusSeeOther)
 
@@ -158,11 +200,26 @@ func (m *mockOdooServer) handler(w http.ResponseWriter, r *http.Request) {
 		}
 		m.totpPending = false
 		m.authenticated = true
+		m.redirectToLogin = false
 		w.Header().Set("Location", "/web")
 		w.WriteHeader(http.StatusSeeOther)
 
 	case r.URL.Path == "/hr_attendance/systray_check_in_out":
-		if !m.authenticated {
+		m.attCalls++
+		if !m.dbBound {
+			// Session unknown to the server (garbage-collected, server
+			// restart): Odoo dispatches in nodb mode on a multi-db server,
+			// where module routes do not exist (verified on dev, #73).
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = fmt.Fprint(w, `<!doctype html><title>404 Not Found</title>`)
+			return
+		}
+		if m.redirectToLogin {
+			http.Redirect(w, r, "/web/login", http.StatusSeeOther)
+			return
+		}
+		if !m.authenticated || m.alwaysExpired {
 			writeJSON(w, map[string]interface{}{
 				"jsonrpc": "2.0", "id": 1,
 				"error": map[string]interface{}{
@@ -431,6 +488,159 @@ func TestJSONRPCSession_CallErrorResponse(t *testing.T) {
 	_, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Something went wrong") {
+		t.Errorf("error %q does not carry the server message", err)
+	}
+	// An ordinary server error is not a session problem: no re-login, no retry.
+	if m.logins != 1 || m.attCalls != 1 {
+		t.Errorf("logins = %d, attendance calls = %d, want 1 and 1", m.logins, m.attCalls)
+	}
+}
+
+// TestJSONRPCSession_Call_ReloginAfterExpiry is the #73 regression test: a
+// long-running process (the TUI) keeps one web session for days. When Odoo
+// ends it server-side, the next call must log in again (including TOTP)
+// and retry once instead of failing on every call from then on.
+func TestJSONRPCSession_Call_ReloginAfterExpiry(t *testing.T) {
+	tests := []struct {
+		name       string
+		mode       expiryMode
+		totpSecret string
+	}{
+		{"logout: JSON-RPC code 100", expiryLogout, ""},
+		{"logout with 2FA", expiryLogout, testTOTPSecret},
+		{"session gone: nodb 404", expiryGone, ""},
+		{"session gone with 2FA", expiryGone, testTOTPSecret},
+		{"redirect to login page", expiryRedirect, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newMockOdooServer(t, &mockOdooServer{
+				multiDB:    true,
+				totpSecret: tt.totpSecret,
+				db:         "testdb",
+				login:      "user@test.com",
+				password:   "pass",
+			})
+			s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", tt.totpSecret)
+
+			if _, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{}); err != nil {
+				t.Fatalf("first call: %v", err)
+			}
+			m.expire(tt.mode)
+
+			result, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
+			if err != nil {
+				t.Fatalf("call after expiry: %v", err)
+			}
+			if result["attendance_state"] != "checked_in" {
+				t.Errorf("attendance_state = %v, want checked_in", result["attendance_state"])
+			}
+			if m.logins != 2 {
+				t.Errorf("logins = %d, want 2 (initial + one re-login)", m.logins)
+			}
+			if m.attCalls != 3 {
+				t.Errorf("attendance calls = %d, want 3 (ok, expired, retry)", m.attCalls)
+			}
+		})
+	}
+}
+
+// TestJSONRPCSession_Call_ExpiredRetryFails: when the re-login does not
+// restore a working session, the call fails with a clear auth error after
+// exactly one retry — never silently, never in a loop.
+func TestJSONRPCSession_Call_ExpiredRetryFails(t *testing.T) {
+	tests := []struct {
+		name         string
+		setup        func(m *mockOdooServer)
+		wantMsg      string
+		wantAttCalls int
+	}{
+		{
+			name: "still expired after re-login",
+			setup: func(m *mockOdooServer) {
+				m.mu.Lock()
+				m.alwaysExpired = true
+				m.mu.Unlock()
+			},
+			wantMsg:      "session expired",
+			wantAttCalls: 3,
+		},
+		{
+			name: "re-login rejected (password changed)",
+			setup: func(m *mockOdooServer) {
+				m.expire(expiryLogout)
+				m.mu.Lock()
+				m.password = "changed"
+				m.mu.Unlock()
+			},
+			wantMsg:      "authentication failed",
+			wantAttCalls: 2,
+		},
+		{
+			name: "re-login cannot bind the database",
+			setup: func(m *mockOdooServer) {
+				m.expire(expiryGone)
+				m.mu.Lock()
+				m.db = "renamed" // GET /web/login?db=testdb no longer binds
+				m.mu.Unlock()
+			},
+			wantMsg:      "fetching login form",
+			wantAttCalls: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newMockOdooServer(t, &mockOdooServer{
+				multiDB:  true,
+				db:       "testdb",
+				login:    "user@test.com",
+				password: "pass",
+			})
+			s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "")
+			if _, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{}); err != nil {
+				t.Fatalf("first call: %v", err)
+			}
+			tt.setup(m)
+
+			_, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
+			if err == nil {
+				t.Fatal("expected an error, got nil")
+			}
+			if got := apperr.KindOf(err); got != apperr.KindAuth {
+				t.Errorf("kind = %q, want %q (err: %v)", got, apperr.KindAuth, err)
+			}
+			if !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("error %q does not mention %q", err, tt.wantMsg)
+			}
+			if m.attCalls != tt.wantAttCalls {
+				t.Errorf("attendance calls = %d, want %d (one retry at most)", m.attCalls, tt.wantAttCalls)
+			}
+			if m.logins > 2 {
+				t.Errorf("logins = %d, want at most 2", m.logins)
+			}
+		})
+	}
+}
+
+// TestJSONRPCSession_Call_ExpiredOnFirstCall: a session that expires and
+// cannot be restored on the very first call still reports an auth error.
+func TestJSONRPCSession_Call_ExpiredOnFirstCall(t *testing.T) {
+	m := newMockOdooServer(t, &mockOdooServer{
+		multiDB:       true,
+		db:            "testdb",
+		login:         "user@test.com",
+		password:      "pass",
+		alwaysExpired: true,
+	})
+	s := newJSONRPCSession(m.URL, "testdb", "user@test.com", "pass", "")
+	_, err := s.call("/hr_attendance/systray_check_in_out", map[string]interface{}{})
+	if got := apperr.KindOf(err); got != apperr.KindAuth {
+		t.Fatalf("kind = %q, want %q (err: %v)", got, apperr.KindAuth, err)
+	}
+	if m.attCalls != 2 {
+		t.Errorf("attendance calls = %d, want 2", m.attCalls)
 	}
 }
 
