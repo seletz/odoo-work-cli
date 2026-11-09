@@ -106,15 +106,25 @@ func Discover(configFlag string) (*DiscoverResult, error) {
 		}
 	}
 
-	// Resolve op:// secrets if [op_secrets] is present and op CLI is available.
-	if result.Config.OPSecrets != nil && opAvailable() {
-		if err := resolveOPSecrets(result.Config, defaultOPInjectRunner); err != nil {
+	envCfg := LoadFromEnv()
+
+	if NoOPEnabled() {
+		// ODOO_WORK_CLI_NO_OP: ignore [op_secrets] completely, plain
+		// values included. Missing fields surface in Validate.
+		result.Config.OPSecrets = nil
+	}
+
+	// Resolve op:// secrets if [op_secrets] is present and op CLI is
+	// available. Fields already set by env vars are dropped first: env
+	// wins anyway, so op is only called for what is really missing.
+	if result.Config.OPSecrets != nil && opIsAvailable() {
+		result.Config.OPSecrets = withoutEnvFields(result.Config.OPSecrets, envCfg)
+		if err := resolveOPSecrets(result.Config, opInject); err != nil {
 			return nil, fmt.Errorf("resolving 1Password secrets: %w", err)
 		}
 	}
 
 	// Env vars always overlay last (highest priority).
-	envCfg := LoadFromEnv()
 	result.Config.Merge(envCfg)
 
 	return result, nil

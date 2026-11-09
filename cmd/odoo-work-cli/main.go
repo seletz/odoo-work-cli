@@ -95,7 +95,7 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 // newRootCmd builds the command tree. started is set once cobra has parsed
 // and validated the command line and command code begins to run.
 func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
-	var cfgFile string
+	var cfgFile, backend string
 	started := new(bool)
 	deps := &app.Deps{}
 
@@ -116,15 +116,16 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 			if _, err := output.FormatOf(cmd); err != nil {
 				return err
 			}
+			if err := checkBackendFlag(backend); err != nil {
+				return err
+			}
 			*started = true
 			// From here on errors are runtime failures, not usage errors.
 			cmd.SilenceUsage = true
 			if !isNoneSetupCommand(cmd) {
 				// Config and secrets load lazily on first RequireConfig /
 				// RequireClient, after the command validated its input.
-				deps.Loader = func() (*config.Config, odoo.Client, error) {
-					return setup(cfgFile)
-				}
+				deps.Loader = loaderFor(backend, cfgFile, setup)
 			}
 			return nil
 		},
@@ -135,6 +136,8 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file path (skip discovery)")
+	rootCmd.PersistentFlags().StringVar(&backend, "backend", "",
+		"backend: odoo (default) or fake (offline, made-up data; env ODOO_WORK_CLI_BACKEND)")
 	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return apperr.Wrap(apperr.KindValidation, err)
 	})

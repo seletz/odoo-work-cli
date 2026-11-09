@@ -90,6 +90,52 @@ func defaultOPInjectRunner(template string) (string, error) {
 	return runOPCommand(opTimeout(), "op", []string{"inject"}, template)
 }
 
+// opInject and opIsAvailable are the op seams used by Discover; tests
+// replace them.
+var (
+	opInject      opInjectRunner = defaultOPInjectRunner
+	opIsAvailable                = opAvailable
+)
+
+// NoOPEnvVar is the environment variable that disables 1Password: when it
+// is truthy, [op_secrets] is ignored completely and op is never called.
+const NoOPEnvVar = "ODOO_WORK_CLI_NO_OP"
+
+// NoOPEnabled reports whether ODOO_WORK_CLI_NO_OP is set to a truthy value
+// (1, true, yes, on; case-insensitive).
+//
+// :returns: true when 1Password must not be used
+func NoOPEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(NoOPEnvVar))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// withoutEnvFields returns a copy of s without the fields that env already
+// sets. Env vars have the highest priority, so resolving those references
+// would only cost an op call (and fail with a locked 1Password).
+//
+// :param s: the configured op_secrets
+// :param env: the config built from env vars
+// :returns: the op_secrets still to resolve
+func withoutEnvFields(s *OPSecrets, env *Config) *OPSecrets {
+	c := *s
+	drop := func(ref *string, envVal string) {
+		if envVal != "" {
+			*ref = ""
+		}
+	}
+	drop(&c.URL, env.URL)
+	drop(&c.Database, env.Database)
+	drop(&c.Username, env.Username)
+	drop(&c.APIKey, env.Password)
+	drop(&c.Password, env.WebPassword)
+	drop(&c.TOTPSecret, env.TOTPSecret)
+	return &c
+}
+
 // opAvailable checks whether the op CLI is on the PATH.
 func opAvailable() bool {
 	_, err := exec.LookPath("op")

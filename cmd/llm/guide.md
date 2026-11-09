@@ -18,7 +18,7 @@ description: Read and write Odoo 17 timesheets (project/task bookings) and atten
 
 ## Commands
 
-Global flag on every command: `--config FILE` (config file path, skips discovery). Almost nobody needs it.
+Global flags on every command: `--config FILE` (config file path, skips discovery; almost nobody needs it) and `--backend odoo|fake` (see [Testing without Odoo](#testing-without-odoo)).
 
 Dates are `YYYY-MM-DD`, weeks are ISO weeks `YYYY-Www` (`2026-W38`). Hours are decimal (`2.5`) or `H:MM` (`2:30`). Times are entered in the **local** timezone.
 
@@ -132,12 +132,19 @@ On `conflict` nothing was written: show the user the record named in the message
 
 Ask the user when the project or task is ambiguous; do not pick one.
 
+## Testing without Odoo
+
+Use this to try commands or rehearse a workflow. Never use it for the user's real bookings.
+
+- **Fake backend:** `ODOO_WORK_CLI_BACKEND=fake` (or `--backend fake`) runs every command against an offline fake: no network, no config, no 1Password. Its projects, tasks, entries and attendance records are **made up** and have nothing to do with the user's Odoo. Writes persist in a state file (`ODOO_WORK_CLI_FAKE_STATE`, default `$TMPDIR/odoo-work-cli-fake-state.json`), so list → add → list works across calls. Delete the file to reset to the seed data. Error kinds match the real backend (`not_found`, `conflict`, `validation`). Differences: `worked_hours` has no lunch deduction, configured filters are ignored, no access rights.
+- **Real Odoo without 1Password:** when the env vars `ODOO_URL`, `ODOO_DATABASE`, `ODOO_USERNAME`, `ODOO_PASSWORD` (and, for plain `clock in|out`, `ODOO_WEB_PASSWORD`, `ODOO_TOTP_SECRET`) are set, 1Password is not asked for them. `ODOO_WORK_CLI_NO_OP=1` ignores `[op_secrets]` completely; a missing field is then a `config` error that names the env var.
+
 ## Pitfalls
 
 - **`clock edit` changes an existing record** instead of adding a new one when the day already has exactly one. To add without risk of overwriting, use `--create-only`.
 - **A check-out after midnight** (a shift that ends the next day) only works with the full format on `--out`: `--in "2026-09-14 22:00" --out "2026-09-15 01:30"`. A bare `HH:MM` means the same day as `--date`, and check-out must be after check-in. `clock list` shows such a record on its check-in day.
 - **Attendance writes need rights.** `clock edit` and `clock in|out --at` write `hr.attendance` directly and require the Attendance Officer access right **and** the user set as their own attendance manager (`attendance_manager_id` on the employee). Without it you get `access_denied`. This is an Odoo admin task: tell the user, do not try to work around it. Plain `clock in`/`clock out` (no `--at`) work for everyone.
-- **Locked 1Password**: secrets come from 1Password. When it is locked the CLI fails after about 5 s (`ODOO_OP_TIMEOUT` changes that) with `secrets_locked`. Stop and ask the user to unlock it. Do not retry in a loop.
+- **Locked 1Password**: secrets come from 1Password. When it is locked the CLI fails after about 5 s (`ODOO_OP_TIMEOUT` changes that) with `secrets_locked`. Stop and ask the user to unlock it. Do not retry in a loop. If the credentials are in env vars, `ODOO_WORK_CLI_NO_OP=1` skips 1Password.
 - `worked_hours` excludes the lunch break of the working calendar, so it can be shorter than check-out minus check-in.
 - Future times are rejected; plain `clock in` records "now".
 - The CLI talks to whatever Odoo instance the config points to; writes are real bookings. Confirm with the user before bulk changes.
