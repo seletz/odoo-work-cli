@@ -20,10 +20,6 @@ func CMD(deps *app.Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			client, err := deps.RequireClient()
-			if err != nil {
-				return err
-			}
 
 			var projectID int64
 			if len(args) == 1 {
@@ -31,6 +27,10 @@ func CMD(deps *app.Deps) *cobra.Command {
 				if err != nil {
 					return apperr.New(apperr.KindValidation, "invalid project ID %q: must be an integer", args[0])
 				}
+			}
+			client, err := deps.RequireClient()
+			if err != nil {
+				return err
 			}
 
 			tasks, err := client.ListTasks(projectID)
