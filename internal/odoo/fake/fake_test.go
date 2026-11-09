@@ -247,3 +247,40 @@ func TestStatePath(t *testing.T) {
 		t.Errorf("StatePath() = %q, want env value", got)
 	}
 }
+
+func TestSearch(t *testing.T) {
+	c := open(t, statePath(t))
+	names := func(ps []odoo.ProjectInfo) []string {
+		var out []string
+		for _, p := range ps {
+			out = append(out, p.Name)
+		}
+		return out
+	}
+
+	tests := []struct {
+		text string
+		want int
+	}{
+		{"alpha", 1},        // name, case-insensitive
+		{"customer b", 1},   // customer
+		{"demo project", 2}, // substring
+		{"", 3},             // empty: all
+		{"no such project", 0},
+	}
+	for _, tt := range tests {
+		got, err := c.SearchProjects(tt.text)
+		if err != nil || len(got) != tt.want {
+			t.Errorf("SearchProjects(%q) = %v, %v; want %d", tt.text, names(got), err, tt.want)
+		}
+	}
+
+	tasks, err := c.SearchTasks(0, "IMPLEMENT")
+	if err != nil || len(tasks) != 1 || tasks[0].ID != 12 {
+		t.Errorf("SearchTasks(0, IMPLEMENT) = %v, %v", tasks, err)
+	}
+	tasks, _ = c.SearchTasks(2, "alpha")
+	if len(tasks) != 0 {
+		t.Errorf("SearchTasks(2, alpha) = %v, want none (other project)", tasks)
+	}
+}

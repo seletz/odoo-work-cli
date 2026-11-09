@@ -342,3 +342,32 @@ func toInt(v interface{}) (int64, bool) {
 	}
 	return 0, false
 }
+
+func containsFold(s, sub string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
+}
+
+// SearchProjects implements odoo.Client: name or customer contains text
+// (case-insensitive, like Odoo's ilike); empty text matches all.
+func (c *Client) SearchProjects(text string) ([]odoo.ProjectInfo, error) {
+	var out []odoo.ProjectInfo
+	for _, p := range c.st.Projects {
+		if containsFold(p.Name, text) || containsFold(p.Customer, text) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+// SearchTasks implements odoo.Client: tasks whose name contains text,
+// limited to projectID unless it is 0.
+func (c *Client) SearchTasks(projectID int64, text string) ([]odoo.TaskInfo, error) {
+	tasks, _ := c.ListAllTasks(projectID)
+	var out []odoo.TaskInfo
+	for _, t := range tasks {
+		if containsFold(t.Name, text) {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}

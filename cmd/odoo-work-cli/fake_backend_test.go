@@ -81,11 +81,22 @@ func TestFakeBackend_ClockWorkflow(t *testing.T) {
 		t.Errorf("second --create-only kind = %q, want conflict", env.Error.Kind)
 	}
 
+	var added idOnly
+	runJSON(t, setup, 0, &added, "clock", "add", "--date", date, "--in", "13:00", "--out", "17:00", "--json")
+	runJSON(t, setup, 0, &list, "clock", "list", "--date", date, "--json")
+	if len(list) != 2 {
+		t.Fatalf("clock list after add = %v, want 2 records", list)
+	}
+	runJSON(t, setup, 1, &env, "clock", "add", "--date", date, "--in", "11:00", "--out", "14:00", "--json")
+	if env.Error.Kind != "conflict" {
+		t.Errorf("overlapping clock add kind = %q, want conflict", env.Error.Kind)
+	}
+
 	var edited struct {
 		ID     int64   `json:"id"`
 		Before *idOnly `json:"before"`
 	}
-	runJSON(t, setup, 0, &edited, "clock", "edit", "--date", date, "--out", "12:30", "--json")
+	runJSON(t, setup, 0, &edited, "clock", "edit", "--date", date, "--id", jsonID(created.ID), "--out", "12:30", "--json")
 	if edited.ID != created.ID || edited.Before == nil || edited.Before.ID != created.ID {
 		t.Errorf("edit = %+v, want before set", edited)
 	}

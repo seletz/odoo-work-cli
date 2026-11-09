@@ -835,7 +835,8 @@ three workdays before the first run, for a "Fake User".
 export ODOO_WORK_CLI_BACKEND=fake
 odoo-work-cli projects --json
 odoo-work-cli clock edit --date 2026-01-07 --in 08:00 --out 12:00 --create-only --json
-odoo-work-cli clock list --date 2026-01-07 --json   # shows the new record
+odoo-work-cli clock add --date 2026-01-07 --in 13:00 --out 17:00 --json
+odoo-work-cli clock list --date 2026-01-07 --json   # shows both records
 odoo-work-cli entries add --project-id 1 --task-id 11 --hours 1:30 --description "try it" --json
 ```
 
