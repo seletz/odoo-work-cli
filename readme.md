@@ -558,6 +558,13 @@ like database name). If `op` is not installed or the `[op_secrets]` section is
 absent, the section is skipped and the CLI falls back to environment variables.
 If `op` **is** installed but not signed in, resolution fails with an error.
 
+`op` is only asked for the fields that no [environment variable](#environment-variables)
+sets (env vars win anyway). With all of them in the environment, for example
+from the dev `.env`, `op` is not called at all and a locked 1Password does
+not matter. `ODOO_WORK_CLI_NO_OP=1` ignores `[op_secrets]` completely; a
+required field that is still missing is then a `config` error naming its env
+var. See [Testing without Odoo](#testing-without-odoo).
+
 If 1Password is locked, `op inject` would hang for about 60 s. The CLI bounds
 the call instead (default 5 s, override with `ODOO_OP_TIMEOUT`, a Go duration
 such as `10s`) and fails with the error kind `secrets_locked`: "1Password is
@@ -582,6 +589,7 @@ and resolved `[op_secrets]`:
 | `ODOO_PASSWORD`     | **API key** — XML-RPC auth                     |
 | `ODOO_WEB_PASSWORD` | Login password — web session (clock in/out)    |
 | `ODOO_TOTP_SECRET`  | Base32 TOTP secret or `otpauth://` URL (2FA)   |
+| `ODOO_WORK_CLI_NO_OP` | `1`: ignore `[op_secrets]`, never call `op`  |
 
 ### Config file example
 
@@ -792,8 +800,64 @@ all other commands are unaffected (they use XML-RPC).
 
 **`op inject` errors at startup.**
 The config has an `[op_secrets]` section and the 1Password CLI is installed
-but not signed in. Run `op signin`, or remove the section and use environment
-variables instead.
+but not signed in. Run `op signin`, or set the credentials as environment
+variables (then `op` is skipped for them), or set `ODOO_WORK_CLI_NO_OP=1`.
+
+## Testing without Odoo
+
+Two switches let you (or an agent) try the CLI without an unlocked 1Password
+and, if needed, without any Odoo server.
+
+### Real Odoo, no 1Password
+
+Set the credentials as environment variables. `op` is only called for
+`[op_secrets]` fields that no env var sets, so with a complete environment it
+is never called:
+
+```bash
+set -a; source .env; set +a      # the dev .env from `mise run prepare_env`
+odoo-work-cli whoami --json      # works with 1Password locked
+```
+
+`ODOO_WORK_CLI_NO_OP=1` ignores `[op_secrets]` completely (plain values
+included). A missing required field is then a `config` error that names the
+env var, for example `missing required config fields: Password (ODOO_PASSWORD)`.
+
+### Fake backend (offline)
+
+`ODOO_WORK_CLI_BACKEND=fake` or `--backend fake` runs every command against a
+built-in fake Odoo: no network, no config files, no 1Password. The fake has
+**nothing to do with real data**. It starts with made-up projects ("Demo
+Project Alpha", …), tasks, timesheet entries and attendance records on the
+three workdays before the first run, for a "Fake User".
+
+```bash
+export ODOO_WORK_CLI_BACKEND=fake
+odoo-work-cli projects --json
+odoo-work-cli clock edit --date 2026-01-07 --in 08:00 --out 12:00 --create-only --json
+odoo-work-cli clock list --date 2026-01-07 --json   # shows the new record
+odoo-work-cli entries add --project-id 1 --task-id 11 --hours 1:30 --description "try it" --json
+```
+
+Writes persist in a JSON state file, so list → add → list works across
+calls:
+
+| Variable                   | Meaning                                                                  |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `ODOO_WORK_CLI_BACKEND`    | `fake` or `odoo` (default). `--backend` overrides it.                    |
+| `ODOO_WORK_CLI_FAKE_STATE` | State file; default `$TMPDIR/odoo-work-cli-fake-state.json`              |
+
+**Reset:** delete the state file; the next call seeds it again. Use a
+separate `ODOO_WORK_CLI_FAKE_STATE` per test run to keep runs independent.
+
+The fake behaves like Odoo where commands depend on it: unique IDs,
+`not_found` for unknown IDs, `conflict` for a double `clock in` or a `clock
+out` without an open record, `validation` for an unknown project or task,
+overlapping attendances and check-out not after check-in. `clock edit` prints
+`before` as usual, and plain `clock in|out` (the web-session path) work too.
+Differences: `worked_hours` is check-out minus check-in (no lunch
+deduction), configured `filters` and `extra_fields` are ignored, there are no
+access rights, and `fields` knows only a few fields of the main models.
 
 ## Development
 
