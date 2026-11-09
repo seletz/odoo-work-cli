@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -153,19 +154,19 @@ func (c *Config) ApplyDefaults() {
 func (c *Config) Validate() error {
 	var missing []string
 	if c.URL == "" {
-		missing = append(missing, "URL")
+		missing = append(missing, "URL (ODOO_URL)")
 	}
 	if c.Database == "" {
-		missing = append(missing, "Database")
+		missing = append(missing, "Database (ODOO_DATABASE)")
 	}
 	if c.Username == "" {
-		missing = append(missing, "Username")
+		missing = append(missing, "Username (ODOO_USERNAME)")
 	}
 	if c.Password == "" {
-		missing = append(missing, "Password")
+		missing = append(missing, "Password (ODOO_PASSWORD)")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("missing required config fields: %v", missing)
+		return fmt.Errorf("missing required config fields: %s", strings.Join(missing, ", "))
 	}
 	return nil
 }
