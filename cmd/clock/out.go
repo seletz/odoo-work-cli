@@ -26,6 +26,13 @@ printed.`,
 			if err != nil {
 				return err
 			}
+			var atTime time.Time
+			if at != "" {
+				var err error
+				if atTime, err = parseAtFlag(at, time.Now()); err != nil {
+					return err
+				}
+			}
 			client, err := deps.RequireClient()
 			if err != nil {
 				return err
@@ -34,10 +41,7 @@ printed.`,
 			var rec *odoo.AttendanceRecord
 			var label string
 			if at != "" {
-				t, err := parseAtFlag(at, time.Now())
-				if err != nil {
-					return err
-				}
+				t := atTime
 				if rec, err = client.ClockOutAt(t); err != nil {
 					return err
 				}

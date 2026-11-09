@@ -66,6 +66,9 @@ func (c *mockClient) GetFields(string) ([]odoo.FieldInfo, error) { return nil, n
 func (c *mockClient) ListProjects() ([]odoo.ProjectInfo, error) {
 	return c.projects, c.projectsErr
 }
+func (c *mockClient) SearchProjects(string) ([]odoo.ProjectInfo, error) {
+	return c.projects, c.projectsErr
+}
 func (c *mockClient) ListAllProjects() ([]odoo.ProjectInfo, error) {
 	if c.allProjects != nil || c.allProjErr != nil {
 		return c.allProjects, c.allProjErr
@@ -73,6 +76,9 @@ func (c *mockClient) ListAllProjects() ([]odoo.ProjectInfo, error) {
 	return c.projects, c.projectsErr
 }
 func (c *mockClient) ListTasks(_ int64) ([]odoo.TaskInfo, error) {
+	return c.tasks, c.tasksErr
+}
+func (c *mockClient) SearchTasks(_ int64, _ string) ([]odoo.TaskInfo, error) {
 	return c.tasks, c.tasksErr
 }
 func (c *mockClient) ListAllTasks(_ int64) ([]odoo.TaskInfo, error) {

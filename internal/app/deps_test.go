@@ -1,6 +1,8 @@
 package app
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,11 +22,19 @@ func (s *stubClient) ListProjects() ([]odoo.ProjectInfo, error) {
 	return nil, nil
 }
 
+func (s *stubClient) SearchProjects(string) ([]odoo.ProjectInfo, error) {
+	return nil, nil
+}
+
 func (s *stubClient) ListAllProjects() ([]odoo.ProjectInfo, error) {
 	return nil, nil
 }
 
 func (s *stubClient) ListTasks(int64) ([]odoo.TaskInfo, error) {
+	return nil, nil
+}
+
+func (s *stubClient) SearchTasks(int64, string) ([]odoo.TaskInfo, error) {
 	return nil, nil
 }
 
@@ -161,3 +171,55 @@ func TestDepsRequireConfigErrorsWhenUninitialized(t *testing.T) {
 func (s *stubClient) GetTimesheet(int64) (*odoo.TimesheetEntry, error) { return nil, nil }
 
 func (s *stubClient) GetAttendance(int64) (*odoo.AttendanceRecord, error) { return nil, nil }
+
+func TestDepsLazyLoader(t *testing.T) {
+	cfg := &config.Config{URL: "https://example.com"}
+	client := &stubClient{}
+	calls := 0
+	deps := &Deps{Loader: func() (*config.Config, odoo.Client, error) {
+		calls++
+		return cfg, client, nil
+	}}
+
+	if calls != 0 {
+		t.Fatalf("loader called before first use")
+	}
+	gotCfg, err := deps.RequireConfig()
+	if err != nil || gotCfg != cfg {
+		t.Fatalf("RequireConfig() = %v, %v", gotCfg, err)
+	}
+	gotClient, err := deps.RequireClient()
+	if err != nil || gotClient != client {
+		t.Fatalf("RequireClient() = %v, %v", gotClient, err)
+	}
+	if calls != 1 {
+		t.Fatalf("loader calls = %d, want 1", calls)
+	}
+}
+
+func TestDepsLazyLoaderError(t *testing.T) {
+	wantErr := fmt.Errorf("locked")
+	calls := 0
+	deps := &Deps{Loader: func() (*config.Config, odoo.Client, error) {
+		calls++
+		return nil, nil, wantErr
+	}}
+
+	if _, err := deps.RequireClient(); !errors.Is(err, wantErr) {
+		t.Fatalf("RequireClient() error = %v, want %v", err, wantErr)
+	}
+	if _, err := deps.RequireConfig(); !errors.Is(err, wantErr) {
+		t.Fatalf("RequireConfig() error = %v, want %v", err, wantErr)
+	}
+	if calls != 1 {
+		t.Fatalf("loader calls = %d, want 1 (error is cached)", calls)
+	}
+}
+
+func TestDepsCloseOnlyAfterLoad(t *testing.T) {
+	deps := &Deps{Loader: func() (*config.Config, odoo.Client, error) {
+		t.Fatal("Close must not trigger the loader")
+		return nil, nil, nil
+	}}
+	deps.Close()
+}
