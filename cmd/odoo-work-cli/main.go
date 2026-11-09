@@ -119,24 +119,18 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 			*started = true
 			// From here on errors are runtime failures, not usage errors.
 			cmd.SilenceUsage = true
-			if isNoneSetupCommand(cmd) {
-				return nil
+			if !isNoneSetupCommand(cmd) {
+				// Config and secrets load lazily on first RequireConfig /
+				// RequireClient, after the command validated its input.
+				deps.Loader = func() (*config.Config, odoo.Client, error) {
+					return setup(cfgFile)
+				}
 			}
-
-			cfg, client, err := setup(cfgFile)
-			if err != nil {
-				return err
-			}
-			deps.Config = cfg
-			deps.Client = client
 			return nil
 		},
 
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
-			if deps.Client != nil {
-				deps.Client.Close()
-				deps.Client = nil
-			}
+			deps.Close()
 		},
 	}
 
