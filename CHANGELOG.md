@@ -10,6 +10,14 @@ release. See [Releases and docs](explanation/50-releases-and-docs.md).
 
 ### Added
 
+- **MCP server (#102).** `odoo-work-cli mcp` serves the CLI as MCP tools on
+  stdin/stdout: 14 tools, reads (`whoami`, `projects`, `tasks`, `entries`,
+  `timesheets`, `clock_status`, `clock_list`) and writes (`entries_add`,
+  `entries_update`, `entries_delete`, `clock_in`, `clock_out`, `clock_add`,
+  `clock_edit`). Every tool runs one CLI command with `--json`, so validation,
+  fields and error kinds are the CLI's. `--read-only` serves only the reads.
+  `odoo-work-cli mcp print` prints the client configuration or the
+  `claude mcp add` line.
 - The documentation site shows the version it documents (a banner on the home
   page and on the release notes, set from the release tag) and has a "Release
   notes" page, this changelog (#112).
