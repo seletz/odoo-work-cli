@@ -8,6 +8,7 @@ import (
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/filter"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
@@ -37,6 +38,33 @@ func CMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "entries",
 		Short: "List individual timesheet entries with full detail",
+		Long: `List your timesheet entries of an ISO week (--week, default the current
+week) or of one day (--date, which takes precedence over --week), with the
+validation status of each entry and the total.
+
+--project and --task keep the entries whose project or task name contains
+the text, ignoring case; --status keeps the entries with exactly that
+validation status (draft or validated). The filters combine. The
+[models.timesheet] filters of the configuration apply as well.
+
+The subcommands add, update and delete write entries.`,
+		Example: `  # The entries of one day
+  odoo-work-cli entries --date 2026-04-08
+
+  # The draft entries of a week on projects named like "portal", as JSON
+  odoo-work-cli entries --week 2026-W15 --project portal --status draft --json`,
+		Annotations: map[string]string{
+			manual.Group: manual.GroupTimesheets,
+			manual.Synopsis: `odoo-work-cli entries [--week YYYY-Www | --date YYYY-MM-DD] [--project TEXT] [--task TEXT] [--status STATUS] [--json | --format FORMAT]
+odoo-work-cli entries add|update|delete [OPTIONS]`,
+			manual.Output: `A "Week: FROM to TO" or "Date: DAY" line, then the columns ID, Date,
+ProjID, Project, TaskID, Task, Hours (H:MM), Status and Description, then
+the total and the number of entries.
+
+With --json the output is an array of entries, [] if none match.`,
+			manual.Schemas: "entry",
+			manual.SeeAlso: "odoo-work-cli timesheets, how-to/20-book-time.md",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -93,11 +121,12 @@ func CMD(deps *app.Deps) *cobra.Command {
 	}
 
 	// Set Flags
-	cmd.Flags().StringVar(&ops.week, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
-	cmd.Flags().StringVar(&ops.date, "date", "", "specific date (YYYY-MM-DD), overrides --week")
-	cmd.Flags().StringVar(&ops.project, "project", "", "filter by project name (substring, case-insensitive)")
-	cmd.Flags().StringVar(&ops.task, "task", "", "filter by task name (substring, case-insensitive)")
-	cmd.Flags().StringVar(&ops.status, "status", "", "filter by validation status (e.g. draft, validated)")
+	cmd.Flags().StringVar(&ops.week, "week", "", "ISO week to list, `YYYY-Www` (e.g. 2026-W10)")
+	cmd.Flags().StringVar(&ops.date, "date", "", "single day to list, `YYYY-MM-DD`; overrides --week")
+	cmd.Flags().StringVar(&ops.project, "project", "", "only entries whose project name contains `TEXT` (case-insensitive)")
+	cmd.Flags().StringVar(&ops.task, "task", "", "only entries whose task name contains `TEXT` (case-insensitive)")
+	cmd.Flags().StringVar(&ops.status, "status", "", "only entries with validation `STATUS` draft or validated")
+	manual.SetFlagDefault(cmd.Flags(), "week", "the current week")
 
 	// --format/--json apply to the list and to add/update/delete.
 	output.AddFlags(cmd.PersistentFlags())

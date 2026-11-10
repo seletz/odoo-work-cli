@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/tui"
 	"github.com/spf13/cobra"
@@ -14,6 +15,25 @@ func statusCMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current attendance status",
+		Long: `Show whether you are clocked in and since when, and today's attendance
+periods with their durations and the total. A running period counts up to
+now. Today is the local calendar day; a record of an earlier day that is
+still running is included.`,
+		Example: `  odoo-work-cli clock status
+
+  # As JSON, e.g. for a status bar
+  odoo-work-cli clock status --json`,
+		Annotations: map[string]string{
+			manual.Output: `"Status: Clocked in since HH:MM (H:MM elapsed)" or "Status: Not clocked
+in", then today's periods with the columns #, Check In, Check Out (--:--
+while running) and Duration, and the total; or "No attendance records
+today."
+
+With --json the clock status with today's periods.`,
+			manual.Schemas:        "clock_status",
+			manual.StaticExamples: "true",
+			manual.SeeAlso:        "odoo-work-cli clock list, explanation/attendance-model.md",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {

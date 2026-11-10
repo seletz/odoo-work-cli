@@ -1,7 +1,7 @@
 // Command docsgen writes the generated parts of the documentation site.
 //
 //	go run ./tools/docsgen screenshots   # TUI screenshots, goldens, CLI samples, demo state
-//	go run ./tools/docsgen reference     # command reference from cobra
+//	go run ./tools/docsgen reference     # command reference (site pages and man pages)
 //
 // The output directories are flags, so scripts/docs-check.sh can render
 // into a temporary directory and compare with the committed files.
@@ -76,7 +76,8 @@ func screenshots(args []string) error {
 
 func reference(args []string) error {
 	fs := flag.NewFlagSet("reference", flag.ExitOnError)
-	out := fs.String("out", "docs/reference/commands", "directory of the command reference")
+	out := fs.String("out", "docs/reference/commands", "directory of the command reference pages")
+	man := fs.String("man", "man/man1", "directory of the man pages")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -84,9 +85,9 @@ func reference(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := docsgen.WriteReference(*out, files); err != nil {
+	if err := docsgen.WriteReference(*out, *man, files); err != nil {
 		return err
 	}
-	fmt.Printf("wrote %d reference pages to %s\n", len(files), *out)
+	fmt.Printf("wrote %d reference pages to %s and %d man pages to %s\n", len(files.Markdown), *out, len(files.Man), *man)
 	return nil
 }

@@ -97,11 +97,11 @@ description = "Fail when the committed screenshots, goldens or CLI samples diffe
 run = "scripts/docs-check.sh screenshots"
 
 [tasks."docs:reference"]
-description = "Generate the command reference (docs/reference/commands) from the cobra command tree"
+description = "Generate the command reference from the cobra command tree: site pages (docs/reference/commands) and man pages (man/man1)"
 run = "go run ./tools/docsgen reference"
 
 [tasks."docs:reference:check"]
-description = "Fail when the committed command reference differs from the code (CI runs this)"
+description = "Fail when the committed command reference or man pages differ from the code (CI runs this)"
 run = "scripts/docs-check.sh reference"
 
 [tasks."docs:generate"]

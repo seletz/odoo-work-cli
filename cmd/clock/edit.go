@@ -8,6 +8,7 @@ import (
 
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
@@ -187,8 +188,32 @@ With --create-only the command only ever creates: if the day already has a
 record it aborts with a "conflict" error and changes nothing. Use it when
 backfilling days, so that an existing record is never overwritten.
 
+Times are HH:MM on --date or "YYYY-MM-DD HH:MM". A time more than one
+minute in the future, or a check-out not after the check-in, is a
+validation error. --id with a record of another day is not_found.
+
 Editing attendance over the API requires the 'Attendance Officer' access
 right, with you set as your own attendance manager.`,
+		Example: `  # Correct the check-in of a day with one record
+  odoo-work-cli clock edit --date 2026-04-07 --in 08:00
+
+  # A day with several records needs --id
+  odoo-work-cli clock edit --date 2026-04-08 --id 4607 --out 17:30
+
+  # Backfill a day, but never overwrite an existing record
+  odoo-work-cli clock edit --date 2026-04-06 --in 09:00 --out 13:00 --create-only`,
+		Annotations: map[string]string{
+			manual.Synopsis: `odoo-work-cli clock edit [--date YYYY-MM-DD] [--id ID] [--in TIME] [--out TIME] [--json | --format FORMAT]
+odoo-work-cli clock edit --create-only [--date YYYY-MM-DD] --in TIME --out TIME [--json | --format FORMAT]`,
+			manual.Output: `"Updated attendance #ID" with the old (was) and the new (now) check-in,
+check-out and duration; or "Created attendance #ID: FROM - TO".
+
+With --json the record as it is now plus before, the record before the
+edit (null when it was created).`,
+			manual.Schemas: "attendance_edit",
+			manual.Errors:  "not_found, conflict, access_denied",
+			manual.SeeAlso: "odoo-work-cli clock list, odoo-work-cli clock add, how-to/30-clock-in-out.md",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -263,11 +288,12 @@ right, with you set as your own attendance manager.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&dateStr, "date", "", "day of the record to edit (YYYY-MM-DD, default today)")
-	cmd.Flags().StringVar(&inStr, "in", "", "new check-in time (HH:MM or YYYY-MM-DD HH:MM)")
-	cmd.Flags().StringVar(&outStr, "out", "", "new check-out time (HH:MM or YYYY-MM-DD HH:MM)")
+	cmd.Flags().StringVar(&dateStr, "date", "", "day of the record to edit, `YYYY-MM-DD`")
+	cmd.Flags().StringVar(&inStr, "in", "", "new check-in `TIME`, HH:MM or \"YYYY-MM-DD HH:MM\"")
+	cmd.Flags().StringVar(&outStr, "out", "", "new check-out `TIME`, HH:MM or \"YYYY-MM-DD HH:MM\"")
 	cmd.Flags().BoolVar(&createOnly, "create-only", false, "only create; abort with a conflict error if the day already has a record")
-	cmd.Flags().Int64Var(&id, "id", 0, "attendance record ID (required if the day has several records)")
+	cmd.Flags().Int64Var(&id, "id", 0, "`ID` of the attendance record (required if the day has several records)")
+	manual.SetFlagDefault(cmd.Flags(), "date", "today")
 
 	return cmd
 }

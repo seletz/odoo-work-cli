@@ -251,3 +251,13 @@ func TestFakeBackend_UnknownProjectPlainText(t *testing.T) {
 		}
 	}
 }
+
+// TestFields_WritesToCommandOutput: the docs generator captures examples
+// through the command's writer, so fields must not print to os.Stdout.
+func TestFields_WritesToCommandOutput(t *testing.T) {
+	useFakeBackend(t)
+	code, stdout, stderr := execute(t, noSetup(t), "fields", "project.project")
+	if code != 0 || !strings.Contains(string(stdout), "Field") {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+}

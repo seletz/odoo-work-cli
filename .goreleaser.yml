@@ -35,6 +35,9 @@ archives:
         formats: [zip]
     files:
       - completions/*
+      # Generated and committed by `mise run docs:reference`; docs:check
+      # fails in CI when they are stale.
+      - man/man1/*
 
 checksum:
   name_template: "checksums-{{ .Tag }}.txt"
@@ -71,6 +74,32 @@ homebrew_casks:
       bash: completions/odoo-work-cli.bash
       zsh: completions/_odoo-work-cli
       fish: completions/odoo-work-cli.fish
+    # One entry per page in man/man1. A test (internal/docsgen,
+    # TestGoreleaser_ListsEveryManPage) fails when a command's page is
+    # missing here.
+    manpages:
+      - man/man1/odoo-work-cli.1
+      - man/man1/odoo-work-cli-clock.1
+      - man/man1/odoo-work-cli-clock-add.1
+      - man/man1/odoo-work-cli-clock-edit.1
+      - man/man1/odoo-work-cli-clock-in.1
+      - man/man1/odoo-work-cli-clock-list.1
+      - man/man1/odoo-work-cli-clock-out.1
+      - man/man1/odoo-work-cli-clock-status.1
+      - man/man1/odoo-work-cli-completion.1
+      - man/man1/odoo-work-cli-config.1
+      - man/man1/odoo-work-cli-config-install.1
+      - man/man1/odoo-work-cli-entries.1
+      - man/man1/odoo-work-cli-entries-add.1
+      - man/man1/odoo-work-cli-entries-delete.1
+      - man/man1/odoo-work-cli-entries-update.1
+      - man/man1/odoo-work-cli-fields.1
+      - man/man1/odoo-work-cli-llm.1
+      - man/man1/odoo-work-cli-projects.1
+      - man/man1/odoo-work-cli-tasks.1
+      - man/man1/odoo-work-cli-timesheets.1
+      - man/man1/odoo-work-cli-tui.1
+      - man/man1/odoo-work-cli-whoami.1
     # Strip the macOS quarantine attribute so the unsigned binary runs without a
     # Gatekeeper prompt. Homebrew 7 deprecated the Ruby `postflight do` block in
     # favour of the declarative `postflight_steps` stanza, but GoReleaser (as of
