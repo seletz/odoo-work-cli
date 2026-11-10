@@ -3,22 +3,22 @@
 Company Prefix / Project / Task         │     Mon│     Tue│     Wed│     Thu│     Fri│     Sat│     Sun│   Total
                                         │Ostermo…│        │        │        │        │        │        │
 ────────────────────────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                                                                                                                                                              ┃
-┃    Search (filtered)    Ctrl+A: toggle filter                                                                                                                ┃
-┃                                                                                                                                                              ┃
-┃    > in                                                                                                                                                      ┃
-┃                                                                                                                                                              ┃
-┃    Projects:                                                                                                                                                 ┃
-┃      [P] [EXA] Lighthouse Portal — Example Consulting                                                                                                        ┃
-┃      [P] [EXA] Orchard Mobile App — Example Consulting                                                                                                       ┃
-┃      [P] [EXA] Internal — Example Consulting                                                                                                                 ┃
-┃                                                                                                                                                              ┃
-┃    Tasks:                                                                                                                                                    ┃
-┃      [T] [EXA] Backend API — Lighthouse Portal                                                                                                               ┃
-┃                                                                                                                                                              ┃
-┃    ... and 7 more                                                                                   tab: results  ↑/↓: navigate  Enter: select  Esc: cancel  ┃
-┃                                                                                                                                                              ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+[┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+[┃                                                                                                                    ┃
+[┃    Search (filtered)    Ctrl+A: toggle filter                                                                      ┃
+[┃                                                                                                                    ┃
+[┃    > in                                                                                                            ┃
+[┃                                                                                                                    ┃
+[┃    Projects:                                                                                                       ┃
+[┃      [P] [EXA] Lighthouse Portal — Example Consulting                                                              ┃
+m┃      [P] [EXA] Orchard Mobile App — Example Consulting                                                             ┃
+─┃      [P] [EXA] Internal — Example Consulting                                                                       ┃
+T┃                                                                                                                    ┃
+─┃    Tasks:                                                                                                          ┃
+C┃      [T] [EXA] Backend API — Lighthouse Portal                                                                     ┃
+C┃                                                                                                                    ┃
+A┃    ... and 7 more                                                                                    tab: result…  ┃
+D┃                                                                                                                    ┃
+ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
   ↑/k up • ↓/j down • tab next day • ←/h prev week • →/l next week • ↵ detail • e edit • a add • d delete • / search …
  SEARCH                                                                                                     Week: 20:15
