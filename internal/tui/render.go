@@ -240,7 +240,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		rowSelected := ri == cursorRow
 		labelLines := wrapLabel(row.Label, labelWidth)
 		if squeezed {
-			labelLines = []string{ansi.Truncate(row.Label, labelWidth, "…")}
+			labelLines = []string{truncateMiddle(row.Label, labelWidth)}
 		}
 		var rowLines []string
 		var rowTotal float64
@@ -323,6 +323,30 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	}
 
 	return b.String()
+}
+
+// truncateMiddle shortens s to at most width terminal cells, keeping the
+// start (about 40%) and the end (the rest) and putting an ellipsis between
+// them, so that names sharing a prefix stay distinguishable.
+func truncateMiddle(s string, width int) string {
+	sw := ansi.StringWidth(s)
+	if sw <= width {
+		return s
+	}
+	if width <= 1 {
+		return ansi.Truncate(s, width, "")
+	}
+	avail := width - 1 // one cell for the ellipsis
+	left := avail * 2 / 5
+	right := avail - left
+	// Cutting inside a wide rune keeps it whole, so step on until it fits.
+	cut := sw - right
+	tail := ansi.TruncateLeft(s, cut, "")
+	for ansi.StringWidth(tail) > right && cut < sw {
+		cut++
+		tail = ansi.TruncateLeft(s, cut, "")
+	}
+	return ansi.Truncate(s, left, "") + "…" + tail
 }
 
 func wrapLabel(label string, width int) []string {

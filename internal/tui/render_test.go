@@ -473,7 +473,7 @@ func TestRenderGrid_SqueezedLabelsAreSingleLine(t *testing.T) {
 	}
 	found := false
 	for _, l := range lines {
-		if strings.Contains(l, "Very long") {
+		if strings.Contains(l, "[DIG]") {
 			found = true
 			if !strings.Contains(strings.Split(l, "│")[0], "…") {
 				t.Errorf("long name not truncated with ellipsis: %q", l)
@@ -487,5 +487,60 @@ func TestRenderGrid_SqueezedLabelsAreSingleLine(t *testing.T) {
 		if w := ansi.StringWidth(l); w > 76 {
 			t.Errorf("line is %d cells: %q", w, l)
 		}
+	}
+}
+
+// Issue #107: squeezed labels are cut in the middle, so rows sharing a prefix
+// stay distinguishable and the end of the task name stays visible.
+func TestRenderGrid_SqueezedLabelsKeepPrefixAndEnd(t *testing.T) {
+	tasks := []struct{ project, task string }{
+		{"Demo Project Alpha", "Alpha: Design"},
+		{"Demo Project Alpha", "Alpha: Implementation"},
+		{"Demo Project Beta", "Beta: Support"},
+		{"Internal (fake)", "Meetings"},
+	}
+	var entries []odoo.TimesheetEntry
+	for i, tk := range tasks {
+		entries = append(entries, odoo.TimesheetEntry{Date: "2026-03-02", Project: tk.project, ProjectID: int64(i + 1), Task: tk.task, TaskID: int64(i + 10), Company: "Example", Hours: 1})
+	}
+	g := BuildWeekGrid(entries, monday(2026, 3, 2))
+	out := ansi.Strip(RenderGrid(g, 0, 0, 76, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{}))
+	labelWidth, _ := gridLayout(76)
+	seen := map[string]bool{}
+	for _, row := range g.Rows {
+		got := truncateMiddle(row.Label, labelWidth)
+		if w := ansi.StringWidth(got); w > labelWidth {
+			t.Errorf("%q is %d cells, limit %d", got, w, labelWidth)
+		}
+		if seen[got] {
+			t.Errorf("duplicate label %q", got)
+		}
+		seen[got] = true
+		if !strings.Contains(got, "…") || !strings.HasPrefix(got, row.Label[:4]) {
+			t.Errorf("label %q lost prefix or ellipsis (from %q)", got, row.Label)
+		}
+		end := got[strings.Index(got, "…")+len("…"):]
+		if !strings.HasSuffix(row.Label, end) || len(end) < 5 {
+			t.Errorf("label %q does not end with the end of %q", got, row.Label)
+		}
+		if !strings.Contains(out, got) {
+			t.Errorf("rendered grid lacks %q:\n%s", got, out)
+		}
+	}
+	if len(seen) != 4 {
+		t.Errorf("want 4 distinct labels, got %d", len(seen))
+	}
+}
+
+func TestTruncateMiddle_CutsByCell(t *testing.T) {
+	// Wide runes are two cells each; the result must never exceed the width.
+	for w := 2; w < 12; w++ {
+		got := truncateMiddle("日本語のプロジェクト名前", w)
+		if cw := ansi.StringWidth(got); cw > w {
+			t.Errorf("width %d: %q is %d cells", w, got, cw)
+		}
+	}
+	if got := truncateMiddle("short", 10); got != "short" {
+		t.Errorf("short label changed: %q", got)
 	}
 }
