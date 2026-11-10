@@ -2,6 +2,7 @@
 //
 //	go run ./tools/docsgen screenshots   # TUI screenshots, goldens, CLI samples, demo state
 //	go run ./tools/docsgen reference     # command reference from cobra
+//	go run ./tools/docsgen compare-png committed fresh  # compare screenshots by pixels
 //
 // The output directories are flags, so scripts/docs-check.sh can render
 // into a temporary directory and compare with the committed files.
@@ -27,7 +28,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: docsgen screenshots|reference [flags]")
+		return fmt.Errorf("usage: docsgen screenshots|reference|compare-png [flags]")
 	}
 	// Every rendering happens in the demo's time zone, whatever TZ says.
 	time.Local = docsgen.Location
@@ -36,8 +37,10 @@ func run(args []string) error {
 		return screenshots(args[1:])
 	case "reference":
 		return reference(args[1:])
+	case "compare-png":
+		return comparePNG(args[1:])
 	}
-	return fmt.Errorf("unknown subcommand %q: use screenshots or reference", args[0])
+	return fmt.Errorf("unknown subcommand %q: use screenshots, reference or compare-png", args[0])
 }
 
 func screenshots(args []string) error {
@@ -88,5 +91,29 @@ func reference(args []string) error {
 		return err
 	}
 	fmt.Printf("wrote %d reference pages to %s\n", len(files), *out)
+	return nil
+}
+
+// errStale makes main exit 1 after comparePNG has listed the differences.
+var errStale = fmt.Errorf("screenshots differ")
+
+// comparePNG compares the screenshots of two directories by decoded
+// pixels and dimensions and prints every difference to stderr. The bytes
+// of a PNG depend on the Go version's zlib, so a byte comparison would
+// fail whenever CI builds with another Go than the one that wrote them.
+func comparePNG(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: docsgen compare-png committed-dir fresh-dir")
+	}
+	diffs, err := docsgen.ComparePNGDirs(args[0], args[1])
+	if err != nil {
+		return err
+	}
+	for _, d := range diffs {
+		fmt.Fprintln(os.Stderr, d)
+	}
+	if len(diffs) > 0 {
+		return errStale
+	}
 	return nil
 }
