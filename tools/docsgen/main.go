@@ -42,7 +42,7 @@ func run(args []string) error {
 
 func screenshots(args []string) error {
 	fs := flag.NewFlagSet("screenshots", flag.ExitOnError)
-	svgDir := fs.String("svg", "docs/assets/screenshots", "directory of the SVG screenshots")
+	pngDir := fs.String("png", "docs/assets/screenshots", "directory of the PNG screenshots")
 	goldenDir := fs.String("golden", filepath.Join("internal/docsgen", docsgen.GoldenDir), "directory of the text goldens")
 	samplesDir := fs.String("samples", "docs/assets/cli", "directory of the CLI output samples")
 	state := fs.String("state", "docs/assets/demo-state.json", "demo state file of the fake backend")
@@ -56,7 +56,7 @@ func screenshots(args []string) error {
 	if err := docsgen.WriteGoldens(*goldenDir, frames); err != nil {
 		return err
 	}
-	if err := docsgen.WriteSVGs(*svgDir, frames); err != nil {
+	if err := docsgen.WritePNGs(*pngDir, frames); err != nil {
 		return err
 	}
 	outs, err := docsgen.RunSamples()
@@ -70,7 +70,7 @@ func screenshots(args []string) error {
 		return err
 	}
 	fmt.Printf("wrote %d screenshots to %s, goldens to %s, %d samples to %s, demo state %s\n",
-		len(frames), *svgDir, *goldenDir, len(outs), *samplesDir, *state)
+		len(frames), *pngDir, *goldenDir, len(outs), *samplesDir, *state)
 	return nil
 }
 

@@ -36,7 +36,9 @@ jobs:
         # Same command as `mise run docs:screenshots:check`: renders the TUI
         # screenshots, their goldens and the CLI samples from the demo state
         # into a temporary directory and fails when the committed files are
-        # stale. The SVGs are text, so they compare exactly on any platform.
+        # stale. The PNGs are rasterized without FMA-sensitive float maths
+        # (internal/docsgen/glyph.go), so they compare byte for byte across
+        # platforms.
         run: scripts/docs-check.sh screenshots
 
       - name: Check command reference

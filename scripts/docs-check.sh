@@ -29,9 +29,9 @@ cd "$ROOT"
 case "$WHAT" in
   screenshots)
     go run ./tools/docsgen screenshots \
-      -svg "$TMP/svg" -golden "$TMP/golden" -samples "$TMP/cli" -state "$TMP/demo-state.json" >/dev/null
+      -png "$TMP/png" -golden "$TMP/golden" -samples "$TMP/cli" -state "$TMP/demo-state.json" >/dev/null
     compare internal/docsgen/testdata/frames "$TMP/golden" "TUI goldens in internal/docsgen/testdata/frames/"
-    compare docs/assets/screenshots "$TMP/svg" "TUI screenshots in docs/assets/screenshots/"
+    compare docs/assets/screenshots "$TMP/png" "TUI screenshots in docs/assets/screenshots/"
     compare docs/assets/cli "$TMP/cli" "CLI samples in docs/assets/cli/"
     if ! cmp -s docs/assets/demo-state.json "$TMP/demo-state.json"; then
       echo "docs/assets/demo-state.json is stale" >&2

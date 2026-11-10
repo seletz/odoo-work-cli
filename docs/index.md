@@ -8,7 +8,7 @@ icon: lucide/clock
 has a CLI for scripts and coding agents, with stable JSON output and error
 kinds, and a TUI for the weekly grid.
 
-![The TUI: weekly grid with attendance per day](assets/screenshots/grid.svg)
+![The TUI: weekly grid with attendance per day](assets/screenshots/grid.png)
 
 *The [TUI](tutorials/30-tui-tour.md): one row per project and task, today's
 column selected, attendance per day below the totals.*

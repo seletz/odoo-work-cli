@@ -17,7 +17,7 @@ Without `--week` the TUI opens the current week.
 
 ## The weekly grid
 
-![Weekly grid](../assets/screenshots/grid.svg)
+![Weekly grid](../assets/screenshots/grid.png)
 
 - The **header** shows the ISO week and its dates, the clock state
   (`● In 08:41 (6:31)`: clocked in since 08:41, for 6:31 hours) and the
@@ -40,7 +40,7 @@ the week. The cursor starts on today.
 
 Press ++h++ once to see the previous week, with Good Friday as a holiday:
 
-![Previous week](../assets/screenshots/prev-week.svg)
+![Previous week](../assets/screenshots/prev-week.png)
 
 Press ++l++ to come back.
 
@@ -49,7 +49,7 @@ Press ++l++ to come back.
 Put the cursor on the cell *Internal / Meetings* on Thursday and press
 ++enter++:
 
-![Detail view](../assets/screenshots/detail.svg)
+![Detail view](../assets/screenshots/detail.png)
 
 The detail view lists every entry of that cell with its ID, hours, status and
 description. ++j++ and ++k++ select an entry.
@@ -58,7 +58,7 @@ description. ++j++ and ++k++ select an entry.
 
 In the detail view press ++e++:
 
-![Edit form](../assets/screenshots/edit.svg)
+![Edit form](../assets/screenshots/edit.png)
 
 Change the hours (`0:45`, `0.75`) or the description. ++tab++ switches the
 field, ++enter++ saves, ++esc++ cancels. The grid reloads from Odoo after
@@ -68,7 +68,7 @@ saving.
 
 In the detail view press ++a++ instead:
 
-![Add form](../assets/screenshots/add.svg)
+![Add form](../assets/screenshots/add.png)
 
 The new entry gets the project, task and day of the selected cell. ++d++ in
 the detail view deletes the selected entry, without asking first.
@@ -78,7 +78,7 @@ the detail view deletes the selected entry, without asking first.
 To book on a project or task that has no row yet, press ++slash++ in the grid
 and type:
 
-![Search](../assets/screenshots/search.svg)
+![Search](../assets/screenshots/search.png)
 
 The list filters as you type. ++tab++ moves the focus to the list, ++enter++
 adds the selected project or task as a new row. ++ctrl+a++ toggles the
@@ -88,7 +88,7 @@ adds the selected project or task as a new row. ++ctrl+a++ toggles the
 
 Press ++t++ on any day to edit its attendance record:
 
-![Attendance form](../assets/screenshots/attendance.svg)
+![Attendance form](../assets/screenshots/attendance.png)
 
 Today has one running record: the check-out is empty. Fill it in to close the
 record, or change the check-in. Times are `HH:MM`, or `YYYY-MM-DD HH:MM` for an
@@ -101,7 +101,7 @@ see [Clock in and out](../how-to/30-clock-in-out.md#permissions).
 
 Press ++question++ for every key binding, grouped by view:
 
-![Help overlay](../assets/screenshots/help.svg)
+![Help overlay](../assets/screenshots/help.png)
 
 ++esc++ closes it, ++q++ quits the TUI.
 
