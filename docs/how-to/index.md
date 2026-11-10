@@ -19,6 +19,6 @@ Recipes for specific tasks: short and to the point. New here? Start with the
 - [Test without Odoo](70-test-without-odoo.md): the fake backend, and real Odoo
   without 1Password.
 - [Use it from a coding agent](80-agents.md): `llm --skill`.
-- [Use it from an MCP client](85-mcp.md).
+- [Connect an MCP client](85-mcp.md): `odoo-work-cli mcp` for Claude Code and other MCP hosts.
 - [Customise the TUI](90-customise-tui.md): keys, colours, hour limits, holidays.
 - [Troubleshoot](95-troubleshoot.md): authentication, 2FA, permissions, 1Password.

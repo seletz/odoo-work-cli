@@ -213,6 +213,7 @@ with made-up data; nothing leaves the machine.`,
 	rootCmd.AddCommand(entries.CMD(deps))
 	rootCmd.AddCommand(clock.CMD(deps))
 	rootCmd.AddCommand(llm.CMD())
+	rootCmd.AddCommand(mcpCMD(setup, &cfgFile, &backend))
 	documentCompletion(rootCmd)
 	manual.DecorateHelp(rootCmd)
 	rootCmd.SetHelpTemplate(rootCmd.HelpTemplate() + helpFooter)
@@ -227,6 +228,10 @@ func isNoneSetupCommand(cmd *cobra.Command) bool {
 	for current := cmd; current != nil; current = current.Parent() {
 		switch current.Name() {
 		case "completion", "__complete", "__completeNoDesc":
+			return true
+		case "mcp":
+			// The server loads config per tool call (newMCPServer); it is
+			// not offline, its tools need the connection.
 			return true
 		}
 	}
