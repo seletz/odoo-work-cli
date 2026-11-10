@@ -41,6 +41,8 @@ the time.
 `ODOO_OP_TIMEOUT=10s` for a longer wait, or provide the credentials as
 environment variables; then `op` is not called for them.
 
+1Password asks too often? See [1Password prompts](87-1password-prompts.md).
+
 ## `op inject` errors at startup
 
 The config has `[op_secrets]`, the 1Password CLI is installed but not signed

@@ -23,9 +23,22 @@ type mcpSession struct {
 	id int
 }
 
+// stagesOf adapts a one-piece setup for tests that never reach it.
+func stagesOf(setup setupFunc) mcpSetup {
+	var client odoo.Client
+	return mcpSetup{
+		loadConfig: func(f string) (*config.Config, error) {
+			c, cl, err := setup(f)
+			client = cl
+			return c, err
+		},
+		newClient: func(*config.Config) (odoo.Client, error) { return client, nil },
+	}
+}
+
 func newSession(t *testing.T, global []string, setup setupFunc, readOnly bool) *mcpSession {
 	t.Helper()
-	s, closeFn := newMCPServer(global, setup, readOnly)
+	s, closeFn := newMCPServer(global, stagesOf(setup), readOnly, false)
 	t.Cleanup(closeFn)
 	return &mcpSession{t: t, s: s}
 }
@@ -317,30 +330,53 @@ func TestMCPErrorEnvelope(t *testing.T) {
 	}
 }
 
+// stageProbe counts the two setup stages and lets a test fail them.
+type stageProbe struct {
+	cfgCalls, clientCalls int
+	locked                bool  // config stage fails with secrets_locked
+	clientErr             error // client stage fails with this error
+	client                *odootest.Fake
+}
+
+func (p *stageProbe) stages() mcpSetup {
+	return mcpSetup{
+		loadConfig: func(string) (*config.Config, error) {
+			p.cfgCalls++
+			if p.locked {
+				return nil, apperr.New(apperr.KindSecretsLocked, "1Password is locked")
+			}
+			cfg := &config.Config{}
+			cfg.ApplyDefaults()
+			return cfg, nil
+		},
+		newClient: func(*config.Config) (odoo.Client, error) {
+			p.clientCalls++
+			if p.clientErr != nil {
+				return nil, p.clientErr
+			}
+			return p.client, nil
+		},
+	}
+}
+
+func newProbe() *stageProbe {
+	return &stageProbe{client: &odootest.Fake{User: odoo.UserInfo{ID: 7, Name: "Pat"}}}
+}
+
 // TestMCPLazySecrets: the server starts and lists its tools without loading
 // config or secrets. A locked 1Password is reported per call as
-// secrets_locked; once it is unlocked the next call loads, and later calls
-// reuse the loaded client (one load for the life of the server).
+// secrets_locked and retried; once it is unlocked the next call loads, and
+// later calls reuse the loaded client (one load for the life of the server).
 func TestMCPLazySecrets(t *testing.T) {
 	t.Setenv("ODOO_WORK_CLI_BACKEND", "")
-	calls := 0
-	locked := true
-	client := &odootest.Fake{User: odoo.UserInfo{ID: 7, Name: "Pat"}}
-	setup := func(string) (*config.Config, odoo.Client, error) {
-		calls++
-		if locked {
-			return nil, nil, apperr.New(apperr.KindSecretsLocked, "1Password is locked")
-		}
-		cfg := &config.Config{}
-		cfg.ApplyDefaults()
-		return cfg, client, nil
-	}
-	s, closeFn := newMCPServer(nil, setup, false)
+	p := newProbe()
+	p.locked = true
+	s, closeFn := newMCPServer(nil, p.stages(), false, false)
 	sess := &mcpSession{t: t, s: s}
 	sess.rpc("initialize", `{"protocolVersion":"2025-06-18"}`)
 	sess.rpc("tools/list", "")
-	if calls != 0 {
-		t.Fatalf("setup called %d times before the first tool call", calls)
+	if p.cfgCalls != 0 {
+		t.Fatalf("config loaded %d times before the first tool call", p.cfgCalls)
 	}
 
 	text, isErr := sess.call("whoami", nil)
@@ -348,18 +384,117 @@ func TestMCPLazySecrets(t *testing.T) {
 		t.Fatalf("locked: %v %s", isErr, text)
 	}
 
-	locked = false
+	p.locked = false
 	sess.mustCall("whoami", nil, nil)
 	sess.mustCall("whoami", nil, nil)
-	if calls != 2 {
-		t.Errorf("setup called %d times, want 2 (locked, then once)", calls)
+	if p.cfgCalls != 2 {
+		t.Errorf("config loaded %d times, want 2 (locked, then once)", p.cfgCalls)
 	}
-	if client.Closed {
+	if p.client.Closed {
 		t.Error("client closed between calls")
 	}
 	closeFn()
-	if !client.Closed {
+	if !p.client.Closed {
 		t.Error("client not closed when the server ends")
+	}
+}
+
+// TestMCPKeepsSecretsWhenClientFails: op succeeded, the Odoo login failed
+// (network): the resolved config is kept, so the retries do not call op
+// again, only the client stage.
+func TestMCPKeepsSecretsWhenClientFails(t *testing.T) {
+	t.Setenv("ODOO_WORK_CLI_BACKEND", "")
+	p := newProbe()
+	p.clientErr = apperr.New(apperr.KindNetwork, "timeout")
+	sess := &mcpSession{t: t}
+	s, closeFn := newMCPServer(nil, p.stages(), false, false)
+	t.Cleanup(closeFn)
+	sess.s = s
+	for range 2 {
+		text, isErr := sess.call("whoami", nil)
+		if !isErr || errKind(t, text) != "network" {
+			t.Fatalf("want network error: %v %s", isErr, text)
+		}
+	}
+	p.clientErr = nil
+	sess.mustCall("whoami", nil, nil)
+	sess.mustCall("whoami", nil, nil)
+	if p.cfgCalls != 1 {
+		t.Errorf("config (op) loaded %d times, want 1", p.cfgCalls)
+	}
+	if p.clientCalls != 3 {
+		t.Errorf("client stage ran %d times, want 3 (2 failures, 1 success)", p.clientCalls)
+	}
+}
+
+// TestMCPReResolvesOnAuth: an auth error discards config and client, the
+// next call resolves again, once. Other error kinds keep the cache.
+func TestMCPReResolvesOnAuth(t *testing.T) {
+	t.Setenv("ODOO_WORK_CLI_BACKEND", "")
+	p := newProbe()
+	s, closeFn := newMCPServer(nil, p.stages(), false, false)
+	t.Cleanup(closeFn)
+	sess := &mcpSession{t: t, s: s}
+	sess.mustCall("whoami", nil, nil)
+
+	p.client.Err = apperr.New(apperr.KindNetwork, "boom")
+	if text, isErr := sess.call("whoami", nil); !isErr || errKind(t, text) != "network" {
+		t.Fatalf("want network: %s", text)
+	}
+	if p.cfgCalls != 1 {
+		t.Fatalf("network error re-resolved: %d op calls", p.cfgCalls)
+	}
+
+	p.client.Err = apperr.New(apperr.KindAuth, "bad key")
+	if text, isErr := sess.call("whoami", nil); !isErr || errKind(t, text) != "auth" {
+		t.Fatalf("want auth: %s", text)
+	}
+	if p.cfgCalls != 1 {
+		t.Fatalf("auth error re-resolved immediately: %d", p.cfgCalls)
+	}
+	p.client.Err = nil
+	sess.mustCall("whoami", nil, nil)
+	sess.mustCall("whoami", nil, nil)
+	if p.cfgCalls != 2 {
+		t.Errorf("op calls = %d, want 2 (start, one after auth)", p.cfgCalls)
+	}
+}
+
+// TestMCPEagerSecrets: --secrets eager resolves before the first request;
+// a failure does not stop the server and is retried by the first call.
+func TestMCPEagerSecrets(t *testing.T) {
+	t.Setenv("ODOO_WORK_CLI_BACKEND", "")
+	p := newProbe()
+	_, closeFn := newMCPServer(nil, p.stages(), false, true)
+	t.Cleanup(closeFn)
+	if p.cfgCalls != 1 {
+		t.Fatalf("eager: %d op calls before the first request, want 1", p.cfgCalls)
+	}
+	if p.clientCalls != 0 {
+		t.Errorf("eager must not connect: %d client calls", p.clientCalls)
+	}
+
+	q := newProbe()
+	q.locked = true
+	s, closeFn2 := newMCPServer(nil, q.stages(), false, true)
+	t.Cleanup(closeFn2)
+	sess := &mcpSession{t: t, s: s}
+	q.locked = false
+	sess.mustCall("whoami", nil, nil)
+	if q.cfgCalls != 2 {
+		t.Errorf("failed eager start, then first call: %d op calls, want 2", q.cfgCalls)
+	}
+}
+
+func TestParseSecretsMode(t *testing.T) {
+	for in, want := range map[string]bool{"eager": true, "lazy": false, "": false, "EAGER": true} {
+		got, err := parseSecretsMode(in)
+		if err != nil || got != want {
+			t.Errorf("%q: %v %v", in, got, err)
+		}
+	}
+	if _, err := parseSecretsMode("sometimes"); err == nil || apperr.KindOf(err) != apperr.KindValidation {
+		t.Errorf("bad mode: %v", err)
 	}
 }
 

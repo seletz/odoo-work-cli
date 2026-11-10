@@ -140,7 +140,8 @@ If your host connects to MCP servers, you can use the same commands as MCP tools
 - `odoo-work-cli mcp`: an MCP server on stdin/stdout, started by the MCP client. Each tool is one command, run with `--json`: same fields, same error kinds. Read tools: `whoami`, `projects`, `tasks`, `entries`, `timesheets`, `clock_status`, `clock_list`. Write tools: `entries_add`, `entries_update`, `entries_delete`, `clock_in`, `clock_out`, `clock_add`, `clock_edit`. Arguments are named like the flags with `_` for `-` (`project_id`, `dry_run`, `create_only`); IDs are integers, `hours` is a number or `"H:MM"`.
 - `--read-only` serves only the read tools.
 - A failed call is a tool result with `isError: true` and the error envelope above, never a protocol error. Results over 32 KiB come in pages (`cursor`).
-- Config and secrets load on the first tool call; a locked 1Password gives `secrets_locked` for that call, and the next call tries again.
+- Config and secrets load on the first tool call; a locked 1Password gives `secrets_locked` for that call, and the next call tries again. Once resolved, the secrets are kept for the life of the server; an `auth` error discards them and the next call resolves again.
+- `--secrets eager` (env `ODOO_WORK_CLI_MCP_SECRETS`) resolves them at server start instead; the default is `lazy`.
 - `odoo-work-cli mcp print [--binary PATH] [--command] [--read-only]`: print the client configuration (`mcpServers` JSON, or with `--command` the `claude mcp add` line). Writes nothing.
 
 ## Testing without Odoo

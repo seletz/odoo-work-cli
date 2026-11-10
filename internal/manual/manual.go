@@ -90,6 +90,9 @@ func Groups() []string {
 	return []string{GroupTimesheets, GroupAttendance, GroupProjects, GroupConfig, GroupAgents, GroupCompletion}
 }
 
+// MCPSecretsEnv is the variable behind `mcp --secrets`.
+const MCPSecretsEnv = "ODOO_WORK_CLI_MCP_SECRETS"
+
 // EnvHelp describes every environment variable the CLI reads.
 var EnvHelp = map[string]string{
 	"ODOO_URL":          "Odoo server URL; overrides url from the config files.",
@@ -99,6 +102,7 @@ var EnvHelp = map[string]string{
 	"ODOO_WEB_PASSWORD": "Odoo login password, used for the web session of clock in and clock out.",
 	"ODOO_TOTP_SECRET":  "TOTP secret (base32 or otpauth:// URL) for accounts with two-factor authentication.",
 	"ODOO_OP_TIMEOUT":   "Timeout of the 1Password call that resolves [op_secrets], a Go duration; default 5s.",
+	MCPSecretsEnv:       "When the MCP server resolves 1Password secrets: lazy (first tool call, default) or eager (at server start); mcp --secrets overrides it.",
 	config.NoOPEnvVar:   "If 1, true, yes or on, [op_secrets] is ignored and the 1Password CLI is never called.",
 	fake.BackendEnvVar:  "Backend, odoo (default) or fake; --backend overrides it.",
 	fake.StateEnvVar:    "State file of the fake backend; default odoo-work-cli-fake-state.json in the temporary directory.",
@@ -356,6 +360,7 @@ var SitePages = map[string]string{
 	"how-to/70-test-without-odoo.md":       "Test without Odoo",
 	"how-to/80-agents.md":                  "Use it from a coding agent",
 	"how-to/85-mcp.md":                     "Connect an MCP client",
+	"how-to/87-1password-prompts.md":       "1Password prompts",
 	"how-to/90-customise-tui.md":           "Customise the TUI",
 	"how-to/95-troubleshoot.md":            "Troubleshoot",
 	"explanation/attendance-model.md":      "The attendance model",

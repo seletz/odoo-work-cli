@@ -249,7 +249,7 @@ func overviewPage(root *cobra.Command, cmds []*cobra.Command) (*manPage, error) 
 		{text: "--version", style: styleCode}}, body: []string{"Print the version and exit."}})
 	add("GLOBAL OPTIONS", para("Every command accepts --config, --backend and --help. Commands that print data also accept --json and --format."),
 		defsBlock(global))
-	add("ENVIRONMENT", envDefsBlocks(manual.OdooEnv())...)
+	add("ENVIRONMENT", envDefsBlocks(append(manual.OdooEnv(), manual.MCPSecretsEnv))...)
 	add("FILES", fileDefsBlocks(manual.OnlineFiles())...)
 	add("EXIT STATUS", exitBlocks(root, nil)...)
 	ex, err := runExamples(root)
