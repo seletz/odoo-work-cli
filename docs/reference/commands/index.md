@@ -112,6 +112,12 @@ with made-up data; nothing leaves the machine.
 [`odoo-work-cli llm`](odoo-work-cli-llm.md)
 :   Print a usage guide for LLM agents (--skill).
 
+[`odoo-work-cli mcp`](odoo-work-cli-mcp.md)
+:   Run the MCP server on stdin/stdout (started by the MCP client).
+
+[`odoo-work-cli mcp print`](odoo-work-cli-mcp-print.md)
+:   Print the MCP client configuration for this server.
+
 ### Shell completion
 
 [`odoo-work-cli completion`](odoo-work-cli-completion.md)

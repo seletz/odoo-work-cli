@@ -118,6 +118,8 @@ homebrew_casks:
       - man/man1/odoo-work-cli-entries-update.1
       - man/man1/odoo-work-cli-fields.1
       - man/man1/odoo-work-cli-llm.1
+      - man/man1/odoo-work-cli-mcp.1
+      - man/man1/odoo-work-cli-mcp-print.1
       - man/man1/odoo-work-cli-projects.1
       - man/man1/odoo-work-cli-tasks.1
       - man/man1/odoo-work-cli-timesheets.1

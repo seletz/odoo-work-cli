@@ -1,69 +1,117 @@
 ---
-title: Use it from an MCP client
+title: Connect an MCP client
 icon: lucide/plug
 ---
-# Use it from an MCP client
+# Connect an MCP client
 
-How an agent that talks to tools over the
-[Model Context Protocol](https://modelcontextprotocol.io/) uses
-`odoo-work-cli`.
+How to give an agent host that speaks the
+[Model Context Protocol](https://modelcontextprotocol.io/) (Claude Code, an
+IDE, a desktop app) the timesheet and attendance commands as MCP tools.
 
-`odoo-work-cli` has **no MCP server of its own**. It is a CLI with a stable
-JSON contract, and that is enough for MCP-capable agents in two ways.
+`odoo-work-cli mcp` is an MCP server on standard input and output. The client
+starts it as a child process; there is no port and no daemon. Every tool is one
+command of the CLI, run with `--json`, so the fields and error kinds are the
+ones you already know. The full list is in the
+[MCP tool reference](../reference/60-mcp-tools.md).
 
-## Agents with a shell tool
+## Register the server
 
-Most coding agents (Claude Code, Codex and others) can run commands
-themselves, next to their MCP tools. For them, `odoo-work-cli` needs no MCP
-at all: give them the guide from `llm --skill` and let them call the CLI.
-See [Use it from a coding agent](80-agents.md).
+=== "Claude Code"
 
-## Clients that only call MCP tools
+    ```bash
+    claude mcp add --scope user odoo-work-cli -- odoo-work-cli mcp
+    ```
 
-If your client can only call MCP tools, connect it to an MCP server that runs
-commands (a "shell" or "command runner" server) and allow it exactly one
-program: `odoo-work-cli`. The agent then calls the CLI through that server's
-tool. Configure it so that:
+    `odoo-work-cli mcp print --command` prints exactly this line. Check it
+    with `claude mcp list`; the server shows as connected.
 
-- only the `odoo-work-cli` binary may run, with arguments as a list, not a
-  shell string;
-- the environment carries the credentials (or `ODOO_WORK_CLI_BACKEND=fake`
-  while you try it out) and nothing else;
-- stdout and the exit code reach the agent; stderr may be dropped, because
-  with `--json` nothing is written there.
+=== "Project `.mcp.json`"
 
-Put the output of `odoo-work-cli llm --skill` into the server's or the
-agent's instructions, so the agent knows the commands, the fields and the
-rules.
+    ```bash
+    odoo-work-cli mcp print
+    ```
 
-## The contract the agent relies on
+    prints the `mcpServers` block to merge into the project's `.mcp.json` (or
+    another client's MCP settings):
 
-| What | Contract |
-| --- | --- |
-| Call | `odoo-work-cli <command> … --json` |
-| Success | exit code `0`, one JSON value on stdout ([JSON output](../reference/20-json-output.md)) |
-| Failure | exit code `1`, `{"error":{"kind":"…","message":"…"}}` on stdout ([Errors](../reference/30-errors.md)) |
-| Empty result | `[]` |
-| Schemas | `internal/output/schemas/*.schema.json`, draft 2020-12 |
+    ```json
+    {
+      "mcpServers": {
+        "odoo-work-cli": {
+          "type": "stdio",
+          "command": "odoo-work-cli",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
 
-If you write a thin tool layer of your own, map tools to commands one to one
-and keep the JSON as it is:
+If the client does not search `PATH`, use an absolute path:
+`odoo-work-cli mcp print --binary "$(command -v odoo-work-cli)"`.
 
-| Tool | Command | Writes |
-| --- | --- | --- |
-| find projects | `projects --search TEXT --json` | no |
-| list tasks | `tasks PROJECT_ID [--search TEXT] --json` | no |
-| list entries | `entries --date D --json` / `--week W` | no |
-| propose entry | `entries add … --dry-run --json` | no |
-| book entry | `entries add … --json` | yes |
-| list attendance | `clock list --date D --json` / `--week W` | no |
-| backfill a day | `clock edit --date D --in T --out T --create-only --json` | yes |
+The server reads the same configuration as the CLI (config files, environment,
+1Password). Global flags go before `mcp` and apply to every tool call, for
+example `odoo-work-cli --config ~/work.toml mcp`.
 
-Let the agent call the read-only tools freely and ask the user before every
-tool that writes.
+## Read only
+
+```bash
+claude mcp add --scope user odoo-work-cli -- odoo-work-cli mcp --read-only
+```
+
+`--read-only` serves only the read tools (`whoami`, `projects`, `tasks`,
+`entries`, `timesheets`, `clock_status`, `clock_list`). The write tools are
+not listed and cannot be called. `mcp print --read-only` adds the flag to the
+printed configuration.
+
+## What the agent sees
+
+- **Annotations.** Read tools carry `readOnlyHint`. `entries_update`,
+  `entries_delete` and `clock_edit` carry `destructiveHint`: they overwrite or
+  remove data. Clients use these to decide what needs a confirmation; let the
+  read tools run freely and confirm every write.
+- **Dry runs.** `entries_add` and `entries_update` take `dry_run: true`: the
+  entry is resolved and checked, duplicates are listed, nothing is written.
+  The server instructions tell the agent to propose with a dry run first.
+- **Errors.** A failed call is a normal tool result with `isError: true` and
+  the [error envelope](../reference/30-errors.md):
+  `{"error":{"kind":"not_found","message":"timesheet entry 424242 not found"}}`.
+  Bad arguments are `validation` and name the argument, not a flag.
+- **Pages.** A result over 32 KiB comes in pages; the second content item
+  says which page and gives the `cursor` for the next.
+
+## 1Password and startup
+
+The server starts without loading the configuration or secrets. They load on
+the first tool call that needs them, as in the CLI. If 1Password is locked,
+that call returns `secrets_locked` and the server keeps running: unlock
+1Password and the next call loads. After that the connection is kept for the
+life of the server, so 1Password is not asked again for every call.
 
 ## Try it without Odoo
 
-Set `ODOO_WORK_CLI_BACKEND=fake` in the environment of the command server.
-Every command then works offline with made-up data; see
+Register the server against the offline fake backend:
+
+```bash
+claude mcp add odoo-work-cli-fake -- odoo-work-cli --backend fake mcp
+```
+
+Every tool then works with made-up data; see
 [Test without Odoo](70-test-without-odoo.md#the-fake-backend).
+
+To watch the protocol by hand:
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"projects","arguments":{"search":"alpha"}}}' \
+  | odoo-work-cli --backend fake mcp
+```
+
+## Agents with a shell tool
+
+Coding agents that can run commands need no MCP server: give them the guide
+from `llm --skill` and let them call the CLI. See
+[Use it from a coding agent](80-agents.md). Both ways use the same commands
+and the same JSON; the MCP server is for hosts that only call tools, or when
+you want the client's per-tool permissions and the `--read-only` switch.
