@@ -1,0 +1,15 @@
+Week: 2026-04-06 to 2026-04-12
+
+ID       Date         ProjID   Project                   TaskID   Task                      Description                    Hours
+-------- ------------ -------- ------------------------- -------- ------------------------- ------------------------------ -----
+4019     2026-04-09   3        Internal                  31       Meetings                  Customer call                  0.75
+4018     2026-04-09   1        Lighthouse Portal         13       Code review               Review fuzzy matching          1.50
+4017     2026-04-09   2        Orchard Mobile App        21       Release 2.4               Store screenshots              2.00
+4016     2026-04-08   3        Internal                  32       Training                  Accessibility workshop         1.50
+4015     2026-04-08   2        Orchard Mobile App        22       Support                   Crash report on login          2.50
+4014     2026-04-08   1        Lighthouse Portal         12       Frontend                  Result list layout             4.00
+4013     2026-04-07   4        Riverbank Data Migration  41       Data mapping              Import dry run                 3.50
+4012     2026-04-07   3        Internal                  31       Meetings                  Weekly sync                    1.00
+4011     2026-04-07   1        Lighthouse Portal         11       Backend API               Search: fuzzy matching         3.50
+
+Total: 20.25 hours

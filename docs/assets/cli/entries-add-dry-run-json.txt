@@ -1,0 +1,31 @@
+{
+  "id": null,
+  "date": "2026-04-09",
+  "project_id": 1,
+  "project": "Lighthouse Portal",
+  "task_id": 13,
+  "task": "Code review",
+  "description": "Review fuzzy matching",
+  "hours": 1.5,
+  "minutes": 90,
+  "employee": null,
+  "status": null,
+  "company": "Example Consulting",
+  "dry_run": true,
+  "duplicates": [
+    {
+      "id": 4018,
+      "date": "2026-04-09",
+      "project_id": 1,
+      "project": "Lighthouse Portal",
+      "task_id": 13,
+      "task": "Code review",
+      "description": "Review fuzzy matching",
+      "hours": 1.5,
+      "minutes": 90,
+      "employee": "Alex Demo",
+      "status": "draft",
+      "company": "Example Consulting"
+    }
+  ]
+}

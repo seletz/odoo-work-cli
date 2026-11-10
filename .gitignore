@@ -27,3 +27,7 @@
 .DS_Store
 Thumbs.db
 __pycache__/
+
+# Docs toolchain and build output
+.venv/
+site/

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "kind": "not_found",
+    "message": "timesheet entry 999 not found"
+  }
+}

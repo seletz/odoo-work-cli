@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1236 608" width="1236" height="608" role="img">
+<rect x="0.5" y="0.5" width="1235" height="607" rx="10" fill="#161b22" stroke="#30363d"/>
+<circle cx="24" cy="17" r="6" fill="#ff5f57"/>
+<circle cx="44" cy="17" r="6" fill="#febc2e"/>
+<circle cx="64" cy="17" r="6" fill="#28c840"/>
+<rect x="18" y="34" width="40" height="20" fill="#262626"/>
+<rect x="18" y="134" width="380" height="20" fill="#303030"/>
+<rect x="428" y="134" width="80" height="20" fill="#5f87ff"/>
+<rect x="518" y="134" width="80" height="20" fill="#303030"/>
+<rect x="608" y="134" width="80" height="20" fill="#303030"/>
+<rect x="698" y="134" width="80" height="20" fill="#1a2a1a"/>
+<rect x="788" y="134" width="80" height="20" fill="#303030"/>
+<rect x="878" y="134" width="80" height="20" fill="#303030"/>
+<rect x="968" y="134" width="80" height="20" fill="#303030"/>
+<rect x="1058" y="134" width="80" height="20" fill="#303030"/>
+<rect x="428" y="154" width="80" height="20" fill="#1a2a1a"/>
+<rect x="698" y="154" width="80" height="20" fill="#1a2a1a"/>
+<rect x="608" y="174" width="80" height="20" fill="#1a2a1a"/>
+<rect x="518" y="194" width="80" height="20" fill="#1a2a1a"/>
+<rect x="608" y="214" width="80" height="20" fill="#1a2a1a"/>
+<rect x="428" y="234" width="80" height="20" fill="#1a2a1a"/>
+<rect x="518" y="254" width="80" height="20" fill="#1a2a1a"/>
+<rect x="608" y="254" width="80" height="20" fill="#1a2a1a"/>
+<rect x="18" y="314" width="380" height="20" fill="#262626"/>
+<rect x="428" y="314" width="80" height="20" fill="#262626"/>
+<rect x="518" y="314" width="80" height="20" fill="#262626"/>
+<rect x="608" y="314" width="80" height="20" fill="#262626"/>
+<rect x="698" y="314" width="80" height="20" fill="#262626"/>
+<rect x="878" y="314" width="80" height="20" fill="#262626"/>
+<rect x="968" y="314" width="80" height="20" fill="#262626"/>
+<rect x="1058" y="314" width="80" height="20" fill="#303030"/>
+<rect x="18" y="474" width="1190" height="20" fill="#262626"/>
+<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="16" xml:space="preserve">
+<text x="28" y="49" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#5fd7ff" font-weight="bold">W14</text>
+<text x="58" y="49" textLength="730" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">  Mon 30 Mar 2026 — Sun 05 Apr 2026                                      </text>
+<text x="788" y="49" textLength="170" lengthAdjust="spacingAndGlyphs" fill="#5fd75f" font-weight="bold">● In 08:41 (6:31)</text>
+<text x="978" y="49" textLength="230" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">Today 6:31 · Week 31:30</text>
+<text x="18" y="89" textLength="400" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">Company Prefix / Project / Task         </text>
+<text x="428" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">     Mon</text>
+<text x="518" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">     Tue</text>
+<text x="608" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">     Wed</text>
+<text x="698" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">     Thu</text>
+<text x="788" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d75fd7">     Fri</text>
+<text x="878" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">     Sat</text>
+<text x="968" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">     Sun</text>
+<text x="1058" y="89" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">   Total</text>
+<text x="788" y="109" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d75fd7">Karfrei…</text>
+<text x="18" y="149" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#800080">[EXA] Internal / Meetings             </text>
+<text x="428" y="149" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#ffffff" font-weight="bold">    1:30</text>
+<text x="698" y="149" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    1:00</text>
+<text x="1058" y="149" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    2:30</text>
+<text x="18" y="169" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#800080">[EXA] Lighthouse Portal / Backend API </text>
+<text x="428" y="169" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    4:00</text>
+<text x="698" y="169" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    6:00</text>
+<text x="1058" y="169" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">   10:00</text>
+<text x="18" y="189" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#800080">[EXA] Lighthouse Portal / Code review </text>
+<text x="608" y="189" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    1:30</text>
+<text x="1058" y="189" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    1:30</text>
+<text x="18" y="209" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#800080">[EXA] Lighthouse Portal / Frontend    </text>
+<text x="518" y="209" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    5:00</text>
+<text x="1058" y="209" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    5:00</text>
+<text x="18" y="229" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#800080">[EXA] Orchard Mobile App / Release 2.4</text>
+<text x="608" y="229" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    2:00</text>
+<text x="1058" y="229" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    2:00</text>
+<text x="18" y="249" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#800080">[EXA] Orchard Mobile App / Support    </text>
+<text x="428" y="249" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    2:30</text>
+<text x="1058" y="249" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    2:30</text>
+<text x="18" y="269" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#008000">[WIL] Riverbank Data Migration / Data </text>
+<text x="518" y="269" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    3:00</text>
+<text x="608" y="269" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    4:30</text>
+<text x="1058" y="269" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    7:30</text>
+<text x="18" y="289" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#008000">mapping                               </text>
+<text x="18" y="329" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">Total                                 </text>
+<text x="428" y="329" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    8:00</text>
+<text x="518" y="329" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    8:00</text>
+<text x="608" y="329" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    8:00</text>
+<text x="698" y="329" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">    7:00</text>
+<text x="1058" y="329" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d7d75f" font-weight="bold">   31:00</text>
+<text x="18" y="369" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">Check-in                              </text>
+<text x="428" y="369" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   08:30</text>
+<text x="518" y="369" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   08:15</text>
+<text x="608" y="369" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   08:20</text>
+<text x="698" y="369" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   08:00</text>
+<text x="18" y="389" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">Check-out                             </text>
+<text x="428" y="389" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   16:45</text>
+<text x="518" y="389" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   16:30</text>
+<text x="608" y="389" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   16:20</text>
+<text x="698" y="389" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">   15:00</text>
+<text x="18" y="409" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">Attendance                            </text>
+<text x="428" y="409" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">    8:15</text>
+<text x="518" y="409" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">    8:15</text>
+<text x="608" y="409" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">    8:00</text>
+<text x="698" y="409" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0">    7:00</text>
+<text x="1058" y="409" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0" font-weight="bold">   31:30</text>
+<text x="18" y="429" textLength="380" lengthAdjust="spacingAndGlyphs" fill="#7c7f82">Diff                                  </text>
+<text x="428" y="429" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d7d75f">   +0:15</text>
+<text x="518" y="429" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d7d75f">   +0:15</text>
+<text x="608" y="429" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    0:00</text>
+<text x="698" y="429" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#5fd75f">    0:00</text>
+<text x="1058" y="429" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#d7d75f">   +0:30</text>
+<text x="38" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#626262">↑/k</text>
+<text x="78" y="469" textLength="20" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">up</text>
+<text x="98" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="128" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#626262">↓/j</text>
+<text x="168" y="469" textLength="40" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">down</text>
+<text x="208" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="238" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#626262">tab</text>
+<text x="278" y="469" textLength="80" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">next day</text>
+<text x="358" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="388" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#626262">←/h</text>
+<text x="428" y="469" textLength="90" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">prev week</text>
+<text x="518" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="548" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#626262">→/l</text>
+<text x="588" y="469" textLength="90" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">next week</text>
+<text x="678" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="708" y="469" textLength="10" lengthAdjust="spacingAndGlyphs" fill="#626262">↵</text>
+<text x="728" y="469" textLength="60" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">detail</text>
+<text x="788" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="818" y="469" textLength="10" lengthAdjust="spacingAndGlyphs" fill="#626262">e</text>
+<text x="838" y="469" textLength="40" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">edit</text>
+<text x="878" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="908" y="469" textLength="10" lengthAdjust="spacingAndGlyphs" fill="#626262">a</text>
+<text x="928" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">add</text>
+<text x="958" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="988" y="469" textLength="10" lengthAdjust="spacingAndGlyphs" fill="#626262">d</text>
+<text x="1008" y="469" textLength="60" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">delete</text>
+<text x="1068" y="469" textLength="30" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c"> • </text>
+<text x="1098" y="469" textLength="10" lengthAdjust="spacingAndGlyphs" fill="#626262">/</text>
+<text x="1118" y="469" textLength="60" lengthAdjust="spacingAndGlyphs" fill="#4a4a4a">search</text>
+<text x="1188" y="469" textLength="10" lengthAdjust="spacingAndGlyphs" fill="#3c3c3c">…</text>
+<text x="18" y="489" textLength="1140" lengthAdjust="spacingAndGlyphs" fill="#d0d0d0"> GRID                                                                                                       Week: </text>
+<text x="1158" y="489" textLength="50" lengthAdjust="spacingAndGlyphs" fill="#d7d75f">31:00</text>
+</g>
+<path d="M423 74V84 M423 84V94 M513 74V84 M513 84V94 M603 74V84 M603 84V94 M693 74V84 M693 84V94 M783 74V84 M783 84V94 M873 74V84 M873 84V94 M963 74V84 M963 84V94 M1053 74V84 M1053 84V94 M423 94V104 M423 104V114 M513 94V104 M513 104V114 M603 94V104 M603 104V114 M693 94V104 M693 104V114 M783 94V104 M783 104V114 M873 94V104 M873 104V114 M963 94V104 M963 104V114 M1053 94V104 M1053 104V114 M18 124H23 M23 124H28 M28 124H33 M33 124H38 M38 124H43 M43 124H48 M48 124H53 M53 124H58 M58 124H63 M63 124H68 M68 124H73 M73 124H78 M78 124H83 M83 124H88 M88 124H93 M93 124H98 M98 124H103 M103 124H108 M108 124H113 M113 124H118 M118 124H123 M123 124H128 M128 124H133 M133 124H138 M138 124H143 M143 124H148 M148 124H153 M153 124H158 M158 124H163 M163 124H168 M168 124H173 M173 124H178 M178 124H183 M183 124H188 M188 124H193 M193 124H198 M198 124H203 M203 124H208 M208 124H213 M213 124H218 M218 124H223 M223 124H228 M228 124H233 M233 124H238 M238 124H243 M243 124H248 M248 124H253 M253 124H258 M258 124H263 M263 124H268 M268 124H273 M273 124H278 M278 124H283 M283 124H288 M288 124H293 M293 124H298 M298 124H303 M303 124H308 M308 124H313 M313 124H318 M318 124H323 M323 124H328 M328 124H333 M333 124H338 M338 124H343 M343 124H348 M348 124H353 M353 124H358 M358 124H363 M363 124H368 M368 124H373 M373 124H378 M378 124H383 M383 124H388 M388 124H393 M393 124H398 M398 124H403 M403 124H408 M408 124H413 M413 124H418 M418 124H423 M423 124H428 M423 124V134 M428 124H433 M433 124H438 M438 124H443 M443 124H448 M448 124H453 M453 124H458 M458 124H463 M463 124H468 M468 124H473 M473 124H478 M478 124H483 M483 124H488 M488 124H493 M493 124H498 M498 124H503 M503 124H508 M508 124H513 M513 124H518 M513 124V134 M518 124H523 M523 124H528 M528 124H533 M533 124H538 M538 124H543 M543 124H548 M548 124H553 M553 124H558 M558 124H563 M563 124H568 M568 124H573 M573 124H578 M578 124H583 M583 124H588 M588 124H593 M593 124H598 M598 124H603 M603 124H608 M603 124V134 M608 124H613 M613 124H618 M618 124H623 M623 124H628 M628 124H633 M633 124H638 M638 124H643 M643 124H648 M648 124H653 M653 124H658 M658 124H663 M663 124H668 M668 124H673 M673 124H678 M678 124H683 M683 124H688 M688 124H693 M693 124H698 M693 124V134 M698 124H703 M703 124H708 M708 124H713 M713 124H718 M718 124H723 M723 124H728 M728 124H733 M733 124H738 M738 124H743 M743 124H748 M748 124H753 M753 124H758 M758 124H763 M763 124H768 M768 124H773 M773 124H778 M778 124H783 M783 124H788 M783 124V134 M788 124H793 M793 124H798 M798 124H803 M803 124H808 M808 124H813 M813 124H818 M818 124H823 M823 124H828 M828 124H833 M833 124H838 M838 124H843 M843 124H848 M848 124H853 M853 124H858 M858 124H863 M863 124H868 M868 124H873 M873 124H878 M873 124V134 M878 124H883 M883 124H888 M888 124H893 M893 124H898 M898 124H903 M903 124H908 M908 124H913 M913 124H918 M918 124H923 M923 124H928 M928 124H933 M933 124H938 M938 124H943 M943 124H948 M948 124H953 M953 124H958 M958 124H963 M963 124H968 M963 124V134 M968 124H973 M973 124H978 M978 124H983 M983 124H988 M988 124H993 M993 124H998 M998 124H1003 M1003 124H1008 M1008 124H1013 M1013 124H1018 M1018 124H1023 M1023 124H1028 M1028 124H1033 M1033 124H1038 M1038 124H1043 M1043 124H1048 M1048 124H1053 M1053 124H1058 M1053 124V134 M1058 124H1063 M1063 124H1068 M1068 124H1073 M1073 124H1078 M1078 124H1083 M1083 124H1088 M1088 124H1093 M1093 124H1098 M1098 124H1103 M1103 124H1108 M1108 124H1113 M1113 124H1118 M1118 124H1123 M1123 124H1128 M1128 124H1133 M1133 124H1138 M423 134V144 M423 144V154 M513 134V144 M513 144V154 M603 134V144 M603 144V154 M693 134V144 M693 144V154 M783 134V144 M783 144V154 M873 134V144 M873 144V154 M963 134V144 M963 144V154 M1053 134V144 M1053 144V154 M423 154V164 M423 164V174 M513 154V164 M513 164V174 M603 154V164 M603 164V174 M693 154V164 M693 164V174 M783 154V164 M783 164V174 M873 154V164 M873 164V174 M963 154V164 M963 164V174 M1053 154V164 M1053 164V174 M423 174V184 M423 184V194 M513 174V184 M513 184V194 M603 174V184 M603 184V194 M693 174V184 M693 184V194 M783 174V184 M783 184V194 M873 174V184 M873 184V194 M963 174V184 M963 184V194 M1053 174V184 M1053 184V194 M423 194V204 M423 204V214 M513 194V204 M513 204V214 M603 194V204 M603 204V214 M693 194V204 M693 204V214 M783 194V204 M783 204V214 M873 194V204 M873 204V214 M963 194V204 M963 204V214 M1053 194V204 M1053 204V214 M423 214V224 M423 224V234 M513 214V224 M513 224V234 M603 214V224 M603 224V234 M693 214V224 M693 224V234 M783 214V224 M783 224V234 M873 214V224 M873 224V234 M963 214V224 M963 224V234 M1053 214V224 M1053 224V234 M423 234V244 M423 244V254 M513 234V244 M513 244V254 M603 234V244 M603 244V254 M693 234V244 M693 244V254 M783 234V244 M783 244V254 M873 234V244 M873 244V254 M963 234V244 M963 244V254 M1053 234V244 M1053 244V254 M423 254V264 M423 264V274 M513 254V264 M513 264V274 M603 254V264 M603 264V274 M693 254V264 M693 264V274 M783 254V264 M783 264V274 M873 254V264 M873 264V274 M963 254V264 M963 264V274 M1053 254V264 M1053 264V274 M423 274V284 M423 284V294 M513 274V284 M513 284V294 M603 274V284 M603 284V294 M693 274V284 M693 284V294 M783 274V284 M783 284V294 M873 274V284 M873 284V294 M963 274V284 M963 284V294 M1053 274V284 M1053 284V294 M18 304H23 M23 304H28 M28 304H33 M33 304H38 M38 304H43 M43 304H48 M48 304H53 M53 304H58 M58 304H63 M63 304H68 M68 304H73 M73 304H78 M78 304H83 M83 304H88 M88 304H93 M93 304H98 M98 304H103 M103 304H108 M108 304H113 M113 304H118 M118 304H123 M123 304H128 M128 304H133 M133 304H138 M138 304H143 M143 304H148 M148 304H153 M153 304H158 M158 304H163 M163 304H168 M168 304H173 M173 304H178 M178 304H183 M183 304H188 M188 304H193 M193 304H198 M198 304H203 M203 304H208 M208 304H213 M213 304H218 M218 304H223 M223 304H228 M228 304H233 M233 304H238 M238 304H243 M243 304H248 M248 304H253 M253 304H258 M258 304H263 M263 304H268 M268 304H273 M273 304H278 M278 304H283 M283 304H288 M288 304H293 M293 304H298 M298 304H303 M303 304H308 M308 304H313 M313 304H318 M318 304H323 M323 304H328 M328 304H333 M333 304H338 M338 304H343 M343 304H348 M348 304H353 M353 304H358 M358 304H363 M363 304H368 M368 304H373 M373 304H378 M378 304H383 M383 304H388 M388 304H393 M393 304H398 M398 304H403 M403 304H408 M408 304H413 M413 304H418 M418 304H423 M423 304H428 M423 294V304 M428 304H433 M433 304H438 M438 304H443 M443 304H448 M448 304H453 M453 304H458 M458 304H463 M463 304H468 M468 304H473 M473 304H478 M478 304H483 M483 304H488 M488 304H493 M493 304H498 M498 304H503 M503 304H508 M508 304H513 M513 304H518 M513 294V304 M518 304H523 M523 304H528 M528 304H533 M533 304H538 M538 304H543 M543 304H548 M548 304H553 M553 304H558 M558 304H563 M563 304H568 M568 304H573 M573 304H578 M578 304H583 M583 304H588 M588 304H593 M593 304H598 M598 304H603 M603 304H608 M603 294V304 M608 304H613 M613 304H618 M618 304H623 M623 304H628 M628 304H633 M633 304H638 M638 304H643 M643 304H648 M648 304H653 M653 304H658 M658 304H663 M663 304H668 M668 304H673 M673 304H678 M678 304H683 M683 304H688 M688 304H693 M693 304H698 M693 294V304 M698 304H703 M703 304H708 M708 304H713 M713 304H718 M718 304H723 M723 304H728 M728 304H733 M733 304H738 M738 304H743 M743 304H748 M748 304H753 M753 304H758 M758 304H763 M763 304H768 M768 304H773 M773 304H778 M778 304H783 M783 304H788 M783 294V304 M788 304H793 M793 304H798 M798 304H803 M803 304H808 M808 304H813 M813 304H818 M818 304H823 M823 304H828 M828 304H833 M833 304H838 M838 304H843 M843 304H848 M848 304H853 M853 304H858 M858 304H863 M863 304H868 M868 304H873 M873 304H878 M873 294V304 M878 304H883 M883 304H888 M888 304H893 M893 304H898 M898 304H903 M903 304H908 M908 304H913 M913 304H918 M918 304H923 M923 304H928 M928 304H933 M933 304H938 M938 304H943 M943 304H948 M948 304H953 M953 304H958 M958 304H963 M963 304H968 M963 294V304 M968 304H973 M973 304H978 M978 304H983 M983 304H988 M988 304H993 M993 304H998 M998 304H1003 M1003 304H1008 M1008 304H1013 M1013 304H1018 M1018 304H1023 M1023 304H1028 M1028 304H1033 M1033 304H1038 M1038 304H1043 M1043 304H1048 M1048 304H1053 M1053 304H1058 M1053 294V304 M1058 304H1063 M1063 304H1068 M1068 304H1073 M1073 304H1078 M1078 304H1083 M1083 304H1088 M1088 304H1093 M1093 304H1098 M1098 304H1103 M1103 304H1108 M1108 304H1113 M1113 304H1118 M1118 304H1123 M1123 304H1128 M1128 304H1133 M1133 304H1138 M423 314V324 M423 324V334 M513 314V324 M513 324V334 M603 314V324 M603 324V334 M693 314V324 M693 324V334 M783 314V324 M783 324V334 M873 314V324 M873 324V334 M963 314V324 M963 324V334 M1053 314V324 M1053 324V334 M18 344H23 M23 344H28 M28 344H33 M33 344H38 M38 344H43 M43 344H48 M48 344H53 M53 344H58 M58 344H63 M63 344H68 M68 344H73 M73 344H78 M78 344H83 M83 344H88 M88 344H93 M93 344H98 M98 344H103 M103 344H108 M108 344H113 M113 344H118 M118 344H123 M123 344H128 M128 344H133 M133 344H138 M138 344H143 M143 344H148 M148 344H153 M153 344H158 M158 344H163 M163 344H168 M168 344H173 M173 344H178 M178 344H183 M183 344H188 M188 344H193 M193 344H198 M198 344H203 M203 344H208 M208 344H213 M213 344H218 M218 344H223 M223 344H228 M228 344H233 M233 344H238 M238 344H243 M243 344H248 M248 344H253 M253 344H258 M258 344H263 M263 344H268 M268 344H273 M273 344H278 M278 344H283 M283 344H288 M288 344H293 M293 344H298 M298 344H303 M303 344H308 M308 344H313 M313 344H318 M318 344H323 M323 344H328 M328 344H333 M333 344H338 M338 344H343 M343 344H348 M348 344H353 M353 344H358 M358 344H363 M363 344H368 M368 344H373 M373 344H378 M378 344H383 M383 344H388 M388 344H393 M393 344H398 M398 344H403 M403 344H408 M408 344H413 M413 344H418 M418 344H423 M423 344H428 M423 334V344 M423 344V354 M428 344H433 M433 344H438 M438 344H443 M443 344H448 M448 344H453 M453 344H458 M458 344H463 M463 344H468 M468 344H473 M473 344H478 M478 344H483 M483 344H488 M488 344H493 M493 344H498 M498 344H503 M503 344H508 M508 344H513 M513 344H518 M513 334V344 M513 344V354 M518 344H523 M523 344H528 M528 344H533 M533 344H538 M538 344H543 M543 344H548 M548 344H553 M553 344H558 M558 344H563 M563 344H568 M568 344H573 M573 344H578 M578 344H583 M583 344H588 M588 344H593 M593 344H598 M598 344H603 M603 344H608 M603 334V344 M603 344V354 M608 344H613 M613 344H618 M618 344H623 M623 344H628 M628 344H633 M633 344H638 M638 344H643 M643 344H648 M648 344H653 M653 344H658 M658 344H663 M663 344H668 M668 344H673 M673 344H678 M678 344H683 M683 344H688 M688 344H693 M693 344H698 M693 334V344 M693 344V354 M698 344H703 M703 344H708 M708 344H713 M713 344H718 M718 344H723 M723 344H728 M728 344H733 M733 344H738 M738 344H743 M743 344H748 M748 344H753 M753 344H758 M758 344H763 M763 344H768 M768 344H773 M773 344H778 M778 344H783 M783 344H788 M783 334V344 M783 344V354 M788 344H793 M793 344H798 M798 344H803 M803 344H808 M808 344H813 M813 344H818 M818 344H823 M823 344H828 M828 344H833 M833 344H838 M838 344H843 M843 344H848 M848 344H853 M853 344H858 M858 344H863 M863 344H868 M868 344H873 M873 344H878 M873 334V344 M873 344V354 M878 344H883 M883 344H888 M888 344H893 M893 344H898 M898 344H903 M903 344H908 M908 344H913 M913 344H918 M918 344H923 M923 344H928 M928 344H933 M933 344H938 M938 344H943 M943 344H948 M948 344H953 M953 344H958 M958 344H963 M963 344H968 M963 334V344 M963 344V354 M968 344H973 M973 344H978 M978 344H983 M983 344H988 M988 344H993 M993 344H998 M998 344H1003 M1003 344H1008 M1008 344H1013 M1013 344H1018 M1018 344H1023 M1023 344H1028 M1028 344H1033 M1033 344H1038 M1038 344H1043 M1043 344H1048 M1048 344H1053 M1053 344H1058 M1053 334V344 M1053 344V354 M1058 344H1063 M1063 344H1068 M1068 344H1073 M1073 344H1078 M1078 344H1083 M1083 344H1088 M1088 344H1093 M1093 344H1098 M1098 344H1103 M1103 344H1108 M1108 344H1113 M1113 344H1118 M1118 344H1123 M1123 344H1128 M1128 344H1133 M1133 344H1138 M423 354V364 M423 364V374 M513 354V364 M513 364V374 M603 354V364 M603 364V374 M693 354V364 M693 364V374 M783 354V364 M783 364V374 M873 354V364 M873 364V374 M963 354V364 M963 364V374 M1053 354V364 M1053 364V374 M423 374V384 M423 384V394 M513 374V384 M513 384V394 M603 374V384 M603 384V394 M693 374V384 M693 384V394 M783 374V384 M783 384V394 M873 374V384 M873 384V394 M963 374V384 M963 384V394 M1053 374V384 M1053 384V394 M423 394V404 M423 404V414 M513 394V404 M513 404V414 M603 394V404 M603 404V414 M693 394V404 M693 404V414 M783 394V404 M783 404V414 M873 394V404 M873 404V414 M963 394V404 M963 404V414 M1053 394V404 M1053 404V414 M423 414V424 M423 424V434 M513 414V424 M513 424V434 M603 414V424 M603 424V434 M693 414V424 M693 424V434 M783 414V424 M783 424V434 M873 414V424 M873 424V434 M963 414V424 M963 424V434 M1053 414V424 M1053 424V434" fill="none" stroke="#7c7f82" stroke-width="1" stroke-linecap="square"/>
+</svg>

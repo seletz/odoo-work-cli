@@ -1,0 +1,7 @@
+Dry run: would create this entry; nothing was written.
+  Date:        2026-04-09
+  Project:     Lighthouse Portal (1)
+  Task:        Code review (13)
+  Hours:       1:30
+  Description: Review fuzzy matching
+Warning: possible duplicate of entry 4018 (same day, project, task and description)

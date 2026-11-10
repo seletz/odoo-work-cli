@@ -1,0 +1,9 @@
+Date: 2026-04-08
+
+ID       Date         ProjID   Project                   TaskID   Task                      Hours  Status     Description
+-------- ------------ -------- ------------------------- -------- ------------------------- ------ ---------- ------------------------------
+4016     2026-04-08   3        Internal                  32       Training                  1:30   draft      Accessibility workshop
+4015     2026-04-08   2        Orchard Mobile App        22       Support                   2:30   draft      Crash report on login
+4014     2026-04-08   1        Lighthouse Portal         12       Frontend                  4:00   draft      Result list layout
+
+Total: 8:00 (3 entries)

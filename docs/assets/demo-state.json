@@ -1,0 +1,442 @@
+{
+  "next_id": 5000,
+  "user": {
+    "ID": 2,
+    "Name": "Alex Demo",
+    "Login": "alex.demo@example.invalid",
+    "Email": "alex.demo@example.invalid",
+    "Company": "Example Consulting"
+  },
+  "employee_id": 7,
+  "projects": [
+    {
+      "ID": 1,
+      "Name": "Lighthouse Portal",
+      "Active": true,
+      "Customer": "Example Harbor Ltd",
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "ProjectManager": "Alex Demo",
+      "ExtraFields": null
+    },
+    {
+      "ID": 2,
+      "Name": "Orchard Mobile App",
+      "Active": true,
+      "Customer": "Example Orchard Inc",
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "ProjectManager": "Alex Demo",
+      "ExtraFields": null
+    },
+    {
+      "ID": 3,
+      "Name": "Internal",
+      "Active": true,
+      "Customer": "",
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "ProjectManager": "Alex Demo",
+      "ExtraFields": null
+    },
+    {
+      "ID": 4,
+      "Name": "Riverbank Data Migration",
+      "Active": true,
+      "Customer": "Example River Co",
+      "Company": "Wildflower Labs",
+      "Stage": "In Progress",
+      "ProjectManager": "Alex Demo",
+      "ExtraFields": null
+    }
+  ],
+  "tasks": [
+    {
+      "ID": 11,
+      "Name": "Backend API",
+      "Project": "Lighthouse Portal",
+      "ProjectID": 1,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 12,
+      "Name": "Frontend",
+      "Project": "Lighthouse Portal",
+      "ProjectID": 1,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 13,
+      "Name": "Code review",
+      "Project": "Lighthouse Portal",
+      "ProjectID": 1,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 21,
+      "Name": "Release 2.4",
+      "Project": "Orchard Mobile App",
+      "ProjectID": 2,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 22,
+      "Name": "Support",
+      "Project": "Orchard Mobile App",
+      "ProjectID": 2,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 31,
+      "Name": "Meetings",
+      "Project": "Internal",
+      "ProjectID": 3,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 32,
+      "Name": "Training",
+      "Project": "Internal",
+      "ProjectID": 3,
+      "Company": "Example Consulting",
+      "Stage": "In Progress",
+      "Active": true
+    },
+    {
+      "ID": 41,
+      "Name": "Data mapping",
+      "Project": "Riverbank Data Migration",
+      "ProjectID": 4,
+      "Company": "Wildflower Labs",
+      "Stage": "In Progress",
+      "Active": true
+    }
+  ],
+  "timesheets": [
+    {
+      "ID": 4001,
+      "Date": "2026-03-30",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 11,
+      "Task": "Backend API",
+      "Name": "Pagination for the search endpoint",
+      "Hours": 4,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4002,
+      "Date": "2026-03-30",
+      "ProjectID": 3,
+      "Project": "Internal",
+      "TaskID": 31,
+      "Task": "Meetings",
+      "Name": "Sprint planning",
+      "Hours": 1.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4003,
+      "Date": "2026-03-30",
+      "ProjectID": 2,
+      "Project": "Orchard Mobile App",
+      "TaskID": 22,
+      "Task": "Support",
+      "Name": "Ticket triage",
+      "Hours": 2.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4004,
+      "Date": "2026-03-31",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 12,
+      "Task": "Frontend",
+      "Name": "Filter sidebar",
+      "Hours": 5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4005,
+      "Date": "2026-03-31",
+      "ProjectID": 4,
+      "Project": "Riverbank Data Migration",
+      "TaskID": 41,
+      "Task": "Data mapping",
+      "Name": "Map legacy customer fields",
+      "Hours": 3,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Wildflower Labs"
+    },
+    {
+      "ID": 4006,
+      "Date": "2026-04-01",
+      "ProjectID": 2,
+      "Project": "Orchard Mobile App",
+      "TaskID": 21,
+      "Task": "Release 2.4",
+      "Name": "Release notes",
+      "Hours": 2,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4007,
+      "Date": "2026-04-01",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 13,
+      "Task": "Code review",
+      "Name": "Review search endpoint",
+      "Hours": 1.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4008,
+      "Date": "2026-04-01",
+      "ProjectID": 4,
+      "Project": "Riverbank Data Migration",
+      "TaskID": 41,
+      "Task": "Data mapping",
+      "Name": "Map legacy order fields",
+      "Hours": 4.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Wildflower Labs"
+    },
+    {
+      "ID": 4009,
+      "Date": "2026-04-02",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 11,
+      "Task": "Backend API",
+      "Name": "Rate limiting",
+      "Hours": 6,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4010,
+      "Date": "2026-04-02",
+      "ProjectID": 3,
+      "Project": "Internal",
+      "TaskID": 31,
+      "Task": "Meetings",
+      "Name": "Retro",
+      "Hours": 1,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "validated",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4011,
+      "Date": "2026-04-07",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 11,
+      "Task": "Backend API",
+      "Name": "Search: fuzzy matching",
+      "Hours": 3.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4012,
+      "Date": "2026-04-07",
+      "ProjectID": 3,
+      "Project": "Internal",
+      "TaskID": 31,
+      "Task": "Meetings",
+      "Name": "Weekly sync",
+      "Hours": 1,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4013,
+      "Date": "2026-04-07",
+      "ProjectID": 4,
+      "Project": "Riverbank Data Migration",
+      "TaskID": 41,
+      "Task": "Data mapping",
+      "Name": "Import dry run",
+      "Hours": 3.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Wildflower Labs"
+    },
+    {
+      "ID": 4014,
+      "Date": "2026-04-08",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 12,
+      "Task": "Frontend",
+      "Name": "Result list layout",
+      "Hours": 4,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4015,
+      "Date": "2026-04-08",
+      "ProjectID": 2,
+      "Project": "Orchard Mobile App",
+      "TaskID": 22,
+      "Task": "Support",
+      "Name": "Crash report on login",
+      "Hours": 2.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4016,
+      "Date": "2026-04-08",
+      "ProjectID": 3,
+      "Project": "Internal",
+      "TaskID": 32,
+      "Task": "Training",
+      "Name": "Accessibility workshop",
+      "Hours": 1.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4017,
+      "Date": "2026-04-09",
+      "ProjectID": 2,
+      "Project": "Orchard Mobile App",
+      "TaskID": 21,
+      "Task": "Release 2.4",
+      "Name": "Store screenshots",
+      "Hours": 2,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4018,
+      "Date": "2026-04-09",
+      "ProjectID": 1,
+      "Project": "Lighthouse Portal",
+      "TaskID": 13,
+      "Task": "Code review",
+      "Name": "Review fuzzy matching",
+      "Hours": 1.5,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    },
+    {
+      "ID": 4019,
+      "Date": "2026-04-09",
+      "ProjectID": 3,
+      "Project": "Internal",
+      "TaskID": 31,
+      "Task": "Meetings",
+      "Name": "Customer call",
+      "Hours": 0.75,
+      "Employee": "Alex Demo",
+      "ValidatedStatus": "draft",
+      "Company": "Example Consulting"
+    }
+  ],
+  "attendances": [
+    {
+      "ID": 4601,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-03-30T08:30:00+02:00",
+      "CheckOut": "2026-03-30T16:45:00+02:00",
+      "WorkedHours": 8.25
+    },
+    {
+      "ID": 4602,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-03-31T08:15:00+02:00",
+      "CheckOut": "2026-03-31T16:30:00+02:00",
+      "WorkedHours": 8.25
+    },
+    {
+      "ID": 4603,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-04-01T08:20:00+02:00",
+      "CheckOut": "2026-04-01T16:20:00+02:00",
+      "WorkedHours": 8
+    },
+    {
+      "ID": 4604,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-04-02T08:00:00+02:00",
+      "CheckOut": "2026-04-02T15:00:00+02:00",
+      "WorkedHours": 7
+    },
+    {
+      "ID": 4605,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-04-07T08:10:00+02:00",
+      "CheckOut": "2026-04-07T16:40:00+02:00",
+      "WorkedHours": 8.5
+    },
+    {
+      "ID": 4606,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-04-08T08:30:00+02:00",
+      "CheckOut": "2026-04-08T12:00:00+02:00",
+      "WorkedHours": 3.5
+    },
+    {
+      "ID": 4607,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-04-08T12:30:00+02:00",
+      "CheckOut": "2026-04-08T17:00:00+02:00",
+      "WorkedHours": 4.5
+    },
+    {
+      "ID": 4608,
+      "EmployeeID": 7,
+      "Employee": "Alex Demo",
+      "CheckIn": "2026-04-09T08:41:00+02:00",
+      "CheckOut": null,
+      "WorkedHours": 0
+    }
+  ]
+}
