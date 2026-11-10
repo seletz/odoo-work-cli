@@ -53,7 +53,7 @@ internal/parsing/             # Date and hours parsing helpers
 internal/display/             # Output formatting
 internal/tui/                 # Bubbletea TUI: model, grid, rendering, keymap, styles, holidays
 internal/version/             # Version string injected at build time via ldflags
-internal/docsgen/             # Docs generator: demo state, TUI screenshots (SVG + goldens), CLI samples, command reference (Markdown + man pages)
+internal/docsgen/             # Docs generator: demo state, TUI screenshots (PNG + goldens), CLI samples, command reference (Markdown + man pages)
 internal/manual/              # Command reference metadata: cobra annotation keys, env/file/error-kind texts
 tools/docsgen/                # `go run ./tools/docsgen screenshots|reference`
 docs/                         # Zensical site (Diátaxis); docs/assets/{screenshots,cli} and docs/reference/commands are generated

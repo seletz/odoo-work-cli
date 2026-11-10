@@ -5,8 +5,10 @@ set -euo pipefail
 # into a temporary directory (tools/docsgen) and compare with the committed
 # files. A difference means the TUI, a command's output or a command's help
 # changed and the docs were not regenerated (the command reference covers
-# the site pages and the man pages); the script then says which
-# files differ, how to fix it, and exits 1. The mise tasks
+# the site pages and the man pages); the script then says which files
+# differ, how to fix it, and exits 1. The goldens, CLI samples, reference
+# pages and man pages compare by bytes, the PNG screenshots by decoded
+# pixels and dimensions (tools/docsgen compare-png). The mise tasks
 # docs:screenshots:check and docs:reference:check and the CI call it.
 #
 # Usage: scripts/docs-check.sh screenshots|reference
@@ -30,9 +32,15 @@ cd "$ROOT"
 case "$WHAT" in
   screenshots)
     go run ./tools/docsgen screenshots \
-      -svg "$TMP/svg" -golden "$TMP/golden" -samples "$TMP/cli" -state "$TMP/demo-state.json" >/dev/null
+      -png "$TMP/png" -golden "$TMP/golden" -samples "$TMP/cli" -state "$TMP/demo-state.json" >/dev/null
     compare internal/docsgen/testdata/frames "$TMP/golden" "TUI goldens in internal/docsgen/testdata/frames/"
-    compare docs/assets/screenshots "$TMP/svg" "TUI screenshots in docs/assets/screenshots/"
+    # The PNGs compare by decoded pixels: their zlib bytes change with the
+    # Go version, the image does not.
+    if ! go run ./tools/docsgen compare-png docs/assets/screenshots "$TMP/png" 2>"$TMP/png.diff"; then
+      echo "TUI screenshots in docs/assets/screenshots/ are stale:" >&2
+      head -n 60 "$TMP/png.diff" >&2
+      stale=1
+    fi
     compare docs/assets/cli "$TMP/cli" "CLI samples in docs/assets/cli/"
     if ! cmp -s docs/assets/demo-state.json "$TMP/demo-state.json"; then
       echo "docs/assets/demo-state.json is stale" >&2

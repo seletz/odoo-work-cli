@@ -5,7 +5,7 @@ and coding agents, and a TUI for the weekly grid.
 
 **Documentation: <https://seletz.github.io/odoo-work-cli/>**
 
-![The TUI: weekly grid with attendance per day](docs/assets/screenshots/grid.svg)
+![The TUI: weekly grid with attendance per day](docs/assets/screenshots/grid.png)
 
 ## Features
 
