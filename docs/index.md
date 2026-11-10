@@ -1,8 +1,11 @@
 ---
 title: Home
 icon: lucide/clock
+render_macros: true
 ---
 # odoo-work-cli
+
+{{ version_banner() }}
 
 `odoo-work-cli` books Odoo 17 timesheets and attendance from the terminal. It
 has a CLI for scripts and coding agents, with stable JSON output and error

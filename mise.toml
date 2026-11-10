@@ -22,7 +22,7 @@ go build -ldflags "-X github.com/seletz/odoo-work-cli/internal/version.Version=$
 """
 
 [tasks.release]
-description = "Create a new release (interactive semver bump)"
+description = "Create a new release (interactive semver bump; refuses an empty Unreleased changelog section)"
 run = "scripts/release.sh"
 
 [tasks.run]
@@ -58,6 +58,10 @@ run = "go test -tags devverify -count=1 -run TestDevVerify_LoginFlowCanary -v ./
 description = "Run all tests"
 run = "go test ./..."
 
+[tasks."changelog:check"]
+description = "Fail when the [Unreleased] section of CHANGELOG.md has no entries"
+run = "go run ./tools/changelog check"
+
 [tasks.lint]
 description = "Run golangci-lint"
 run = "golangci-lint run ./..."
@@ -84,9 +88,12 @@ depends = ["uv:sync"]
 run = "uv run --locked zensical serve --open"
 
 [tasks."docs:build"]
-description = "Build the documentation site (strict) into site/"
+description = "Build the documentation site (strict) into site/ and check that it shows its version"
 depends = ["uv:sync"]
-run = "uv run --locked zensical build --clean --strict"
+run = """
+uv run --locked zensical build --clean --strict
+scripts/docs-version-check.sh
+"""
 
 [tasks."docs:screenshots"]
 description = "Render the TUI screenshots, their text goldens, the CLI output samples and the demo state from the fake backend (fixed clock)"

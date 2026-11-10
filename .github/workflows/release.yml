@@ -1,6 +1,6 @@
 name: Release
 
-# Tag v*: verify (tests, lint, docs) -> GoReleaser -> deploy the docs site.
+# Tag v*: verify (tests, lint, changelog, docs) -> GoReleaser -> deploy the docs site.
 # Nothing is released when the verification fails; the site is deployed only
 # after the release is out, so it always shows the state of the latest release.
 on:
@@ -28,6 +28,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Changelog has a section for the tag
+        # scripts/release.sh cuts [Unreleased] into the section of the new
+        # version before tagging; a tag without one has no release notes.
+        run: go run ./tools/changelog section "$GITHUB_REF_NAME" > /dev/null
+
       - name: Vet
         run: go vet ./...
 
@@ -50,7 +55,12 @@ jobs:
         run: uv sync --locked
 
       - name: Build docs (strict)
+        env:
+          DOCS_VERSION: ${{ github.ref_name }}
         run: uv run --locked zensical build --clean --strict
+
+      - name: Check the version on the site
+        run: scripts/docs-version-check.sh "$GITHUB_REF_NAME"
 
   goreleaser:
     needs: verify
@@ -68,12 +78,18 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Release notes from the changelog
+        # The section of the tag is the head of the release text; GoReleaser
+        # appends its commit list below it (--release-header, not
+        # --release-notes: that would skip the commit list).
+        run: go run ./tools/changelog section "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-header ${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
@@ -104,7 +120,12 @@ jobs:
         run: uv sync --locked
 
       - name: Build docs (strict)
+        env:
+          DOCS_VERSION: ${{ github.ref_name }}
         run: uv run --locked zensical build --clean --strict
+
+      - name: Check the version on the site
+        run: scripts/docs-version-check.sh "$GITHUB_REF_NAME"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

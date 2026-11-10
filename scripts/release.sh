@@ -16,6 +16,15 @@ if ! mise run docs:check; then
     exit 1
 fi
 
+# A release needs release notes: the Unreleased section of the changelog is
+# the text of the GitHub release and the "Release notes" page of the site.
+if ! go run ./tools/changelog check; then
+    echo "" >&2
+    echo "Describe the changes in the [Unreleased] section of CHANGELOG.md, merge that," >&2
+    echo "and run the release again." >&2
+    exit 1
+fi
+
 echo "Current version: $LATEST"
 echo ""
 echo "Select bump type:"
@@ -57,10 +66,18 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     exit 0
 fi
 
+# Cut the release into the changelog before tagging, so the tag contains
+# the section the release workflow publishes.
+echo "Updating CHANGELOG.md for $NEXT..."
+go run ./tools/changelog release "$NEXT" "$(date +%Y-%m-%d)"
+git add CHANGELOG.md
+git commit -S -m "docs: changelog for $NEXT"
+
 echo "Tagging $NEXT..."
 git tag -a "$NEXT" -m "Release $NEXT"
 
-echo "Pushing tag to origin..."
+echo "Pushing the changelog commit and the tag to origin..."
+git push origin HEAD
 git push origin "$NEXT"
 
 echo ""
