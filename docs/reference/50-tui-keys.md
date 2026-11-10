@@ -61,13 +61,13 @@ detail_delete = "x"
 
 | View | Opened with | Screenshot |
 | --- | --- | --- |
-| Grid | start | [grid](../assets/screenshots/grid.svg) |
-| Detail | ++enter++ in the grid | [detail](../assets/screenshots/detail.svg) |
-| Edit form | ++e++ in the detail view | [edit](../assets/screenshots/edit.svg) |
-| Add form | ++a++ in the detail view | [add](../assets/screenshots/add.svg) |
-| Search | ++slash++ in the grid | [search](../assets/screenshots/search.svg) |
-| Attendance form | ++t++ in the grid | [attendance](../assets/screenshots/attendance.svg) |
-| Help | ++question++ | [help](../assets/screenshots/help.svg) |
+| Grid | start | [grid](../assets/screenshots/grid.png) |
+| Detail | ++enter++ in the grid | [detail](../assets/screenshots/detail.png) |
+| Edit form | ++e++ in the detail view | [edit](../assets/screenshots/edit.png) |
+| Add form | ++a++ in the detail view | [add](../assets/screenshots/add.png) |
+| Search | ++slash++ in the grid | [search](../assets/screenshots/search.png) |
+| Attendance form | ++t++ in the grid | [attendance](../assets/screenshots/attendance.png) |
+| Help | ++question++ | [help](../assets/screenshots/help.png) |
 
 ### The attendance rows
 
