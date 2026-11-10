@@ -22,7 +22,7 @@ go build -ldflags "-X github.com/seletz/odoo-work-cli/internal/version.Version=$
 """
 
 [tasks.release]
-description = "Create a new release (interactive semver bump)"
+description = "Create a new release (interactive semver bump; refuses an empty Unreleased changelog section)"
 run = "scripts/release.sh"
 
 [tasks.run]
@@ -58,6 +58,10 @@ run = "go test -tags devverify -count=1 -run TestDevVerify_LoginFlowCanary -v ./
 description = "Run all tests"
 run = "go test ./..."
 
+[tasks."changelog:check"]
+description = "Fail when the [Unreleased] section of CHANGELOG.md has no entries"
+run = "go run ./tools/changelog check"
+
 [tasks.lint]
 description = "Run golangci-lint"
 run = "golangci-lint run ./..."
@@ -84,9 +88,12 @@ depends = ["uv:sync"]
 run = "uv run --locked zensical serve --open"
 
 [tasks."docs:build"]
-description = "Build the documentation site (strict) into site/"
+description = "Build the documentation site (strict) into site/ and check that it shows its version"
 depends = ["uv:sync"]
-run = "uv run --locked zensical build --clean --strict"
+run = """
+uv run --locked zensical build --clean --strict
+scripts/docs-version-check.sh
+"""
 
 [tasks."docs:screenshots"]
 description = "Render the TUI screenshots, their text goldens, the CLI output samples and the demo state from the fake backend (fixed clock)"
@@ -104,10 +111,18 @@ run = "go run ./tools/docsgen reference"
 description = "Fail when the committed command reference or man pages differ from the code (CI runs this)"
 run = "scripts/docs-check.sh reference"
 
+[tasks."docs:mcp"]
+description = "Generate the MCP tool reference (docs/reference/60-mcp-tools.md) from the tool table"
+run = "go run ./tools/docsgen mcp"
+
+[tasks."docs:mcp:check"]
+description = "Check the MCP tool reference is up to date"
+run = "go test ./internal/cli -run TestMCPToolsReferenceUpToDate -count=1"
+
 [tasks."docs:generate"]
 description = "Regenerate everything generated in docs/"
-depends = ["docs:screenshots", "docs:reference"]
+depends = ["docs:screenshots", "docs:reference", "docs:mcp"]
 
 [tasks."docs:check"]
 description = "Check everything generated in docs/ is up to date"
-depends = ["docs:screenshots:check", "docs:reference:check"]
+depends = ["docs:screenshots:check", "docs:reference:check", "docs:mcp:check"]

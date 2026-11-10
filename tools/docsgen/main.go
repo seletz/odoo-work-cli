@@ -2,6 +2,7 @@
 //
 //	go run ./tools/docsgen screenshots   # TUI screenshots, goldens, CLI samples, demo state
 //	go run ./tools/docsgen reference     # command reference (site pages and man pages)
+//	go run ./tools/docsgen mcp           # MCP tool reference
 //	go run ./tools/docsgen compare-png committed fresh  # compare screenshots by pixels
 //
 // The output directories are flags, so scripts/docs-check.sh can render
@@ -28,7 +29,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: docsgen screenshots|reference|compare-png [flags]")
+		return fmt.Errorf("usage: docsgen screenshots|reference|mcp|compare-png [flags]")
 	}
 	// Every rendering happens in the demo's time zone, whatever TZ says.
 	time.Local = docsgen.Location
@@ -37,10 +38,12 @@ func run(args []string) error {
 		return screenshots(args[1:])
 	case "reference":
 		return reference(args[1:])
+	case "mcp":
+		return mcpTools(args[1:])
 	case "compare-png":
 		return comparePNG(args[1:])
 	}
-	return fmt.Errorf("unknown subcommand %q: use screenshots, reference or compare-png", args[0])
+	return fmt.Errorf("unknown subcommand %q: use screenshots, reference, mcp or compare-png", args[0])
 }
 
 func screenshots(args []string) error {
@@ -116,5 +119,20 @@ func comparePNG(args []string) error {
 	if len(diffs) > 0 {
 		return errStale
 	}
+	return nil
+}
+
+// mcpTools writes the MCP tool reference page. Its stale check is
+// TestMCPToolsReferenceUpToDate in internal/cli.
+func mcpTools(args []string) error {
+	fs := flag.NewFlagSet("mcp", flag.ExitOnError)
+	out := fs.String("out", "docs/reference/60-mcp-tools.md", "file of the MCP tool reference")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := os.WriteFile(*out, []byte(cli.MCPToolsReference()), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("wrote the MCP tool reference to %s\n", *out)
 	return nil
 }

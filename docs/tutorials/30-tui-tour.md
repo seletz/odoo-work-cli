@@ -38,6 +38,14 @@ Move with the arrow keys or ++h++ ++j++ ++k++ ++l++: up and down change the
 row, ++tab++ and ++shift+tab++ change the day, ++left++ and ++right++ change
 the week. The cursor starts on today.
 
+### Narrow terminals
+
+The grid adapts to the width of the terminal. At 80 columns the project/task
+column is squeezed, and a name that no longer fits is shortened in the middle
+(`[EXA] …pha: Design`), so rows that start alike stay distinct. The detail
+view shows the full name. Below 68 columns the TUI shows a "terminal too
+narrow" notice instead of a broken grid; widen the window and it comes back.
+
 Press ++h++ once to see the previous week, with Good Friday as a holiday:
 
 ![Previous week](../assets/screenshots/prev-week.png)

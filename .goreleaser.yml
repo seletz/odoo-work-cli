@@ -42,13 +42,36 @@ archives:
 checksum:
   name_template: "checksums-{{ .Tag }}.txt"
 
+# The release notes are the section of CHANGELOG.md for the tag (the release
+# job cuts it out and passes it as --release-header); GoReleaser appends the
+# commit list below them. Only commits whose subject ends in a PR number
+# ("... (#123)") are listed: that drops the merge commits ("Merge ...") and the
+# branch commits that the PR merge repeats with the same subject. docs: and
+# ci: commits are listed too, a docs-only release has nothing else to show.
 changelog:
   sort: asc
   filters:
+    include:
+      - '\(#\d+\)$'
     exclude:
-      - "^docs:"
+      - "^Merge"
       - "^test:"
       - "^chore:"
+  groups:
+    - title: Features
+      regexp: '^feat(\(.*\))?!?:'
+      order: 0
+    - title: Fixes
+      regexp: '^fix(\(.*\))?!?:'
+      order: 1
+    - title: Documentation
+      regexp: '^docs(\(.*\))?!?:'
+      order: 2
+    - title: CI
+      regexp: '^ci(\(.*\))?!?:'
+      order: 3
+    - title: Other
+      order: 999
 
 release:
   prerelease: auto
@@ -95,6 +118,8 @@ homebrew_casks:
       - man/man1/odoo-work-cli-entries-update.1
       - man/man1/odoo-work-cli-fields.1
       - man/man1/odoo-work-cli-llm.1
+      - man/man1/odoo-work-cli-mcp.1
+      - man/man1/odoo-work-cli-mcp-print.1
       - man/man1/odoo-work-cli-projects.1
       - man/man1/odoo-work-cli-tasks.1
       - man/man1/odoo-work-cli-timesheets.1

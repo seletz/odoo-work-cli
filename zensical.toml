@@ -96,6 +96,14 @@ toggle.name = "Switch to light mode"
 [project.theme.icon]
 logo = "lucide/clock"
 
+# Build-time macros (docs_macros.py in the repo root): version_banner() and
+# changelog(). Only pages with `render_macros: true` run through Jinja; a macro
+# error fails the build.
+[project.markdown_extensions."zensical.extensions.macros"]
+module_name = "docs_macros"
+render_by_default = false
+on_error_fail = true
+
 # Section titles come from each folder's index.md.
 [project.plugins."mkdocs-nav-weight"]
 section_renamed = true

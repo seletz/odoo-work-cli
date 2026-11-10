@@ -355,6 +355,7 @@ var SitePages = map[string]string{
 	"how-to/60-json-output.md":             "Script with JSON output",
 	"how-to/70-test-without-odoo.md":       "Test without Odoo",
 	"how-to/80-agents.md":                  "Use it from a coding agent",
+	"how-to/85-mcp.md":                     "Connect an MCP client",
 	"how-to/90-customise-tui.md":           "Customise the TUI",
 	"how-to/95-troubleshoot.md":            "Troubleshoot",
 	"explanation/attendance-model.md":      "The attendance model",
@@ -365,6 +366,7 @@ var SitePages = map[string]string{
 	"reference/30-errors.md":               "Errors and exit codes",
 	"reference/40-configuration.md":        "Configuration",
 	"reference/50-tui-keys.md":             "TUI keys and views",
+	"reference/60-mcp-tools.md":            "MCP tools",
 }
 
 // SiteURL is the base URL of the documentation site.
