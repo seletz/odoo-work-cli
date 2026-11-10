@@ -56,6 +56,9 @@ internal/version/             # Version string injected at build time via ldflag
 internal/docsgen/             # Docs generator: demo state, TUI screenshots (PNG + goldens), CLI samples, command reference (Markdown + man pages)
 internal/manual/              # Command reference metadata: cobra annotation keys, env/file/error-kind texts
 tools/docsgen/                # `go run ./tools/docsgen screenshots|reference`
+tools/changelog/              # `go run ./tools/changelog check|section|release|needed` (release tooling, CI)
+docs_macros.py                # Zensical macros: version_banner(), changelog()
+CHANGELOG.md                  # Keep a Changelog; the "Release notes" page and the GitHub release text
 docs/                         # Zensical site (Diátaxis); docs/assets/{screenshots,cli} and docs/reference/commands are generated
 man/man1/                     # Generated man pages (shipped in the release archives and the Homebrew cask)
 scripts/release.sh            # Interactive semver release script
@@ -149,6 +152,14 @@ The docs site follows the releases: on a `v*` tag `release.yml` runs
 
 ## Conventions
 
+- **Documentation duty:** a PR with a user-visible change (commands, flags,
+  output, TUI, config, behaviour) adds an entry under `## [Unreleased]` in
+  `CHANGELOG.md` and updates the docs pages it affects. CI (`changelog` job)
+  fails a PR that changes `cmd/` or non-test code in `internal/` without a
+  `CHANGELOG.md` change; the label `no-changelog` opts out (refactoring,
+  internal-only). `mise run release` refuses an empty `Unreleased`, cuts it
+  into `## [X.Y.Z] - DATE`, commits and tags; the section is the GitHub
+  release text and the verify job fails without it.
 - Conventional commits: `feat:`, `fix:`, `test:`, `refactor:`
 - Go RST-style docstrings
 - No personal data, credentials, or company-specific URLs in committed code

@@ -3,6 +3,8 @@ name: CI
 # Tests, vet and lint on every pull request and every push to develop.
 on:
   pull_request:
+    # labeled/unlabeled: adding the label no-changelog re-runs the changelog check.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches:
       - develop
@@ -38,3 +40,25 @@ jobs:
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
+
+  changelog:
+    # Documentation duty: a pull request that changes code under cmd/ or
+    # internal/ (not tests) adds an entry under [Unreleased] in CHANGELOG.md.
+    # Opt out with the label no-changelog (refactoring, internal changes).
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-changelog')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Changelog entry required
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --name-only "$BASE_SHA"...HEAD | go run ./tools/changelog needed

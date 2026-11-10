@@ -60,6 +60,13 @@ It does: the TUI grid ignores `[models.timesheet]` filters and shows all of
 your bookings. The `entries` and `timesheets` commands apply those filters;
 check them with `odoo-work-cli config --merged`.
 
+## The TUI says "terminal too narrow"
+
+The weekly grid needs at least 68 columns. Widen the terminal window or reduce
+the font size. On narrower terminals the TUI squeezes the project/task
+column and shortens long names in the middle (`[EXA] …pha: Design`); open the
+cell with ++enter++ to see the full name.
+
 ## Still stuck
 
 Run the command with `--json` and look at `kind`; the table in

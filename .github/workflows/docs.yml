@@ -36,6 +36,8 @@ jobs:
           fi
           echo "Building the site from $tag"
           git checkout --detach "$tag"
+          # The site shows the version of the tag it is built from.
+          echo "DOCS_VERSION=$tag" >> "$GITHUB_ENV"
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -66,6 +68,9 @@ jobs:
       - name: Build docs (strict)
         # Same command as `mise run docs:build`.
         run: uv run --locked zensical build --clean --strict
+
+      - name: Check the version on the site
+        run: scripts/docs-version-check.sh
 
       - name: Upload Pages artifact
         if: github.event_name == 'workflow_dispatch'
