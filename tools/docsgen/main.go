@@ -2,6 +2,7 @@
 //
 //	go run ./tools/docsgen screenshots   # TUI screenshots, goldens, CLI samples, demo state
 //	go run ./tools/docsgen reference     # command reference from cobra
+//	go run ./tools/docsgen mcp           # MCP tool reference
 //
 // The output directories are flags, so scripts/docs-check.sh can render
 // into a temporary directory and compare with the committed files.
@@ -27,7 +28,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: docsgen screenshots|reference [flags]")
+		return fmt.Errorf("usage: docsgen screenshots|reference|mcp [flags]")
 	}
 	// Every rendering happens in the demo's time zone, whatever TZ says.
 	time.Local = docsgen.Location
@@ -36,8 +37,10 @@ func run(args []string) error {
 		return screenshots(args[1:])
 	case "reference":
 		return reference(args[1:])
+	case "mcp":
+		return mcpTools(args[1:])
 	}
-	return fmt.Errorf("unknown subcommand %q: use screenshots or reference", args[0])
+	return fmt.Errorf("unknown subcommand %q: use screenshots, reference or mcp", args[0])
 }
 
 func screenshots(args []string) error {
@@ -88,5 +91,20 @@ func reference(args []string) error {
 		return err
 	}
 	fmt.Printf("wrote %d reference pages to %s\n", len(files), *out)
+	return nil
+}
+
+// mcpTools writes the MCP tool reference page. Its stale check is
+// TestMCPToolsReferenceUpToDate in internal/cli.
+func mcpTools(args []string) error {
+	fs := flag.NewFlagSet("mcp", flag.ExitOnError)
+	out := fs.String("out", "docs/reference/60-mcp-tools.md", "file of the MCP tool reference")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := os.WriteFile(*out, []byte(cli.MCPToolsReference()), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("wrote the MCP tool reference to %s\n", *out)
 	return nil
 }

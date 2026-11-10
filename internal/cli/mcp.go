@@ -326,7 +326,7 @@ Use --binary for an absolute path when the client does not search PATH, and
 		},
 	}
 	cmd.Flags().StringVar(&binary, "binary", MCPServerName, "command used in the entry, e.g. an absolute path")
-	cmd.Flags().BoolVar(&asCommand, "command", false, "print the `claude mcp add` command line instead of JSON")
+	cmd.Flags().BoolVar(&asCommand, "command", false, "print the claude mcp add command line instead of JSON")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "register the server with --read-only")
 	return cmd
 }

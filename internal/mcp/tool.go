@@ -69,6 +69,13 @@ type Tool struct {
 	TextDefaults map[string]string
 }
 
+// Hints returns the MCP annotations readOnlyHint, destructiveHint and
+// idempotentHint: a read-only tool is never destructive and always
+// idempotent.
+func (t Tool) Hints() (readOnly, destructive, idempotent bool) {
+	return t.ReadOnly, !t.ReadOnly && t.Destructive, t.ReadOnly || t.Idempotent
+}
+
 func (t Tool) descriptor() map[string]any {
 	props := map[string]any{}
 	required := []string{}
@@ -106,6 +113,7 @@ func (t Tool) descriptor() map[string]any {
 	if len(required) > 0 {
 		schema["required"] = required
 	}
+	readOnly, destructive, idempotent := t.Hints()
 	title := t.Title
 	if title == "" {
 		title = t.Name
@@ -117,9 +125,9 @@ func (t Tool) descriptor() map[string]any {
 		"inputSchema": schema,
 		"annotations": map[string]any{
 			"title":           title,
-			"readOnlyHint":    t.ReadOnly,
-			"destructiveHint": !t.ReadOnly && t.Destructive,
-			"idempotentHint":  t.ReadOnly || t.Idempotent,
+			"readOnlyHint":    readOnly,
+			"destructiveHint": destructive,
+			"idempotentHint":  idempotent,
 			"openWorldHint":   false,
 		},
 	}

@@ -104,10 +104,18 @@ run = "go run ./tools/docsgen reference"
 description = "Fail when the committed command reference differs from the code (CI runs this)"
 run = "scripts/docs-check.sh reference"
 
+[tasks."docs:mcp"]
+description = "Generate the MCP tool reference (docs/reference/60-mcp-tools.md) from the tool table"
+run = "go run ./tools/docsgen mcp"
+
+[tasks."docs:mcp:check"]
+description = "Check the MCP tool reference is up to date"
+run = "go test ./internal/cli -run TestMCPToolsReferenceUpToDate -count=1"
+
 [tasks."docs:generate"]
 description = "Regenerate everything generated in docs/"
-depends = ["docs:screenshots", "docs:reference"]
+depends = ["docs:screenshots", "docs:reference", "docs:mcp"]
 
 [tasks."docs:check"]
 description = "Check everything generated in docs/ is up to date"
-depends = ["docs:screenshots:check", "docs:reference:check"]
+depends = ["docs:screenshots:check", "docs:reference:check", "docs:mcp:check"]

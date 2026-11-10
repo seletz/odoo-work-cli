@@ -18,6 +18,7 @@ CLI for managing Odoo 17 timesheets
 * [odoo-work-cli entries](odoo-work-cli_entries.md)	 - List individual timesheet entries with full detail
 * [odoo-work-cli fields](odoo-work-cli_fields.md)	 - Inspect Odoo model fields
 * [odoo-work-cli llm](odoo-work-cli_llm.md)	 - Print a usage guide for LLM agents (--skill)
+* [odoo-work-cli mcp](odoo-work-cli_mcp.md)	 - Run the MCP server on stdin/stdout (started by the MCP client)
 * [odoo-work-cli projects](odoo-work-cli_projects.md)	 - List Odoo projects
 * [odoo-work-cli tasks](odoo-work-cli_tasks.md)	 - List Odoo tasks
 * [odoo-work-cli timesheets](odoo-work-cli_timesheets.md)	 - List Odoo timesheets for a week
