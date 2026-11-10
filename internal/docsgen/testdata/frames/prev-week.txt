@@ -1,0 +1,23 @@
+ W14  Mon 30 Mar 2026 — Sun 05 Apr 2026                                      ● In 08:41 (6:31)  Today 6:31 · Week 31:30
+
+Company Prefix / Project / Task         │     Mon│     Tue│     Wed│     Thu│     Fri│     Sat│     Sun│   Total
+                                        │        │        │        │        │Karfrei…│        │        │
+────────────────────────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────
+[EXA] Internal / Meetings               │    1:30│        │        │    1:00│        │        │        │    2:30
+[EXA] Lighthouse Portal / Backend API   │    4:00│        │        │    6:00│        │        │        │   10:00
+[EXA] Lighthouse Portal / Code review   │        │        │    1:30│        │        │        │        │    1:30
+[EXA] Lighthouse Portal / Frontend      │        │    5:00│        │        │        │        │        │    5:00
+[EXA] Orchard Mobile App / Release 2.4  │        │        │    2:00│        │        │        │        │    2:00
+[EXA] Orchard Mobile App / Support      │    2:30│        │        │        │        │        │        │    2:30
+[WIL] Riverbank Data Migration / Data   │        │    3:00│    4:30│        │        │        │        │    7:30
+mapping                                 │        │        │        │        │        │        │        │
+────────────────────────────────────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────
+Total                                   │    8:00│    8:00│    8:00│    7:00│        │        │        │   31:00
+────────────────────────────────────────┼────────┼────────┼────────┼────────┼────────┼────────┼────────┼────────
+Check-in                                │   08:30│   08:15│   08:20│   08:00│        │        │        │
+Check-out                               │   16:45│   16:30│   16:20│   15:00│        │        │        │
+Attendance                              │    8:15│    8:15│    8:00│    7:00│        │        │        │   31:30
+Diff                                    │   +0:15│   +0:15│    0:00│    0:00│        │        │        │   +0:30
+
+  ↑/k up • ↓/j down • tab next day • ←/h prev week • →/l next week • ↵ detail • e edit • a add • d delete • / search …
+ GRID                                                                                                       Week: 31:00

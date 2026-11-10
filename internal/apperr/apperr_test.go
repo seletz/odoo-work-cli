@@ -94,7 +94,7 @@ func TestWrap_Nil(t *testing.T) {
 }
 
 func TestKinds_AreStableStrings(t *testing.T) {
-	// These strings are a public contract (readme, #74 skill docs);
+	// These strings are a public contract (docs, #74 skill docs);
 	// renaming one is a breaking change.
 	want := map[Kind]string{
 		KindAuth:          "auth",
@@ -117,17 +117,18 @@ func TestKinds_AreStableStrings(t *testing.T) {
 	}
 }
 
-// TestKinds_DocumentedInReadme keeps the readme's "Errors" table in sync:
-// adding a kind without documenting it fails here.
-func TestKinds_DocumentedInReadme(t *testing.T) {
-	raw, err := os.ReadFile("../../readme.md")
+// TestKinds_Documented keeps the kinds table of the docs' error reference
+// in sync: adding a kind without documenting it fails here.
+func TestKinds_Documented(t *testing.T) {
+	const page = "../../docs/reference/30-errors.md"
+	raw, err := os.ReadFile(page)
 	if err != nil {
-		t.Fatalf("reading readme: %v", err)
+		t.Fatalf("reading %s: %v", page, err)
 	}
-	readme := string(raw)
+	doc := string(raw)
 	for _, k := range Kinds() {
-		if !strings.Contains(readme, "| `"+string(k)+"` ") {
-			t.Errorf("kind %q is not documented in the readme's error kinds table", k)
+		if !strings.Contains(doc, "| `"+string(k)+"` ") {
+			t.Errorf("kind %q is not documented in the kinds table of %s", k, page)
 		}
 	}
 }

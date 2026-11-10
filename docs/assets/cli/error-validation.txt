@@ -1,0 +1,6 @@
+{
+  "error": {
+    "kind": "validation",
+    "message": "hours must be a positive number (e.g. 1.5 or 1:30)"
+  }
+}

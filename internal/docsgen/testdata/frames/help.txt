@@ -1,0 +1,46 @@
+ W15  Mo╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮k 23:01
+        │                                                                                                      │
+Company │    Key Bindings                                                                                      │
+        │                                                                                                      │
+────────│    Navigation                                                                                        │
+[EXA] In│      ↑/k          up                                                                                 │
+[EXA] In│      ↓/j          down                                                                               │
+[EXA] Li│      tab          next day                                                                           │
+[EXA] Li│      s-tab        prev day                                                                           │
+[EXA] Li│                                                                                                      │
+[EXA] Or│    Grid View                                                                                         │
+[EXA] Or│      ↵            detail                                                                             │
+[WIL] Ri│      /            search                                                                             │
+mapping │      t            edit attendance                                                                    │
+────────│                                                                                                      │
+Total   │    Detail View                                                                                       │
+────────│      e            edit                                                                               │
+Check-in│      a            add                                                                                │
+Check-ou│      d            delete                                                                             │
+Attendan│                                                                                                      │
+Diff    │    Search                                                                                            │
+        │      C-a          toggle filter                                                                      │
+  ↑/k up│      tab          switch focus (field/results)                                                       │arch …
+ HELP   │                                                                                                      │: 20:15
+        │    Add/Edit Form                                                                                     │
+        │      tab          switch focus (hours/description)                                                   │
+        │      enter        save                                                                               │
+        │      esc          cancel                                                                             │
+        │                                                                                                      │
+        │    Attendance Form                                                                                   │
+        │      tab          switch focus (check-in/check-out)                                                  │
+        │      enter        save                                                                               │
+        │      esc          cancel                                                                             │
+        │                                                                                                      │
+        │    Global                                                                                            │
+        │      ←/h          prev week                                                                          │
+        │      →/l          next week                                                                          │
+        │      esc          back                                                                               │
+        │      c            clock in/out                                                                       │
+        │      r            refresh                                                                            │
+        │      ?            help                                                                               │
+        │      q            quit                                                                               │
+        │                                                                                                      │
+        │    Press Esc or ? to close                                                                           │
+        │                                                                                                      │
+        ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯

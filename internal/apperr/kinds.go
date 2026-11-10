@@ -2,12 +2,13 @@ package apperr
 
 // Kind is a stable, machine-readable error category. Its string value is
 // part of the CLI's public contract: it is emitted as
-// {"error":{"kind":…}} in JSON output and documented in the readme.
+// {"error":{"kind":…}} in JSON output and documented in
+// docs/reference/30-errors.md.
 // Never rename an existing kind; add a new constant instead.
 type Kind string
 
 // Error kinds. To add a kind, declare a constant here, append it to
-// Kinds, and document it in the readme ("Error kinds"). Nothing else in
+// Kinds, and document it in docs/reference/30-errors.md. Nothing else in
 // the rendering path needs to change.
 const (
 	// KindAuth: authentication failed (wrong API key or password, TOTP

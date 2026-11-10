@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
@@ -28,7 +29,7 @@ const (
 
 // RenderHeaderBar renders a styled top header bar with app name, week number,
 // date range, clock status, attendance totals, and loading indicator.
-func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAttendance []odoo.AttendanceRecord, loading bool, spin spinner.Model, width int) string {
+func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAttendance []odoo.AttendanceRecord, loading bool, spin spinner.Model, width int, now time.Time) string {
 	sunday := monday.AddDate(0, 0, 6)
 	_, isoWeek := monday.ISOWeek()
 
@@ -44,8 +45,8 @@ func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAt
 		loadingIndicator = " " + spin.View()
 	}
 
-	right := renderClockStatus(attendance)
-	if summary := renderAttendanceSummary(attendance, weekAttendance, time.Now()); summary != "" {
+	right := renderClockStatus(attendance, now)
+	if summary := renderAttendanceSummary(attendance, weekAttendance, now); summary != "" {
 		right += "  " + summary
 	}
 	right += loadingIndicator + " "
@@ -444,6 +445,18 @@ func detailTableStyles() table.Styles {
 	return s
 }
 
+// spliceLine puts box over bg starting at cell col. Both may hold escape
+// sequences, so the background is cut by terminal cell (ansi.Truncate),
+// never by rune; styles of the right part are reset before the box.
+func spliceLine(bg, box string, col int) string {
+	left := ansi.Truncate(bg, col, "")
+	if w := ansi.StringWidth(left); w < col {
+		left += strings.Repeat(" ", col-w)
+	}
+	right := ansi.TruncateLeft(bg, col+ansi.StringWidth(box), "")
+	return left + "\x1b[m" + box + "\x1b[m" + right
+}
+
 // RenderDetailOverlay composites a bordered detail box centered on top of bg.
 // boxStyle selects which border style to use for the overlay.
 func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int, boxStyle lipgloss.Style) string {
@@ -475,28 +488,22 @@ func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int, boxStyle lipg
 		if row >= len(bgLines) {
 			break
 		}
-		bgRunes := []rune(bgLines[row])
-		// Pad bg line if needed.
-		for len(bgRunes) < startCol+len([]rune(bline)) {
-			bgRunes = append(bgRunes, ' ')
-		}
-		// Overwrite bg runes with box content.
-		copy(bgRunes[startCol:], []rune(bline))
-		bgLines[row] = string(bgRunes)
+		bgLines[row] = spliceLine(bgLines[row], bline, startCol)
 	}
 
 	return strings.Join(bgLines, "\n")
 }
 
-// renderClockStatus returns a styled clock-in/out status string.
-func renderClockStatus(attendance *odoo.AttendanceStatus) string {
+// renderClockStatus returns a styled clock-in/out status string; the
+// elapsed time of a running period counts up to now.
+func renderClockStatus(attendance *odoo.AttendanceStatus, now time.Time) string {
 	if attendance == nil {
 		return ""
 	}
 	if !attendance.ClockedIn || attendance.CheckIn == nil {
 		return clockedOutStyle.Render("● Out")
 	}
-	elapsed := time.Since(*attendance.CheckIn)
+	elapsed := now.Sub(*attendance.CheckIn)
 	h := int(elapsed.Hours())
 	m := int(elapsed.Minutes()) % 60
 	text := fmt.Sprintf("● In %s (%d:%02d)",
@@ -847,7 +854,7 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 func lipglossWidth(lines []string) int {
 	max := 0
 	for _, l := range lines {
-		w := len([]rune(l))
+		w := ansi.StringWidth(l)
 		if w > max {
 			max = w
 		}

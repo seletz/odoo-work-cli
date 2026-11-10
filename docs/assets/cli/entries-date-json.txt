@@ -1,0 +1,44 @@
+[
+  {
+    "id": 4019,
+    "date": "2026-04-09",
+    "project_id": 3,
+    "project": "Internal",
+    "task_id": 31,
+    "task": "Meetings",
+    "description": "Customer call",
+    "hours": 0.75,
+    "minutes": 45,
+    "employee": "Alex Demo",
+    "status": "draft",
+    "company": "Example Consulting"
+  },
+  {
+    "id": 4018,
+    "date": "2026-04-09",
+    "project_id": 1,
+    "project": "Lighthouse Portal",
+    "task_id": 13,
+    "task": "Code review",
+    "description": "Review fuzzy matching",
+    "hours": 1.5,
+    "minutes": 90,
+    "employee": "Alex Demo",
+    "status": "draft",
+    "company": "Example Consulting"
+  },
+  {
+    "id": 4017,
+    "date": "2026-04-09",
+    "project_id": 2,
+    "project": "Orchard Mobile App",
+    "task_id": 21,
+    "task": "Release 2.4",
+    "description": "Store screenshots",
+    "hours": 2,
+    "minutes": 120,
+    "employee": "Alex Demo",
+    "status": "draft",
+    "company": "Example Consulting"
+  }
+]

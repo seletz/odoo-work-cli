@@ -422,7 +422,7 @@ func TestModel_AttendanceTickStopsWhenNotClockedIn(t *testing.T) {
 }
 
 func TestRenderClockStatus_Nil(t *testing.T) {
-	result := renderClockStatus(nil)
+	result := renderClockStatus(nil, time.Now())
 	if result != "" {
 		t.Fatalf("expected empty string for nil attendance, got %q", result)
 	}
@@ -430,7 +430,7 @@ func TestRenderClockStatus_Nil(t *testing.T) {
 
 func TestRenderClockStatus_NotClockedIn(t *testing.T) {
 	status := &odoo.AttendanceStatus{ClockedIn: false}
-	result := renderClockStatus(status)
+	result := renderClockStatus(status, time.Now())
 	if !strings.Contains(result, "Out") {
 		t.Fatalf("expected 'Out' in %q", result)
 	}
@@ -439,7 +439,7 @@ func TestRenderClockStatus_NotClockedIn(t *testing.T) {
 func TestRenderClockStatus_ClockedIn(t *testing.T) {
 	checkIn := time.Now().Add(-90 * time.Minute)
 	status := &odoo.AttendanceStatus{ClockedIn: true, CheckIn: &checkIn}
-	result := renderClockStatus(status)
+	result := renderClockStatus(status, time.Now())
 	if !strings.Contains(result, "In") {
 		t.Fatalf("expected 'In' in %q", result)
 	}

@@ -4,6 +4,7 @@ op = "latest"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "latest"
 gh = "latest"
 goreleaser = "latest"
+uv = "latest"
 
 [env]
 # Dev-environment credentials, generated from 1p.env via `mise run prepare_env`.
@@ -72,3 +73,41 @@ run = "goreleaser check"
 [tasks.goreleaser-snapshot]
 description = "Test GoReleaser build locally (no publish)"
 run = "goreleaser release --snapshot --clean"
+
+[tasks."uv:sync"]
+description = "Install the docs toolchain (Zensical) into .venv"
+run = "uv sync --locked"
+
+[tasks."docs:serve"]
+description = "Serve the documentation locally with live reload"
+depends = ["uv:sync"]
+run = "uv run --locked zensical serve --open"
+
+[tasks."docs:build"]
+description = "Build the documentation site (strict) into site/"
+depends = ["uv:sync"]
+run = "uv run --locked zensical build --clean --strict"
+
+[tasks."docs:screenshots"]
+description = "Render the TUI screenshots, their text goldens, the CLI output samples and the demo state from the fake backend (fixed clock)"
+run = "go run ./tools/docsgen screenshots"
+
+[tasks."docs:screenshots:check"]
+description = "Fail when the committed screenshots, goldens or CLI samples differ from a fresh render (CI runs this)"
+run = "scripts/docs-check.sh screenshots"
+
+[tasks."docs:reference"]
+description = "Generate the command reference (docs/reference/commands) from the cobra command tree"
+run = "go run ./tools/docsgen reference"
+
+[tasks."docs:reference:check"]
+description = "Fail when the committed command reference differs from the code (CI runs this)"
+run = "scripts/docs-check.sh reference"
+
+[tasks."docs:generate"]
+description = "Regenerate everything generated in docs/"
+depends = ["docs:screenshots", "docs:reference"]
+
+[tasks."docs:check"]
+description = "Check everything generated in docs/ is up to date"
+depends = ["docs:screenshots:check", "docs:reference:check"]

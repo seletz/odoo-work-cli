@@ -1,0 +1,101 @@
+[project]
+site_name = "odoo-work-cli"
+site_description = "Book Odoo 17 timesheets and attendance from the terminal: CLI, TUI and a JSON contract for scripts and agents."
+site_author = "Stefan Eletzhofer"
+site_url = "https://seletz.github.io/odoo-work-cli/"
+repo_url = "https://github.com/seletz/odoo-work-cli"
+repo_name = "seletz/odoo-work-cli"
+copyright = "Copyright &copy; 2026 Stefan Eletzhofer"
+
+# Strict: dead internal links, broken anchors and missing snippet files
+# fail the build instead of warning. What is green locally stays green in CI.
+strict = true
+
+# No explicit `nav`: the sidebar follows the four Diátaxis folders
+# docs/tutorials, docs/how-to, docs/reference and docs/explanation. Each
+# folder has an index.md as its landing page (`navigation.indexes`), which
+# also gives the section its title (`section_renamed`) and its position via
+# `weight:` in the front matter. Pages sort by file name; number prefixes
+# where the order matters. docs/reference/commands is generated
+# (`mise run docs:reference`).
+
+# Zensical replaces (does not merge) the default extension list when this
+# key is set, so everything in use is listed explicitly.
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+"pymdownx.betterem" = {}
+"pymdownx.details" = {}
+"pymdownx.inlinehilite" = {}
+"pymdownx.keys" = {}
+"pymdownx.magiclink" = {}
+"pymdownx.mark" = {}
+"pymdownx.smartsymbols" = {}
+"pymdownx.tasklist" = { custom_checkbox = true }
+
+[project.markdown_extensions.toc]
+permalink = true
+
+# CLI output samples are generated into docs/assets/cli by
+# `mise run docs:screenshots` and included with --8<-- "docs/assets/cli/…".
+# check_paths: a missing sample breaks the build.
+[project.markdown_extensions."pymdownx.snippets"]
+base_path = ["."]
+check_paths = true
+
+# Icons in text (:lucide-wrench:, :octicons-arrow-right-24:) for the cards
+# of the landing page.
+[project.markdown_extensions."pymdownx.emoji"]
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+
+[project.markdown_extensions."pymdownx.highlight"]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
+[project.markdown_extensions."pymdownx.superfences"]
+custom_fences = [{ name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }]
+
+[project.markdown_extensions."pymdownx.tabbed"]
+alternate_style = true
+combine_header_slug = true
+
+[project.theme]
+language = "en"
+# No instant navigation: Safari leaves the address bar on the old URL after
+# history.pushState (same as total-recall).
+features = [
+    "content.code.annotate",
+    "content.code.copy",
+    "content.code.select",
+    "content.tabs.link",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.top",
+    "navigation.tracking",
+    "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.theme.icon]
+logo = "lucide/clock"
+
+# Section titles come from each folder's index.md.
+[project.plugins."mkdocs-nav-weight"]
+section_renamed = true

@@ -150,6 +150,30 @@ type Model struct {
 	att attendanceState // attendance edit overlay (issue #47)
 
 	now func() time.Time // clock source, overridable in tests
+
+	// tick schedules the attendance ticker; tea.Tick by default. The
+	// screenshot renderer replaces it so a headless run never waits.
+	tick func(time.Duration, func(time.Time) tea.Msg) tea.Cmd
+}
+
+// WithNow returns the model with now as its clock source: today's column,
+// elapsed clock-in time and attendance totals all follow it.
+//
+// :param now: the clock source
+// :returns: the updated model
+func (m Model) WithNow(now func() time.Time) Model {
+	m.now = now
+	return m
+}
+
+// WithTick returns the model with tick as the scheduler of the attendance
+// ticker (tea.Tick by default).
+//
+// :param tick: replacement for tea.Tick
+// :returns: the updated model
+func (m Model) WithTick(tick func(time.Duration, func(time.Time) tea.Msg) tea.Cmd) Model {
+	m.tick = tick
+	return m
 }
 
 // MondayTime wraps time.Time for the Monday of the displayed week.
@@ -177,6 +201,7 @@ func NewModel(client odoo.Client, monday MondayTime, limits config.HoursLimits, 
 		help:          help.New(),
 		keys:          km,
 		now:           time.Now,
+		tick:          tea.Tick,
 	}
 }
 
@@ -250,8 +275,12 @@ func (m Model) toggleClock() tea.Cmd {
 	}
 }
 
-func attendanceTick() tea.Cmd {
-	return tea.Tick(time.Minute, func(t time.Time) tea.Msg {
+func (m Model) attendanceTick() tea.Cmd {
+	tick := m.tick
+	if tick == nil {
+		tick = tea.Tick
+	}
+	return tick(time.Minute, func(t time.Time) tea.Msg {
 		return attendanceTickMsg(t)
 	})
 }
@@ -270,7 +299,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Preserve detail state when reloading after edit save.
 		if m.state != stateDetail {
 			m.state = stateGrid
-			m.cursor = [2]int{0, TodayColumn(m.monday.Time, time.Now())}
+			m.cursor = [2]int{0, TodayColumn(m.monday.Time, m.now())}
 		}
 		hints := HintLabelsFromEntries(msg.prevEntries)
 		m.grid = BuildWeekGridWithHints(msg.entries, m.monday.Time, hints)
@@ -312,13 +341,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if m.attendance != nil && m.attendance.ClockedIn {
-			return m, attendanceTick()
+			return m, m.attendanceTick()
 		}
 		return m, nil
 
 	case attendanceTickMsg:
 		if m.attendance != nil && m.attendance.ClockedIn {
-			return m, attendanceTick()
+			return m, m.attendanceTick()
 		}
 		return m, nil
 
@@ -334,7 +363,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.attendance = msg.status
 		// Reload attendance to refresh the displayed week's records.
 		if m.attendance != nil && m.attendance.ClockedIn {
-			return m, tea.Batch(m.loadAttendance(), attendanceTick())
+			return m, tea.Batch(m.loadAttendance(), m.attendanceTick())
 		}
 		return m, m.loadAttendance()
 
@@ -980,8 +1009,8 @@ func (m Model) View() tea.View {
 	var s string
 
 	// Compute today's column for the displayed week (-1 if not this week).
-	todayCol := TodayColumn(m.monday.Time, time.Now())
-	nowDate := time.Now()
+	todayCol := TodayColumn(m.monday.Time, m.now())
+	nowDate := m.now()
 	monDate := time.Date(m.monday.Year(), m.monday.Month(), m.monday.Day(), 0, 0, 0, 0, m.monday.Location())
 	nowDateOnly := time.Date(nowDate.Year(), nowDate.Month(), nowDate.Day(), 0, 0, 0, 0, nowDate.Location())
 	daysSince := int(nowDateOnly.Sub(monDate).Hours() / 24)
@@ -998,7 +1027,7 @@ func (m Model) View() tea.View {
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
 	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp, stateAttendance:
-		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.weekAttendance, m.loading, m.spinner, m.width)
+		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.weekAttendance, m.loading, m.spinner, m.width, m.now())
 		var weekAtt WeekAttendance
 		if m.weekAttendanceLoaded {
 			weekAtt = SummarizeWeekAttendance(m.weekAttendance, m.monday.Time, m.now())

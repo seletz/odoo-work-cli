@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "name": "Lighthouse Portal",
+    "active": true,
+    "customer": "Example Harbor Ltd",
+    "company": "Example Consulting",
+    "stage": "In Progress",
+    "project_manager": "Alex Demo",
+    "extra_fields": {}
+  }
+]

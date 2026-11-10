@@ -1,0 +1,6 @@
+ID     Name                           Customer             Company         Phase           Project Manager      Active
+------ ------------------------------ -------------------- --------------- --------------- -------------------- ------
+1      Lighthouse Portal              Example Harbor Ltd   Example Consulting In Progress     Alex Demo            true
+2      Orchard Mobile App             Example Orchard Inc  Example Consulting In Progress     Alex Demo            true
+3      Internal                                            Example Consulting In Progress     Alex Demo            true
+4      Riverbank Data Migration       Example River Co     Wildflower Labs In Progress     Alex Demo            true

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 )
@@ -312,12 +314,56 @@ func TestRenderHeaderBar_ShowsAttendanceTotals(t *testing.T) {
 	}
 
 	s := spinner.New()
-	out := RenderHeaderBar(mon, attendance, week, false, s, 160)
+	out := RenderHeaderBar(mon, attendance, week, false, s, 160, time.Now())
 
 	if !strings.Contains(out, "Today 0:30") {
 		t.Errorf("header %q should contain today's attendance total", out)
 	}
 	if !strings.Contains(out, "Week 8:30") {
 		t.Errorf("header %q should contain weekly attendance total", out)
+	}
+}
+
+// The overlay must splice styled background lines by terminal cell, not by
+// rune: cutting through an escape sequence printed its tail ("[48;2;…m")
+// as text to the right of the box.
+func TestRenderDetailOverlay_StyledBackgroundStaysIntact(t *testing.T) {
+	styled := lipgloss.NewStyle().Foreground(lipgloss.Color("#5fd75f")).Background(lipgloss.Color("#1a2a1a"))
+	var b strings.Builder
+	for i := range 12 {
+		b.WriteString(styled.Render(fmt.Sprintf("%5d", i)))
+	}
+	line := b.String() // 60 cells, many escape sequences
+	bg := strings.Join([]string{line, line, line, line, line}, "\n")
+
+	result := RenderDetailOverlay(bg, "X", 60, 5, lipgloss.NewStyle())
+
+	plainBg := ansi.Strip(line)
+	for i, l := range strings.Split(result, "\n") {
+		if w := ansi.StringWidth(l); w != 60 {
+			t.Errorf("line %d is %d cells wide, want 60: %q", i, w, l)
+		}
+		plain := ansi.Strip(l)
+		if strings.Contains(plain, "[") {
+			t.Errorf("line %d shows a cut escape sequence: %q", i, plain)
+		}
+		if i == 2 {
+			want := plainBg[:29] + "X" + plainBg[30:]
+			if plain != want {
+				t.Errorf("box row = %q, want %q", plain, want)
+			}
+		}
+	}
+}
+
+// A styled box is centred by its visible width, not by its byte or rune
+// count (escape sequences made it drift left).
+func TestRenderDetailOverlay_CentersStyledBox(t *testing.T) {
+	bg := strings.Join([]string{strings.Repeat(".", 60), strings.Repeat(".", 60), strings.Repeat(".", 60)}, "\n")
+	box := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5f5f")).Bold(true)
+	result := RenderDetailOverlay(bg, "0123456789", 60, 3, box)
+	row := ansi.Strip(strings.Split(result, "\n")[1])
+	if got := strings.Index(row, "0123456789"); got != 25 {
+		t.Errorf("box starts at cell %d, want 25: %q", got, row)
 	}
 }

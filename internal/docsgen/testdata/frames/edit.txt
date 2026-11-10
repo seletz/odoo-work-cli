@@ -1,0 +1,24 @@
+ W15  Mon 06 Apr 2026 — Sun 12 Apr 2026                                      ● In 08:41 (6:31)  Today 6:31 · Week 23:01
+
+Company Prefix / Project / Task         │     Mon│     Tue│     Wed│     Thu│     Fri│     Sat│     Sun│   Total
+                                        │Ostermo…│        │        │        │        │        │        │
+────────────────────────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────
+[EXA] Internal / Meetings               │        │    1:00│        │    0:45│        │        │        │    1:45
+[EXA] Internal / Training               │        │        │    1:30│        │        │        │        │    1:30
+[EXA] Lighthouse Portal / Backend API   │        │    3:30│        │        │        │        │        │    3:30
+[EXA] Lighthouse Portal / Code review   │        │        │        │    1:30│        │        │        │    1:30
+[EXA] Lighthouse Portal╭────────────────────────────────────────────────────────────────────────╮      │    4:00
+[EXA] Orchard Mobile Ap│                                                                        │      │    2:00
+[EXA] Orchard Mobile Ap│  Editing: [EXA] Internal / Meetings — Thu 09 Apr 2026                  │      │    2:30
+[WIL] Riverbank Data Mi│                                                                        │      │    3:30
+mapping                │    Hours:       > 0.75                                                 │      │
+───────────────────────│    Description: > Customer call                                        │──────┴────────
+Total                  │                                                                        │      │   20:15
+───────────────────────│  Enter: save  Esc: cancel  tab: next field                             │──────┼────────
+Check-in               │                                                                        │      │
+Check-out              ╰────────────────────────────────────────────────────────────────────────╯      │
+Attendance                              │        │    8:30│    8:00│    6:31│        │        │        │   23:01
+Diff                                    │        │   +0:30│    0:00│   +2:16│        │        │        │   +2:46
+
+  ↑/k up • ↓/j down • tab next day • ←/h prev week • →/l next week • ↵ detail • e edit • a add • d delete • / search …
+ EDIT                                                                                                       Week: 20:15

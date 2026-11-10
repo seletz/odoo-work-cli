@@ -1,0 +1,24 @@
+ W15  Mon 06 Apr 2026 — Sun 12 Apr 2026                                      ● In 08:41 (6:31)  Today 6:31 · Week 23:01
+
+Company Prefix / Project / Task         │     Mon│     Tue│     Wed│     Thu│     Fri│     Sat│     Sun│   Total
+                                        │Ostermo…│        │        │        │        │        │        │
+────────────────────────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                                                                                                                                                              ┃
+┃    Search (filtered)    Ctrl+A: toggle filter                                                                                                                ┃
+┃                                                                                                                                                              ┃
+┃    > in                                                                                                                                                      ┃
+┃                                                                                                                                                              ┃
+┃    Projects:                                                                                                                                                 ┃
+┃      [P] [EXA] Lighthouse Portal — Example Consulting                                                                                                        ┃
+┃      [P] [EXA] Orchard Mobile App — Example Consulting                                                                                                       ┃
+┃      [P] [EXA] Internal — Example Consulting                                                                                                                 ┃
+┃                                                                                                                                                              ┃
+┃    Tasks:                                                                                                                                                    ┃
+┃      [T] [EXA] Backend API — Lighthouse Portal                                                                                                               ┃
+┃                                                                                                                                                              ┃
+┃    ... and 7 more                                                                                   tab: results  ↑/↓: navigate  Enter: select  Esc: cancel  ┃
+┃                                                                                                                                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+  ↑/k up • ↓/j down • tab next day • ←/h prev week • →/l next week • ↵ detail • e edit • a add • d delete • / search …
+ SEARCH                                                                                                     Week: 20:15

@@ -1,0 +1,22 @@
+[
+  {
+    "id": 4606,
+    "employee_id": 7,
+    "employee": "Alex Demo",
+    "check_in": "2026-04-08T08:30:00+02:00",
+    "check_out": "2026-04-08T12:00:00+02:00",
+    "running": false,
+    "worked_hours": 3.5,
+    "worked_minutes": 210
+  },
+  {
+    "id": 4607,
+    "employee_id": 7,
+    "employee": "Alex Demo",
+    "check_in": "2026-04-08T12:30:00+02:00",
+    "check_out": "2026-04-08T17:00:00+02:00",
+    "running": false,
+    "worked_hours": 4.5,
+    "worked_minutes": 270
+  }
+]
