@@ -14,7 +14,9 @@ brew tap seletz/tap
 brew install odoo-work-cli
 ```
 
-Homebrew also installs the shell completions.
+Homebrew also installs the shell completions and the man pages:
+`man odoo-work-cli` lists every command, `man odoo-work-cli-entries-add`
+describes one.
 
 ### Update
 
@@ -39,6 +41,13 @@ brew install odoo-work-cli
 Download the archive for your platform from the
 [releases page](https://github.com/seletz/odoo-work-cli/releases), unpack it
 and put `odoo-work-cli` on your `PATH`. To update, replace the binary.
+
+The archive also holds the man pages in `man/man1/`. Copy them to a
+directory on your `MANPATH`, for example:
+
+```sh
+sudo cp man/man1/*.1 /usr/local/share/man/man1/
+```
 
 ## From source
 

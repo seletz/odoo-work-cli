@@ -4,10 +4,11 @@ set -euo pipefail
 # Check that the generated parts of the docs are up to date: render them
 # into a temporary directory (tools/docsgen) and compare with the committed
 # files. A difference means the TUI, a command's output or a command's help
-# changed and the docs were not regenerated; the script then says which
-# files differ, how to fix it, and exits 1. The goldens, CLI samples and
-# reference pages compare by bytes, the PNG screenshots by decoded pixels
-# and dimensions (tools/docsgen compare-png). The mise tasks
+# changed and the docs were not regenerated (the command reference covers
+# the site pages and the man pages); the script then says which files
+# differ, how to fix it, and exits 1. The goldens, CLI samples, reference
+# pages and man pages compare by bytes, the PNG screenshots by decoded
+# pixels and dimensions (tools/docsgen compare-png). The mise tasks
 # docs:screenshots:check and docs:reference:check and the CI call it.
 #
 # Usage: scripts/docs-check.sh screenshots|reference
@@ -48,8 +49,9 @@ case "$WHAT" in
     fix="mise run docs:screenshots"
     ;;
   reference)
-    go run ./tools/docsgen reference -out "$TMP/reference" >/dev/null
+    go run ./tools/docsgen reference -out "$TMP/reference" -man "$TMP/man1" >/dev/null
     compare docs/reference/commands "$TMP/reference" "command reference pages in docs/reference/commands/"
+    compare man/man1 "$TMP/man1" "man pages in man/man1/"
     fix="mise run docs:reference"
     ;;
   *)

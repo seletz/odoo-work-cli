@@ -6,6 +6,7 @@ import (
 
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
@@ -14,9 +15,30 @@ import (
 func CMD(deps *app.Deps) *cobra.Command {
 	var search string
 	cmd := &cobra.Command{
-		Use:   "tasks [project-id]",
+		Use:   "tasks [PROJECT-ID]",
 		Short: "List Odoo tasks",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `List the Odoo tasks visible to you: those of the project PROJECT-ID, or
+of all projects without it. The [models.task] filters of the
+configuration restrict the list.
+
+--search TEXT keeps the tasks whose name contains TEXT, ignoring case. The
+ID column is what entries add --task-id takes. A PROJECT-ID that is not an
+integer is a validation error.`,
+		Example: `  # The tasks of project 1
+  odoo-work-cli tasks 1
+
+  # Tasks named like "review" in any project, as JSON
+  odoo-work-cli tasks --search review --json`,
+		Annotations: map[string]string{
+			manual.Group: manual.GroupProjects,
+			manual.Output: `The table has the columns ID, Name, Project and Stage. With --search and
+no match the command prints "No tasks match TEXT" and exits with 0.
+
+With --json the output is an array of tasks, [] if there are none.`,
+			manual.Schemas: "task",
+			manual.SeeAlso: "odoo-work-cli projects, how-to/40-find-projects-and-tasks.md",
+		},
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -60,7 +82,7 @@ func CMD(deps *app.Deps) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&search, "search", "", "only tasks whose name contains TEXT (case-insensitive)")
+	cmd.Flags().StringVar(&search, "search", "", "only tasks whose name contains `TEXT` (case-insensitive)")
 	output.AddFlags(cmd.Flags())
 	return cmd
 }
