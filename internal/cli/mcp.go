@@ -270,7 +270,7 @@ func parseSecretsMode(mode string) (bool, error) {
 // :returns: the server and its close function
 func newMCPServer(global []string, stages mcpSetup, readOnly, eager bool) (*mcp.Server, func()) {
 	st := &sharedState{stages: stages}
-	if eager {
+	if eager && !usesFakeBackend(global) {
 		st.resolve(cfgFileOf(global))
 	}
 	tools := mcpTools()
@@ -287,6 +287,20 @@ func newMCPServer(global []string, stages mcpSetup, readOnly, eager bool) (*mcp.
 	}
 	return &mcp.Server{Name: MCPServerName, Version: version.Version, Instructions: mcpInstructions,
 		Tools: tools, Run: runCLI}, st.close
+}
+
+// usesFakeBackend reports whether the global flags or the environment
+// select the fake backend, which never needs secrets. An invalid backend
+// is not "fake": the first call reports it.
+func usesFakeBackend(global []string) bool {
+	flag := ""
+	for _, g := range global {
+		if v, ok := strings.CutPrefix(g, "--backend="); ok {
+			flag = v
+		}
+	}
+	b, err := resolveBackend(flag)
+	return err == nil && b == backendFake
 }
 
 // cfgFileOf returns the value of --config in the global flags.

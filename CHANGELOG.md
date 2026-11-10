@@ -20,7 +20,8 @@ release. See [Releases and docs](explanation/50-releases-and-docs.md).
 
 - `odoo-work-cli mcp --secrets eager|lazy` (env `ODOO_WORK_CLI_MCP_SECRETS`,
   default `lazy`): `eager` resolves the secrets at server start, so the prompt
-  comes when the client starts (#117).
+  comes when the client starts, except with the fake backend, which never
+  needs secrets (#117).
 - How-to "1Password prompts": when prompts come, and three setups (eager MCP,
   `op run --env-file`, `ODOO_WORK_CLI_NO_OP`) (#117).
 

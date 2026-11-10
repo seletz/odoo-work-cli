@@ -486,6 +486,29 @@ func TestMCPEagerSecrets(t *testing.T) {
 	}
 }
 
+// TestMCPEagerSkipsFakeBackend: the fake backend never needs secrets, so
+// eager resolves nothing, by flag or by environment.
+func TestMCPEagerSkipsFakeBackend(t *testing.T) {
+	t.Run("flag", func(t *testing.T) {
+		t.Setenv("ODOO_WORK_CLI_BACKEND", "")
+		p := newProbe()
+		_, closeFn := newMCPServer([]string{"--backend=fake"}, p.stages(), false, true)
+		t.Cleanup(closeFn)
+		if p.cfgCalls != 0 {
+			t.Errorf("--backend fake + eager: %d op calls, want 0", p.cfgCalls)
+		}
+	})
+	t.Run("env", func(t *testing.T) {
+		t.Setenv("ODOO_WORK_CLI_BACKEND", "fake")
+		p := newProbe()
+		_, closeFn := newMCPServer(nil, p.stages(), false, true)
+		t.Cleanup(closeFn)
+		if p.cfgCalls != 0 {
+			t.Errorf("env fake + eager: %d op calls, want 0", p.cfgCalls)
+		}
+	})
+}
+
 func TestParseSecretsMode(t *testing.T) {
 	for in, want := range map[string]bool{"eager": true, "lazy": false, "": false, "EAGER": true} {
 		got, err := parseSecretsMode(in)
