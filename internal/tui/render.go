@@ -132,6 +132,40 @@ func buildGridSeparatorBottom(labelWidth, colWidth int) string {
 	return gridSepStyle.Render(b.String())
 }
 
+// Grid layout limits. A day cell needs 5 cells for "10:30" (6 for "-1:30"
+// style attendance values, 5 when compact); each column adds one separator.
+const (
+	gridMinLabelWidth = 14
+	gridCompactCol    = 6 // day column incl. separator, compact
+	gridMinCol        = 7 // day column incl. separator, normal
+)
+
+// gridMinWidth is the smallest terminal width the grid can be laid out in.
+func gridMinWidth() int {
+	return gridMinLabelWidth + 2 + 8*gridCompactCol
+}
+
+// gridNaturalLabelWidth is the label column width when nothing is squeezed.
+func gridNaturalLabelWidth(width int) int {
+	return max(min(40, width/3), 20)
+}
+
+// gridLayout returns the label column width and the day column width
+// (including its separator) for a grid of the given total width. The label
+// gets up to a third of the width (20..40); when that does not fit, the
+// label shrinks first, then the day columns go compact.
+func gridLayout(width int) (labelWidth, colWidth int) {
+	labelWidth = gridNaturalLabelWidth(width)
+	colWidth = max((width-labelWidth-2)/8, gridMinCol)
+	if labelWidth+2+8*colWidth <= width {
+		return labelWidth, colWidth
+	}
+	if l := width - 2 - 8*gridMinCol; l >= gridMinLabelWidth {
+		return l, gridMinCol
+	}
+	return max(width-2-8*gridCompactCol, gridMinLabelWidth), gridCompactCol
+}
+
 // RenderGrid renders the weekly grid as a styled string.
 // holidays is a [7]string with holiday names per day (empty = no holiday).
 // companyColors maps company name to lipgloss color string for row label coloring.
@@ -140,30 +174,21 @@ func buildGridSeparatorBottom(labelWidth, colWidth int) string {
 // attendance and the attendance − booked difference are rendered below the
 // totals row.
 func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string, todayCol int, att WeekAttendance) string {
-	minColWidth := 7
-	minLabelWidth := 20
-	maxLabelWidth := 40
-
-	// Label gets up to maxLabelWidth; remaining space goes to day columns.
-	labelWidth := maxLabelWidth
-	if labelWidth > width/3 {
-		labelWidth = width / 3
-	}
-	if labelWidth < minLabelWidth {
-		labelWidth = minLabelWidth
-	}
-	remaining := width - labelWidth - 2 // 2 for gap
-	colWidth := remaining / 8           // 7 days + total
-	if colWidth < minColWidth {
-		colWidth = minColWidth
-	}
+	labelWidth, colWidth := gridLayout(width)
+	// A squeezed label column cannot wrap names into several lines without
+	// eating the screen: show one truncated line per row instead.
+	squeezed := labelWidth < gridNaturalLabelWidth(width)
 
 	isHoliday := func(d int) bool { return holidays[d] != "" }
 
 	var b strings.Builder
 
 	// Header row.
-	header := fmt.Sprintf("%-*s  ", labelWidth, "Company Prefix / Project / Task")
+	title := "Company Prefix / Project / Task"
+	if runeLen(title) > labelWidth {
+		title = "Project / Task"
+	}
+	header := fmt.Sprintf("%-*s  ", labelWidth, title)
 	for i, name := range dayNames {
 		cell := fmt.Sprintf("%*s", colWidth-1, name)
 		switch {
@@ -214,6 +239,9 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	for ri, row := range grid.Rows {
 		rowSelected := ri == cursorRow
 		labelLines := wrapLabel(row.Label, labelWidth)
+		if squeezed {
+			labelLines = []string{truncateMiddle(row.Label, labelWidth)}
+		}
 		var rowLines []string
 		var rowTotal float64
 		for d := 0; d < 7; d++ {
@@ -221,7 +249,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		}
 
 		for li, label := range labelLines {
-			styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
+			styledLabel := label + strings.Repeat(" ", max(labelWidth-ansi.StringWidth(label), 0))
 			if color, ok := companyColors[row.Company]; ok {
 				styledLabel = companyLabelStyle(color).Render(styledLabel)
 			}
@@ -295,6 +323,30 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	}
 
 	return b.String()
+}
+
+// truncateMiddle shortens s to at most width terminal cells, keeping the
+// start (about 40%) and the end (the rest) and putting an ellipsis between
+// them, so that names sharing a prefix stay distinguishable.
+func truncateMiddle(s string, width int) string {
+	sw := ansi.StringWidth(s)
+	if sw <= width {
+		return s
+	}
+	if width <= 1 {
+		return ansi.Truncate(s, width, "")
+	}
+	avail := width - 1 // one cell for the ellipsis
+	left := avail * 2 / 5
+	right := avail - left
+	// Cutting inside a wide rune keeps it whole, so step on until it fits.
+	cut := sw - right
+	tail := ansi.TruncateLeft(s, cut, "")
+	for ansi.StringWidth(tail) > right && cut < sw {
+		cut++
+		tail = ansi.TruncateLeft(s, cut, "")
+	}
+	return ansi.Truncate(s, left, "") + "…" + tail
 }
 
 func wrapLabel(label string, width int) []string {

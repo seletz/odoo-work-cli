@@ -77,7 +77,9 @@ mise run lint
 
 The site under [`docs/`](docs/) is built with [Zensical](https://zensical.org/)
 (pinned in `pyproject.toml`, installed by `uv`) and deployed to GitHub Pages
-from `develop` by `.github/workflows/docs.yml`.
+as part of each release (`.github/workflows/release.yml`), so the site always
+matches the latest release. `.github/workflows/docs.yml` checks and builds it on
+pull requests and `develop`, without deploying.
 
 ```bash
 mise run docs:serve              # live preview
@@ -204,12 +206,15 @@ mise run release
 
 This will:
 
-1. Show the current version (latest `v*` tag, or `v0.0.0` if none)
-2. Prompt for bump type (patch / minor / major)
-3. Create an annotated git tag
-4. Push the tag to origin
+1. Check that the generated docs are current (`mise run docs:check`); abort if not
+2. Show the current version (latest `v*` tag, or `v0.0.0` if none)
+3. Prompt for bump type (patch / minor / major)
+4. Create an annotated git tag
+5. Push the tag to origin
 
-GoReleaser then automatically:
+The Release workflow then runs three dependent jobs: `verify` (tests, lint,
+docs check, strict docs build), `goreleaser` and `docs` (deploys the site to
+GitHub Pages). If `verify` fails, nothing is released. GoReleaser:
 
 - Cross-compiles for macOS (amd64, arm64), Linux (amd64, arm64), and Windows (amd64)
 - Packages binaries as `.tar.gz` (Unix) or `.zip` (Windows)

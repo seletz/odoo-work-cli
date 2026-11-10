@@ -1027,6 +1027,10 @@ func (m Model) View() tea.View {
 		s = fmt.Sprintf("\n  Error: %s\n\n  Press 'r' to retry or 'q' to quit.\n\n", m.err)
 
 	case stateGrid, stateDetail, stateEdit, stateSearch, stateHelp, stateAttendance:
+		if m.width > 0 && m.width-4 < gridMinWidth() {
+			s = fmt.Sprintf("\n  terminal too narrow, at least %d columns needed.\n  Please widen the window.\n", gridMinWidth()+4)
+			break
+		}
 		headerBar := RenderHeaderBar(m.monday.Time, m.attendance, m.weekAttendance, m.loading, m.spinner, m.width, m.now())
 		var weekAtt WeekAttendance
 		if m.weekAttendanceLoaded {
