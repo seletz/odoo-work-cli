@@ -53,9 +53,11 @@ internal/parsing/             # Date and hours parsing helpers
 internal/display/             # Output formatting
 internal/tui/                 # Bubbletea TUI: model, grid, rendering, keymap, styles, holidays
 internal/version/             # Version string injected at build time via ldflags
-internal/docsgen/             # Docs generator: demo state, TUI screenshots (SVG + goldens), CLI samples, cobra reference
+internal/docsgen/             # Docs generator: demo state, TUI screenshots (PNG + goldens), CLI samples, command reference (Markdown + man pages)
+internal/manual/              # Command reference metadata: cobra annotation keys, env/file/error-kind texts
 tools/docsgen/                # `go run ./tools/docsgen screenshots|reference`
 docs/                         # Zensical site (Diátaxis); docs/assets/{screenshots,cli} and docs/reference/commands are generated
+man/man1/                     # Generated man pages (shipped in the release archives and the Homebrew cask)
 scripts/release.sh            # Interactive semver release script
 ```
 
@@ -129,6 +131,12 @@ mise run docs:check   # fail if generated docs are stale (CI)
 
 A TUI change, a changed command output or help text needs `mise run docs:generate`
 and the regenerated files in the same PR, or the Docs workflow fails.
+
+Every command documents itself for the reference (site page, man page, `--help`):
+`Short`, `Long`, `Example` (run against the fake backend), and `manual.*`
+annotations (group, output, schemas, error kinds, see also). `TestCheckDocumented`
+names what a new command lacks; see the package doc of `internal/manual`. A new
+command also needs its man page added to `manpages:` in `.goreleaser.yml`.
 
 Releases are built with GoReleaser (`mise run goreleaser-check` / `goreleaser-snapshot`).
 

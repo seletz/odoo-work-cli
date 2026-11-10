@@ -7,6 +7,7 @@ import (
 
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
@@ -99,8 +100,25 @@ day before that runs past midnight, or a running record) the command
 aborts with a "conflict" error, names the overlapping record and changes
 nothing. Adjacent records (12:00 out, 12:00 in) do not overlap.
 
+Times are HH:MM on --date or "YYYY-MM-DD HH:MM". A time more than one
+minute in the future, or a check-out not after the check-in, is a
+validation error.
+
 Adding attendance over the API requires the 'Attendance Officer' access
 right, with you set as your own attendance manager.`,
+		Example: `  # The afternoon of a day with a break: a second record
+  odoo-work-cli clock add --date 2026-04-07 --in 17:00 --out 18:30
+
+  # An overlapping span is a conflict, and nothing is changed
+  odoo-work-cli clock add --date 2026-04-08 --in 11:00 --out 13:00`,
+		Annotations: map[string]string{
+			manual.Output: `Prints "Created attendance #ID: FROM - TO".
+
+With --json the created record.`,
+			manual.Schemas: "attendance",
+			manual.Errors:  "conflict, access_denied",
+			manual.SeeAlso: "odoo-work-cli clock list, odoo-work-cli clock edit, how-to/30-clock-in-out.md",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -138,9 +156,12 @@ right, with you set as your own attendance manager.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&dateStr, "date", "", "day of the new record (YYYY-MM-DD, default today)")
-	cmd.Flags().StringVar(&inStr, "in", "", "check-in time (HH:MM or YYYY-MM-DD HH:MM)")
-	cmd.Flags().StringVar(&outStr, "out", "", "check-out time (HH:MM or YYYY-MM-DD HH:MM)")
+	cmd.Flags().StringVar(&dateStr, "date", "", "day of the new record, `YYYY-MM-DD`")
+	cmd.Flags().StringVar(&inStr, "in", "", "check-in `TIME`, HH:MM or \"YYYY-MM-DD HH:MM\"")
+	cmd.Flags().StringVar(&outStr, "out", "", "check-out `TIME`, HH:MM or \"YYYY-MM-DD HH:MM\"")
+	manual.SetFlagDefault(cmd.Flags(), "date", "today")
+	manual.SetFlagRequired(cmd.Flags(), "in")
+	manual.SetFlagRequired(cmd.Flags(), "out")
 
 	return cmd
 }

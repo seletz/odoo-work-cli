@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/seletz/odoo-work-cli/internal/apperr"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -108,7 +109,25 @@ func CMD() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "llm",
 		Short: "Print a usage guide for LLM agents (--skill)",
-		Args:  cobra.NoArgs,
+		Long: `With --skill, print a Markdown guide for coding agents on standard
+output: how to call the CLI, the JSON contract, every error kind with what
+to do about it, and the usual pitfalls. It starts with skill front matter
+(name, description), so it can be saved as a Claude Code skill as is.
+
+The error kinds and the JSON fields in the guide are generated from the
+same sources as the CLI, so the guide always matches the installed
+version. Without --skill the command fails with a validation error.`,
+		Example: `  # Install the guide as a Claude Code skill
+  mkdir -p ~/.claude/skills/odoo-work-cli
+  odoo-work-cli llm --skill > ~/.claude/skills/odoo-work-cli/SKILL.md`,
+		Annotations: map[string]string{
+			manual.Group:          manual.GroupAgents,
+			manual.Offline:        "true",
+			manual.StaticExamples: "true",
+			manual.Output:         "The guide, as Markdown.",
+			manual.SeeAlso:        "how-to/80-agents.md, reference/20-json-output.md",
+		},
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !skill {
 				return apperr.New(apperr.KindValidation, "nothing to print: use `odoo-work-cli llm --skill`")

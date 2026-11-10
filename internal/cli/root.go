@@ -21,6 +21,7 @@ import (
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/config"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 
@@ -131,8 +132,35 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 	deps := &app.Deps{}
 
 	rootCmd := &cobra.Command{
-		Use:     "odoo-work-cli",
-		Short:   "CLI for managing Odoo 17 timesheets",
+		Use:   "odoo-work-cli",
+		Short: "Book Odoo 17 timesheets and attendance from the terminal",
+		Long: `odoo-work-cli reads and writes your own Odoo 17 timesheet entries and
+attendance records: list projects and tasks, book, change and delete
+timesheet entries, clock in and out, and correct attendance afterwards. The
+tui command opens an interactive weekly grid.
+
+Every command that prints data prints a table for humans by default and a
+stable JSON contract with --json or --format json|jsonl, for scripts and
+coding agents. Write commands validate their input before they connect;
+entries add and entries update can show the result first with --dry-run.
+
+Models are read and written over XML-RPC with an Odoo API key. Clock in and
+clock out without --at use the web session of the Odoo attendance systray,
+which needs the login password and, with two-factor authentication, the
+TOTP secret.
+Secrets can be resolved from 1Password at startup ([op_secrets]).
+
+--backend fake (or ODOO_WORK_CLI_BACKEND=fake) replaces Odoo by a local file
+with made-up data; nothing leaves the machine.`,
+		Example: `  # Who am I, on the offline fake backend
+  odoo-work-cli --backend fake whoami
+
+  # The bookings of one day
+  odoo-work-cli --backend fake entries --date 2026-04-08`,
+		Annotations: map[string]string{
+			manual.SeeAlso: "tutorials/10-try-it-offline.md, how-to/10-install-and-update.md, " +
+				"reference/20-json-output.md, reference/30-errors.md, reference/40-configuration.md",
+		},
 		Version: version.Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// cobra checks required flags only after this hook; check them
@@ -166,9 +194,11 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 		},
 	}
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file path (skip discovery)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "read only the config `FILE` (skip discovery)")
 	rootCmd.PersistentFlags().StringVar(&backend, "backend", "",
-		"backend: odoo (default) or fake (offline, made-up data; env ODOO_WORK_CLI_BACKEND)")
+		"`BACKEND`: odoo or fake (offline, made-up data; env ODOO_WORK_CLI_BACKEND)")
+	manual.SetFlagDefault(rootCmd.PersistentFlags(), "backend", "odoo")
+	manual.SetFlagEnv(rootCmd.PersistentFlags(), "backend", "ODOO_WORK_CLI_BACKEND")
 	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return apperr.Wrap(apperr.KindValidation, err)
 	})
@@ -184,23 +214,66 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 	rootCmd.AddCommand(clock.CMD(deps))
 	rootCmd.AddCommand(llm.CMD())
 	rootCmd.AddCommand(mcpCMD(setup, &cfgFile, &backend))
+	documentCompletion(rootCmd)
+	manual.DecorateHelp(rootCmd)
+	rootCmd.SetHelpTemplate(rootCmd.HelpTemplate() + helpFooter)
 
 	return rootCmd, started
 }
 
+// isNoneSetupCommand reports whether cmd runs without config, secrets
+// and an Odoo connection: cobra's completion machinery and every command
+// marked manual.Offline.
 func isNoneSetupCommand(cmd *cobra.Command) bool {
 	for current := cmd; current != nil; current = current.Parent() {
 		switch current.Name() {
 		case "completion", "__complete", "__completeNoDesc":
 			return true
-		case "config", "llm":
-			return true
 		case "mcp":
-			// The server loads config per tool call (newMCPServer).
+			// The server loads config per tool call (newMCPServer); it is
+			// not offline, its tools need the connection.
 			return true
 		}
 	}
-	return false
+	return manual.IsOffline(cmd)
+}
+
+func init() {
+	cobra.AddTemplateFunc("manName", manual.ManName)
+	cobra.AddTemplateFunc("referenceURL", manual.ReferenceURL)
+}
+
+// helpFooter points from --help to the full reference.
+const helpFooter = `
+Full reference: man {{manName .}}
+or {{referenceURL .}}
+`
+
+// documentCompletion adds cobra's completion command now instead of at
+// Execute, so it carries the annotations and examples of the reference.
+func documentCompletion(root *cobra.Command) {
+	root.InitDefaultCompletionCmd()
+	c, _, err := root.Find([]string{"completion"})
+	if err != nil || c.Name() != "completion" {
+		return
+	}
+	c.Long = `Print the shell completion script of odoo-work-cli for bash, zsh, fish
+or PowerShell on standard output. It completes commands and flags.
+
+The Homebrew cask installs the scripts for bash, zsh and fish; the
+release archives contain them in completions/. Load a script by hand as
+shown for each shell below.`
+	c.Example = `  # Load completion into the current zsh session
+  source <(odoo-work-cli completion zsh)
+
+  # Install it for every new bash session (Linux)
+  odoo-work-cli completion bash > /etc/bash_completion.d/odoo-work-cli`
+	c.Annotations = map[string]string{
+		manual.Group:          manual.GroupCompletion,
+		manual.Offline:        "true",
+		manual.StaticExamples: "true",
+		manual.SeeAlso:        "how-to/10-install-and-update.md",
+	}
 }
 
 // defaultSetup loads the config and connects to Odoo. Config errors that
@@ -243,6 +316,19 @@ func whoamiCMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "whoami",
 		Short: "Show current Odoo user info",
+		Long: `Print the Odoo user the configured credentials belong to: ID, name,
+login, e-mail and company. Use it to check that the configuration and the
+API key work.`,
+		Example: `  odoo-work-cli whoami
+
+  # The same as JSON
+  odoo-work-cli whoami --json`,
+		Annotations: map[string]string{
+			manual.Group:   manual.GroupConfig,
+			manual.Output:  "One line each for ID, Name, Login, Email and Company.\n\nWith --json one user object.",
+			manual.Schemas: "user",
+			manual.SeeAlso: "odoo-work-cli config, how-to/95-troubleshoot.md",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {

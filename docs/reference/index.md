@@ -8,7 +8,9 @@ weight: 3
 Facts to look up. Nothing here explains why; that is in the
 [explanation](../explanation/index.md).
 
-- [Commands](commands/index.md): every command and flag, generated from the CLI.
+- [Commands](commands/index.md): every command in man page form (options,
+  output, environment, exit status, examples), generated from the CLI; the
+  same pages are installed as `man odoo-work-cli`.
 - [JSON output](20-json-output.md): formats, conventions, objects and schemas.
 - [Errors and exit codes](30-errors.md): the error envelope and its kinds.
 - [Configuration](40-configuration.md): config files, keys, environment variables.

@@ -1,5 +1,5 @@
 // Package docsgen generates the generated parts of the documentation site:
-// the demo state of the fake backend, TUI screenshots (SVG plus plain-text
+// the demo state of the fake backend, TUI screenshots (PNG plus plain-text
 // goldens), CLI output samples and the command reference.
 //
 // Everything is rendered from a fixed demo state at a fixed clock

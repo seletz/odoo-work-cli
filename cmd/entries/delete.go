@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -12,10 +13,20 @@ func deleteCmd(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete ID",
 		Short: "Delete a timesheet entry",
-		Long: `Delete a timesheet entry.
+		Long: `Delete the timesheet entry ID. The entry is read first: an unknown ID
+fails with not_found and nothing is deleted. There is no confirmation
+prompt and no undo. Odoo may refuse to delete validated entries (access_denied).`,
+		Example: `  # Delete an entry
+  odoo-work-cli entries delete 4019
 
-With --json (or --format json|jsonl) the entry as it was before deletion
-is printed.`,
+  # An unknown ID is a not_found error
+  odoo-work-cli entries delete 999 --json`,
+		Annotations: map[string]string{
+			manual.Output:  "Prints \"Deleted entry ID\".\n\nWith --json the entry as it was before the deletion.",
+			manual.Schemas: "entry",
+			manual.Errors:  "not_found, access_denied",
+			manual.SeeAlso: "odoo-work-cli entries",
+		},
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)

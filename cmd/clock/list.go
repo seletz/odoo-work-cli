@@ -8,6 +8,7 @@ import (
 
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
@@ -103,7 +104,25 @@ week (--week YYYY-Www) with ID, check-in, check-out and duration.
 
 Records are attributed to the day of their check-in. A record that crosses
 midnight is listed on its check-in day and shows the check-out date. Use it
-before 'clock edit' to see what is already recorded.`,
+before 'clock edit' to see what is already recorded.
+
+--date and --week together are a validation error.`,
+		Example: `  # A week, with the total
+  odoo-work-cli clock list --week 2026-W14
+
+  # One day as JSON
+  odoo-work-cli clock list --date 2026-04-08 --json`,
+		Annotations: map[string]string{
+			manual.Synopsis: "odoo-work-cli clock list [--date YYYY-MM-DD | --week YYYY-Www] [--json | --format FORMAT]",
+			manual.Output: `The columns ID, Check In, Check Out (with the date if it is on a later
+day, --:-- while running) and Duration (H:MM, "(running)" for a running
+record), then the total; or "No attendance records."
+
+With --json an array of attendance records, oldest first, [] if there are
+none.`,
+			manual.Schemas: "attendance",
+			manual.SeeAlso: "odoo-work-cli clock edit, odoo-work-cli clock status",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -135,7 +154,8 @@ before 'clock edit' to see what is already recorded.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&dateStr, "date", "", "day to list (YYYY-MM-DD, default today)")
-	cmd.Flags().StringVar(&weekStr, "week", "", "ISO week to list (YYYY-Www)")
+	cmd.Flags().StringVar(&dateStr, "date", "", "day to list, `YYYY-MM-DD`")
+	cmd.Flags().StringVar(&weekStr, "week", "", "ISO week to list, `YYYY-Www`")
+	manual.SetFlagDefault(cmd.Flags(), "date", "today")
 	return cmd
 }

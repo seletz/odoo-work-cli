@@ -5,6 +5,7 @@ import (
 
 	"github.com/seletz/odoo-work-cli/internal/app"
 	"github.com/seletz/odoo-work-cli/internal/apperr"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
 	"github.com/spf13/cobra"
@@ -16,6 +17,23 @@ func CMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "timesheets",
 		Short: "List Odoo timesheets for a week",
+		Long: `List your timesheet entries of an ISO week, Monday to Sunday, with the
+total of the week. Without --week, the current week. The
+[models.timesheet] filters of the configuration apply.
+
+For one day, for filters by project, task or validation status, and for
+the status column, use entries.`,
+		Example: `  # The entries of week 15 of 2026
+  odoo-work-cli timesheets --week 2026-W15`,
+		Annotations: map[string]string{
+			manual.Group: manual.GroupTimesheets,
+			manual.Output: `A "Week: FROM to TO" line, then the columns ID, Date, ProjID, Project,
+TaskID, Task, Description and Hours (decimal), then the total in hours.
+
+With --json the output is an array of entries, [] for an empty week.`,
+			manual.Schemas: "entry",
+			manual.SeeAlso: "odoo-work-cli entries, odoo-work-cli tui",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -53,7 +71,8 @@ func CMD(deps *app.Deps) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&tsWeek, "week", "", "ISO week (e.g. 2026-W10), defaults to current week")
+	cmd.Flags().StringVar(&tsWeek, "week", "", "ISO week to list, `YYYY-Www` (e.g. 2026-W10)")
+	manual.SetFlagDefault(cmd.Flags(), "week", "the current week")
 
 	output.AddFlags(cmd.Flags())
 	return cmd

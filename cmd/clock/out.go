@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/seletz/odoo-work-cli/internal/app"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/output"
 	"github.com/seletz/odoo-work-cli/internal/tui"
@@ -17,10 +18,30 @@ func outCMD(deps *app.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "out",
 		Short: "Clock out (end attendance)",
-		Long: `Clock out (end attendance).
+		Long: `End the running attendance record now, through the Odoo web session
+(the controller of the attendance systray). It needs the login password
+(ODOO_WEB_PASSWORD, or password in [op_secrets]) and, with two-factor
+authentication, the TOTP secret. The running record may have started on
+an earlier day.
 
-With --json (or --format json|jsonl) the closed attendance record is
-printed.`,
+--at TIME uses an earlier time instead: HH:MM is today, "YYYY-MM-DD HH:MM"
+any day. A time more than one minute in the future is a validation error.
+--at writes hr.attendance over XML-RPC with the API key, which requires the
+Attendance Officer access right, with you set as your own attendance
+manager. The check-out must be after the check-in.
+
+Clocking out while not clocked in is a conflict error.`,
+		Example: `  # Clock out afterwards, at the time you left
+  odoo-work-cli clock out --at "2026-04-09 17:15"`,
+		Annotations: map[string]string{
+			manual.Output: `Prints "Clocked out at HH:MM" (with --at the date as well) and the
+duration of the record, as H:MM and in decimal hours.
+
+With --json the closed attendance record.`,
+			manual.Schemas: "attendance",
+			manual.Errors:  "conflict, access_denied",
+			manual.SeeAlso: "odoo-work-cli clock in, odoo-work-cli clock status, how-to/30-clock-in-out.md",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := output.FormatOf(cmd)
 			if err != nil {
@@ -64,7 +85,8 @@ printed.`,
 	}
 
 	cmd.Flags().StringVar(&at, "at", "",
-		"clock out at a past time (HH:MM or YYYY-MM-DD HH:MM) instead of now; requires attendance officer rights")
+		"clock out at an earlier `TIME`, HH:MM or \"YYYY-MM-DD HH:MM\", instead of now; requires attendance officer rights")
+	manual.SetFlagDefault(cmd.Flags(), "at", "now")
 
 	return cmd
 }

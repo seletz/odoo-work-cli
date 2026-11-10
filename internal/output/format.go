@@ -56,7 +56,7 @@ func (f *Format) Set(s string) error {
 // :param fs: flag set to register the flags on
 func AddFlags(fs *pflag.FlagSet) {
 	f := FormatTable
-	fs.Var(&f, flagFormat, "output format: table, json or jsonl")
+	fs.Var(&f, flagFormat, "output `FORMAT`: table, json or jsonl")
 	fs.Bool(flagJSON, false, "shorthand for --format json")
 }
 

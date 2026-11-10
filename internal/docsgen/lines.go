@@ -1,9 +1,9 @@
 package docsgen
 
 import (
-	"bytes"
-	"fmt"
-	"strings"
+	"image"
+	"image/color"
+	"math"
 )
 
 // Line weights of a box-drawing arm.
@@ -38,102 +38,111 @@ var boxGlyphs = map[string]arms{
 	"╚": {r: double, u: double}, "╝": {l: double, u: double},
 }
 
-func isLine(s string) bool {
-	_, ok := boxGlyphs[s]
-	return ok
-}
-
-// linePaths collects the path segments of box-drawing cells, one path per
-// colour and stroke width, in first-seen order.
-type linePaths struct {
-	order []string
-	paths map[string]*strings.Builder
-}
-
-func (p *linePaths) builder(fg string, width float64) *strings.Builder {
-	key := fmt.Sprintf(`stroke="%s" stroke-width="%g"`, fg, width)
-	if p.paths == nil {
-		p.paths = map[string]*strings.Builder{}
-	}
-	sb, ok := p.paths[key]
-	if !ok {
-		sb = &strings.Builder{}
-		p.paths[key] = sb
-		p.order = append(p.order, key)
-	}
-	return sb
-}
-
-// add draws c at cell x, y if it is a box-drawing glyph and reports
-// whether it was one.
-func (p *linePaths) add(c cellStyle, x, y int) bool {
-	a, ok := boxGlyphs[c.text]
+// boxShape draws the box-drawing glyph ch into the cell r as lines that
+// meet the neighbouring cells at their edge midpoints, and reports whether
+// ch was one. Light and heavy arms are strokes of their thickness, double
+// arms two light strokes either side of the centre line, rounded corners
+// a quarter circle.
+func boxShape(img *image.RGBA, r image.Rectangle, ch string, fg color.Color) bool {
+	a, ok := boxGlyphs[ch]
 	if !ok {
 		return false
 	}
-	x0, y0 := float64(padX+x*cellW), float64(titleBar+y*cellH)
-	cx, cy := x0+cellW/2, y0+cellH/2
-	x1, y1 := x0+cellW, y0+cellH
+	cx, cy := r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2
+	// hband and vband fill a horizontal or vertical stroke of width sw
+	// centred off pixels below/right of the centre line.
+	hband := func(x0, x1, off, sw int) {
+		fill(img, image.Rect(min(x0, x1), cy+off-sw/2, max(x0, x1), cy+off-sw/2+sw), fg)
+	}
+	vband := func(y0, y1, off, sw int) {
+		fill(img, image.Rect(cx+off-sw/2, min(y0, y1), cx+off-sw/2+sw, max(y0, y1)), fg)
+	}
 	weight := max(a.l, a.r, a.u, a.d)
-
 	switch {
-	case weight == double:
-		sb := p.builder(c.fg, 1)
-		// Two parallel strokes, 2 units either side of the centre line.
-		const o = 2.0
-		hs, vs := a.l != none || a.r != none, a.u != none || a.d != none
-		switch {
-		case hs && !vs:
-			fmt.Fprintf(sb, "M%g %gH%g M%g %gH%g ", x0, cy-o, x1, x0, cy+o, x1)
-		case vs && !hs:
-			fmt.Fprintf(sb, "M%g %gV%g M%g %gV%g ", cx-o, y0, y1, cx+o, y0, y1)
-		default:
-			// A corner: h and v point to the arms; outer and inner L.
-			h, hx := 1.0, x1
-			if a.l != none {
-				h, hx = -1, x0
-			}
-			v, vy := 1.0, y1
-			if a.u != none {
-				v, vy = -1, y0
-			}
-			for _, s := range []float64{-o, o} {
-				fmt.Fprintf(sb, "M%g %gL%g %gL%g %g ", hx, cy+s*v, cx+s*h, cy+s*v, cx+s*h, vy)
-			}
-		}
 	case a.round:
-		sb := p.builder(c.fg, 1)
-		hx, vy := x1, y1
+		rad := min(r.Dx(), r.Dy()) / 2
+		h, hx := 1, r.Max.X
 		if a.l != none {
-			hx = x0
+			h, hx = -1, r.Min.X
 		}
+		v, vy := 1, r.Max.Y
 		if a.u != none {
-			vy = y0
+			v, vy = -1, r.Min.Y
 		}
-		// Quadratic curve through the centre gives the rounded corner.
-		fmt.Fprintf(sb, "M%g %gL%g %gQ%g %g %g %gL%g %g ",
-			hx, cy, (hx+cx)/2, cy, cx, cy, cx, (vy+cy)/2, cx, vy)
-	default:
-		sb := p.builder(c.fg, map[int]float64{light: 1, heavy: 2.5}[weight])
-		if a.l != none {
-			fmt.Fprintf(sb, "M%g %gH%g ", x0, cy, cx)
-		}
+		ox, oy := cx+h*rad, cy+v*rad
+		arc(img, ox, oy, rad, -h, -v, fg)
+		hband(ox, hx, 0, stroke)
+		vband(oy, vy, 0, stroke)
+	case weight == double:
+		h, v := 0, 0 // direction of the horizontal and vertical arm, 0 for none
 		if a.r != none {
-			fmt.Fprintf(sb, "M%g %gH%g ", cx, cy, x1)
-		}
-		if a.u != none {
-			fmt.Fprintf(sb, "M%g %gV%g ", cx, y0, cy)
+			h = 1
+		} else if a.l != none {
+			h = -1
 		}
 		if a.d != none {
-			fmt.Fprintf(sb, "M%g %gV%g ", cx, cy, y1)
+			v = 1
+		} else if a.u != none {
+			v = -1
+		}
+		switch {
+		case v == 0:
+			hband(r.Min.X, r.Max.X, -doubleGap, stroke)
+			hband(r.Min.X, r.Max.X, doubleGap, stroke)
+		case h == 0:
+			vband(r.Min.Y, r.Max.Y, -doubleGap, stroke)
+			vband(r.Min.Y, r.Max.Y, doubleGap, stroke)
+		default:
+			// A corner: an outer and an inner L, joined at their bends.
+			hx, vy := r.Max.X, r.Max.Y
+			if h < 0 {
+				hx = r.Min.X
+			}
+			if v < 0 {
+				vy = r.Min.Y
+			}
+			for _, s := range []int{-1, 1} {
+				ex, ey := cx+s*doubleGap*h, cy+s*doubleGap*v
+				hband(ex-h*(stroke/2), hx, s*doubleGap*v, stroke)
+				vband(ey-v*(stroke/2), vy, s*doubleGap*h, stroke)
+			}
+		}
+	default:
+		sw := stroke
+		if weight == heavy {
+			sw = heavyStroke
+		}
+		// Each arm runs from the far side of the centre stroke to the edge,
+		// so arms join in a square.
+		if a.l != none {
+			hband(r.Min.X, cx-sw/2+sw, 0, sw)
+		}
+		if a.r != none {
+			hband(cx-sw/2, r.Max.X, 0, sw)
+		}
+		if a.u != none {
+			vband(r.Min.Y, cy-sw/2+sw, 0, sw)
+		}
+		if a.d != none {
+			vband(cy-sw/2, r.Max.Y, 0, sw)
 		}
 	}
 	return true
 }
 
-func (p *linePaths) write(b *bytes.Buffer) {
-	for _, key := range p.order {
-		d := strings.TrimSpace(p.paths[key].String())
-		fmt.Fprintf(b, `<path d="%s" fill="none" %s stroke-linecap="square"/>`+"\n", d, key)
+// arc draws the quarter of a circle of radius rad around (ox, oy) that
+// lies towards sx, sy (each -1 or +1), as a light stroke with soft edges.
+func arc(img *image.RGBA, ox, oy, rad, sx, sy int, c color.Color) {
+	for y := oy - rad - stroke; y <= oy+rad+stroke; y++ {
+		for x := ox - rad - stroke; x <= ox+rad+stroke; x++ {
+			dx, dy := float64(x)+0.5-float64(ox), float64(y)+0.5-float64(oy)
+			if dx*float64(sx) < 0 || dy*float64(sy) < 0 {
+				continue
+			}
+			d := math.Abs(hypot(dx, dy) - float64(rad))
+			if t := float64(stroke)/2 + 0.5 - d; t > 0 {
+				img.Set(x, y, blend(c, img.RGBAAt(x, y), math.Min(t, 1)))
+			}
+		}
 	}
 }

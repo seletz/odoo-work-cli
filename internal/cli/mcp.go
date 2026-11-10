@@ -12,6 +12,7 @@ import (
 
 	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/config"
+	"github.com/seletz/odoo-work-cli/internal/manual"
 	"github.com/seletz/odoo-work-cli/internal/mcp"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/version"
@@ -257,6 +258,13 @@ error stays empty.`,
 
   # One request by hand
   echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | odoo-work-cli mcp`,
+		Annotations: map[string]string{
+			manual.Group:          manual.GroupAgents,
+			manual.StaticExamples: "true",
+			manual.Output: "Only MCP protocol messages, one JSON-RPC 2.0 response per line on standard output. " +
+				"A tool result's first content item is the --json output of the command; see the MCP tool reference.",
+			manual.SeeAlso: "odoo-work-cli mcp print, odoo-work-cli llm, how-to/85-mcp.md, reference/60-mcp-tools.md",
+		},
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var global []string
@@ -303,6 +311,12 @@ Use --binary for an absolute path when the client does not search PATH, and
 
   # Absolute path for clients without PATH lookup
   odoo-work-cli mcp print --binary "$(command -v odoo-work-cli)"`,
+		Annotations: map[string]string{
+			manual.Offline:        "true",
+			manual.StaticExamples: "true",
+			manual.Output:         "The mcpServers JSON block, or with --command one claude mcp add command line.",
+			manual.SeeAlso:        "odoo-work-cli mcp, how-to/85-mcp.md",
+		},
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			args := []string{"mcp"}

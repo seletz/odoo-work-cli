@@ -5,7 +5,7 @@ and coding agents, and a TUI for the weekly grid.
 
 **Documentation: <https://seletz.github.io/odoo-work-cli/>**
 
-![The TUI: weekly grid with attendance per day](docs/assets/screenshots/grid.svg)
+![The TUI: weekly grid with attendance per day](docs/assets/screenshots/grid.png)
 
 ## Features
 
@@ -83,7 +83,7 @@ from `develop` by `.github/workflows/docs.yml`.
 mise run docs:serve              # live preview
 mise run docs:build              # strict build into site/
 mise run docs:screenshots        # TUI screenshots, CLI samples, demo state
-mise run docs:reference          # command reference from cobra
+mise run docs:reference          # command reference: site pages and man pages (man/man1)
 mise run docs:check              # fail if anything generated is stale (CI runs this)
 ```
 
