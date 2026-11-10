@@ -20,5 +20,7 @@ Recipes for specific tasks: short and to the point. New here? Start with the
   without 1Password.
 - [Use it from a coding agent](80-agents.md): `llm --skill`.
 - [Connect an MCP client](85-mcp.md): `odoo-work-cli mcp` for Claude Code and other MCP hosts.
+- [Predictable 1Password prompts](87-1password-prompts.md): when `op` asks, and
+  a setup with none during work.
 - [Customise the TUI](90-customise-tui.md): keys, colours, hour limits, holidays.
 - [Troubleshoot](95-troubleshoot.md): authentication, 2FA, permissions, 1Password.

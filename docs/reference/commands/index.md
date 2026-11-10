@@ -188,6 +188,9 @@ Every command accepts --config, --backend and --help. Commands that print data a
 `XDG_CONFIG_HOME`
 :   Base directory of the global config file; default ~/.config.
 
+`ODOO_WORK_CLI_MCP_SECRETS`
+:   When the MCP server resolves 1Password secrets: lazy (first tool call, default) or eager (at server start); mcp --secrets overrides it.
+
 ## FILES
 
 `~/.config/odoo-work-cli/config.toml`

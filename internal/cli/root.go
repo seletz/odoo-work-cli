@@ -73,6 +73,13 @@ func NewRootCmd() *cobra.Command {
 // :param setup: config + client factory
 // :returns: the exit code
 func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
+	code, _ := runErr(args, stdout, stderr, setup)
+	return code
+}
+
+// runErr is run that also returns the error it rendered (nil on success),
+// for callers that branch on its kind, like the MCP server.
+func runErr(args []string, stdout, stderr io.Writer, setup setupFunc) (int, error) {
 	registerClassifiers.Do(func() { apperr.RegisterClassifier(odoo.ClassifyError) })
 
 	rootCmd, started := newRootCmd(setup)
@@ -90,7 +97,7 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 
 	cmd, err := rootCmd.ExecuteC()
 	if err == nil {
-		return 0
+		return 0, nil
 	}
 	if !*started {
 		// cobra failed before any command code ran: unknown flag or
@@ -121,7 +128,7 @@ func run(args []string, stdout, stderr io.Writer, setup setupFunc) int {
 	if format.IsMachine() {
 		output.WriteError(stdout, format, err)
 	}
-	return 1
+	return 1, err
 }
 
 // newRootCmd builds the command tree. started is set once cobra has parsed
@@ -213,7 +220,7 @@ with made-up data; nothing leaves the machine.`,
 	rootCmd.AddCommand(entries.CMD(deps))
 	rootCmd.AddCommand(clock.CMD(deps))
 	rootCmd.AddCommand(llm.CMD())
-	rootCmd.AddCommand(mcpCMD(setup, &cfgFile, &backend))
+	rootCmd.AddCommand(mcpCMD(mcpStages, &cfgFile, &backend))
 	documentCompletion(rootCmd)
 	manual.DecorateHelp(rootCmd)
 	rootCmd.SetHelpTemplate(rootCmd.HelpTemplate() + helpFooter)
@@ -280,12 +287,8 @@ shown for each shell below.`
 // carry no kind are KindConfig; connection errors are classified by
 // apperr (network) and odoo.ClassifyError (auth).
 func defaultSetup(cfgFile string) (*config.Config, odoo.Client, error) {
-	cfg, err := loadConfig(cfgFile)
+	cfg, err := loadKindedConfig(cfgFile)
 	if err != nil {
-		var typed *apperr.Error
-		if !errors.As(err, &typed) {
-			err = apperr.Wrap(apperr.KindConfig, err)
-		}
 		return nil, nil, err
 	}
 	client, err := newClient(cfg)
@@ -293,6 +296,21 @@ func defaultSetup(cfgFile string) (*config.Config, odoo.Client, error) {
 		return nil, nil, err
 	}
 	return cfg, client, nil
+}
+
+// loadKindedConfig is loadConfig with config errors that carry no kind
+// classified as KindConfig. It is the first stage of defaultSetup: the
+// stage that may call 1Password.
+func loadKindedConfig(cfgFile string) (*config.Config, error) {
+	cfg, err := loadConfig(cfgFile)
+	if err != nil {
+		var typed *apperr.Error
+		if !errors.As(err, &typed) {
+			err = apperr.Wrap(apperr.KindConfig, err)
+		}
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // loadConfig loads and merges config using file discovery and env vars.

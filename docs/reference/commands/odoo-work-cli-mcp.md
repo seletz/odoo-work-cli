@@ -14,7 +14,7 @@ odoo-work-cli-mcp - Run the MCP server on stdin/stdout (started by the MCP clien
 ## SYNOPSIS
 
 ```text
-odoo-work-cli mcp [--read-only]
+odoo-work-cli mcp [--read-only] [--secrets VALUE]
 odoo-work-cli mcp COMMAND [OPTIONS]
 ```
 
@@ -42,8 +42,14 @@ of the next page.
 
 Configuration and secrets load on the first tool call that needs them, not at
 start: the server starts and lists its tools even with 1Password locked, and
-such a call reports secrets_locked. The next call tries again; once loaded, the
-connection is kept for the life of the server. The global flags --config and
+such a call reports secrets_locked. The next call tries again. Once 1Password
+has answered, the resolved secrets are kept for the life of the server, even
+when the Odoo login fails (network), so 1Password is asked at most once; an
+auth error discards them and the next call resolves again. With
+--secrets eager (or ODOO_WORK_CLI_MCP_SECRETS=eager) the secrets resolve at
+server start, so the 1Password prompt comes when the client starts; if that
+fails the server still starts and calls report secrets_locked. The connection
+is kept for the life of the server. The global flags --config and
 --backend given before mcp apply to every call.
 
 Nothing is written to standard output except protocol messages; standard
@@ -60,6 +66,11 @@ Subcommands:
 :   Serve only the read tools (no entries_add, entries_update, entries_delete, clock_in, clock_out, clock_add, clock_edit).
 
     *flag; optional*
+
+`--secrets` *VALUE*
+:   When to resolve 1Password secrets: lazy (first tool call, default) or eager (at server start); env ODOO_WORK_CLI_MCP_SECRETS.
+
+    *string; optional; env: ODOO_WORK_CLI_MCP_SECRETS*
 
 ## GLOBAL OPTIONS
 
@@ -115,6 +126,9 @@ Only MCP protocol messages, one JSON-RPC 2.0 response per line on standard outpu
 `XDG_CONFIG_HOME`
 :   Base directory of the global config file; default ~/.config.
 
+`ODOO_WORK_CLI_MCP_SECRETS`
+:   When the MCP server resolves 1Password secrets: lazy (first tool call, default) or eager (at server start); mcp --secrets overrides it.
+
 ## FILES
 
 `~/.config/odoo-work-cli/config.toml`
@@ -164,6 +178,12 @@ Only the read tools, against the offline fake backend:
 $ odoo-work-cli --backend fake mcp --read-only
 ```
 
+Ask 1Password at client start instead of in the middle of a task:
+
+```console
+$ claude mcp add --scope user odoo-work-cli -- odoo-work-cli mcp --secrets eager
+```
+
 One request by hand:
 
 ```console
@@ -176,6 +196,7 @@ $ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | odoo-work-cli mcp
 - [`odoo-work-cli mcp print`](odoo-work-cli-mcp-print.md)
 - [`odoo-work-cli llm`](odoo-work-cli-llm.md)
 - [Connect an MCP client](../../how-to/85-mcp.md)
+- [1Password prompts](../../how-to/87-1password-prompts.md)
 - [MCP tools](../../reference/60-mcp-tools.md)
 - [Errors and exit codes](../../reference/30-errors.md)
 - [Configuration](../../reference/40-configuration.md)

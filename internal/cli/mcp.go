@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -155,59 +156,161 @@ type keepOpen struct{ odoo.Client }
 // Close does nothing; see keepOpen.
 func (keepOpen) Close() {}
 
-// sharedSetup returns a setup that loads config and client on its first
-// successful call and returns them from then on. A failure (1Password
-// locked) is not kept, so the next call tries again. closeFn closes the
-// loaded client.
-func sharedSetup(setup setupFunc) (shared setupFunc, closeFn func()) {
-	var mu sync.Mutex
-	var cfg *config.Config
-	var client odoo.Client
-	shared = func(cfgFile string) (*config.Config, odoo.Client, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		if client == nil {
-			c, cl, err := setup(cfgFile)
-			if err != nil {
-				return nil, nil, err
-			}
-			cfg, client = c, cl
-		}
-		return cfg, keepOpen{client}, nil
+// mcpSetup is the server's setup in two stages. Loading the config is the
+// stage that resolves 1Password references; creating the client is the
+// stage that logs in to Odoo. They are cached separately: secrets once op
+// succeeded, the client once the login succeeded.
+type mcpSetup struct {
+	loadConfig func(cfgFile string) (*config.Config, error)
+	newClient  func(cfg *config.Config) (odoo.Client, error)
+}
+
+// mcpStages is the real two-stage setup.
+var mcpStages = mcpSetup{loadConfig: loadKindedConfig, newClient: newClient}
+
+// sharedState caches the resolved config and the client for the life of
+// the MCP server.
+type sharedState struct {
+	mu     sync.Mutex
+	stages mcpSetup
+	cfg    *config.Config
+	client odoo.Client
+}
+
+// setup is the setupFunc of every tool call. A failed config stage
+// (1Password locked) is not kept; a failed client stage keeps the config,
+// so a network error never costs another op call.
+func (st *sharedState) setup(cfgFile string) (*config.Config, odoo.Client, error) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if err := st.loadLocked(cfgFile); err != nil {
+		return nil, nil, err
 	}
-	closeFn = func() {
-		mu.Lock()
-		defer mu.Unlock()
-		if client != nil {
-			client.Close()
-			client = nil
+	if st.client == nil {
+		cl, err := st.stages.newClient(st.cfg)
+		if err != nil {
+			return nil, nil, err
 		}
+		st.client = cl
 	}
-	return shared, closeFn
+	return st.cfg, keepOpen{st.client}, nil
+}
+
+func (st *sharedState) loadLocked(cfgFile string) error {
+	if st.cfg != nil {
+		return nil
+	}
+	cfg, err := st.stages.loadConfig(cfgFile)
+	if err != nil {
+		return err
+	}
+	st.cfg = cfg
+	return nil
+}
+
+// resolve loads the config now (eager secrets), ignoring a failure: the
+// first call reports it and tries again.
+func (st *sharedState) resolve(cfgFile string) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	_ = st.loadLocked(cfgFile)
+}
+
+// reset drops config and client, so the next call resolves secrets and
+// logs in again (after an auth error: rotated key or password).
+func (st *sharedState) reset() {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.cfg = nil
+	st.dropClientLocked()
+}
+
+func (st *sharedState) dropClientLocked() {
+	if st.client != nil {
+		st.client.Close()
+		st.client = nil
+	}
+}
+
+func (st *sharedState) close() {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.dropClientLocked()
+}
+
+// SecretsEnvVar selects when the MCP server resolves 1Password secrets.
+const SecretsEnvVar = manual.MCPSecretsEnv
+
+// parseSecretsMode parses --secrets: "lazy" (default, on the first tool
+// call) or "eager" (at server start).
+//
+// :param mode: the flag or environment value
+// :returns: true for eager
+func parseSecretsMode(mode string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "lazy":
+		return false, nil
+	case "eager":
+		return true, nil
+	}
+	return false, apperr.New(apperr.KindValidation, "--secrets must be eager or lazy, not %q", mode)
 }
 
 // newMCPServer returns the MCP server and a function that releases the
 // Odoo client. Every tool call runs the CLI in-process with a fresh command
 // tree (no flag state survives a call) and the global flags the server was
-// started with; config and secrets load on the first call that needs them.
+// started with. Config and secrets load on the first call that needs them,
+// or before the first request with eager; they are kept once loaded, and
+// dropped only by an auth error.
 //
 // :param global: persistent flags of the server (--config, --backend)
-// :param setup: config + client factory
+// :param stages: config and client factories
 // :param readOnly: serve only the tools that change nothing
+// :param eager: resolve the secrets now instead of on the first call
 // :returns: the server and its close function
-func newMCPServer(global []string, setup setupFunc, readOnly bool) (*mcp.Server, func()) {
-	shared, closeFn := sharedSetup(setup)
+func newMCPServer(global []string, stages mcpSetup, readOnly, eager bool) (*mcp.Server, func()) {
+	st := &sharedState{stages: stages}
+	if eager && !usesFakeBackend(global) {
+		st.resolve(cfgFileOf(global))
+	}
 	tools := mcpTools()
 	if readOnly {
 		tools = readOnlyTools(tools)
 	}
 	runCLI := func(_ context.Context, argv []string) (string, bool) {
 		var out bytes.Buffer
-		code := run(append(slices.Clone(global), argv...), &out, io.Discard, shared)
+		code, err := runErr(append(slices.Clone(global), argv...), &out, io.Discard, st.setup)
+		if err != nil && apperr.KindOf(err) == apperr.KindAuth {
+			st.reset()
+		}
 		return out.String(), code != 0
 	}
 	return &mcp.Server{Name: MCPServerName, Version: version.Version, Instructions: mcpInstructions,
-		Tools: tools, Run: runCLI}, closeFn
+		Tools: tools, Run: runCLI}, st.close
+}
+
+// usesFakeBackend reports whether the global flags or the environment
+// select the fake backend, which never needs secrets. An invalid backend
+// is not "fake": the first call reports it.
+func usesFakeBackend(global []string) bool {
+	flag := ""
+	for _, g := range global {
+		if v, ok := strings.CutPrefix(g, "--backend="); ok {
+			flag = v
+		}
+	}
+	b, err := resolveBackend(flag)
+	return err == nil && b == backendFake
+}
+
+// cfgFileOf returns the value of --config in the global flags.
+func cfgFileOf(global []string) string {
+	for _, g := range global {
+		if v, ok := strings.CutPrefix(g, "--config="); ok {
+			return v
+		}
+	}
+	return ""
 }
 
 // mcpServerEntry is the entry of the "mcpServers" object of an MCP client.
@@ -217,8 +320,9 @@ type mcpServerEntry struct {
 	Args    []string `json:"args"`
 }
 
-func mcpCMD(setup setupFunc, cfgFile, backend *string) *cobra.Command {
+func mcpCMD(stages mcpSetup, cfgFile, backend *string) *cobra.Command {
 	var readOnly bool
+	var secrets string
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Run the MCP server on stdin/stdout (started by the MCP client)",
@@ -244,8 +348,14 @@ of the next page.
 
 Configuration and secrets load on the first tool call that needs them, not at
 start: the server starts and lists its tools even with 1Password locked, and
-such a call reports secrets_locked. The next call tries again; once loaded, the
-connection is kept for the life of the server. The global flags --config and
+such a call reports secrets_locked. The next call tries again. Once 1Password
+has answered, the resolved secrets are kept for the life of the server, even
+when the Odoo login fails (network), so 1Password is asked at most once; an
+auth error discards them and the next call resolves again. With
+--secrets eager (or ODOO_WORK_CLI_MCP_SECRETS=eager) the secrets resolve at
+server start, so the 1Password prompt comes when the client starts; if that
+fails the server still starts and calls report secrets_locked. The connection
+is kept for the life of the server. The global flags --config and
 --backend given before mcp apply to every call.
 
 Nothing is written to standard output except protocol messages; standard
@@ -256,14 +366,18 @@ error stays empty.`,
   # Only the read tools, against the offline fake backend
   odoo-work-cli --backend fake mcp --read-only
 
+  # Ask 1Password at client start instead of in the middle of a task
+  claude mcp add --scope user odoo-work-cli -- odoo-work-cli mcp --secrets eager
+
   # One request by hand
   echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | odoo-work-cli mcp`,
 		Annotations: map[string]string{
 			manual.Group:          manual.GroupAgents,
 			manual.StaticExamples: "true",
+			manual.Env:            strings.Join(append(manual.OdooEnv(), manual.MCPSecretsEnv), ", "),
 			manual.Output: "Only MCP protocol messages, one JSON-RPC 2.0 response per line on standard output. " +
 				"A tool result's first content item is the --json output of the command; see the MCP tool reference.",
-			manual.SeeAlso: "odoo-work-cli mcp print, odoo-work-cli llm, how-to/85-mcp.md, reference/60-mcp-tools.md",
+			manual.SeeAlso: "odoo-work-cli mcp print, odoo-work-cli llm, how-to/85-mcp.md, how-to/87-1password-prompts.md, reference/60-mcp-tools.md",
 		},
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -274,12 +388,18 @@ error stays empty.`,
 			if *backend != "" {
 				global = append(global, "--backend="+*backend)
 			}
-			s, closeFn := newMCPServer(global, setup, readOnly)
+			eager, err := parseSecretsMode(secrets)
+			if err != nil {
+				return err
+			}
+			s, closeFn := newMCPServer(global, stages, readOnly, eager)
 			defer closeFn()
 			return s.Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout())
 		},
 	}
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "serve only the read tools (no entries_add, entries_update, entries_delete, clock_in, clock_out, clock_add, clock_edit)")
+	cmd.Flags().StringVar(&secrets, "secrets", os.Getenv(SecretsEnvVar), "when to resolve 1Password secrets: lazy (first tool call, default) or eager (at server start); env "+SecretsEnvVar)
+	manual.SetFlagEnv(cmd.Flags(), "secrets", SecretsEnvVar)
 	cmd.AddCommand(mcpPrintCMD())
 	return cmd
 }

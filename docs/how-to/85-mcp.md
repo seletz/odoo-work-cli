@@ -85,8 +85,24 @@ printed configuration.
 The server starts without loading the configuration or secrets. They load on
 the first tool call that needs them, as in the CLI. If 1Password is locked,
 that call returns `secrets_locked` and the server keeps running: unlock
-1Password and the next call loads. After that the connection is kept for the
-life of the server, so 1Password is not asked again for every call.
+1Password and the next call loads.
+
+Once 1Password has answered, the resolved secrets are kept for the life of the
+server, even when the Odoo login then fails (network, timeout): 1Password is
+asked at most once per server process. Only an `auth` error (a rotated API key
+or password) discards them; the next call resolves again, once.
+
+To have the prompt when the client starts instead of in the middle of a task,
+resolve eagerly:
+
+```bash
+claude mcp add --scope user odoo-work-cli -- odoo-work-cli mcp --secrets eager
+```
+
+`--secrets eager` (or `ODOO_WORK_CLI_MCP_SECRETS=eager`) resolves the secrets
+before the first request. If that fails the server still starts, and calls
+report `secrets_locked` as before. For a setup without any prompt during work,
+see [1Password prompts](87-1password-prompts.md).
 
 ## Try it without Odoo
 

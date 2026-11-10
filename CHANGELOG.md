@@ -8,6 +8,23 @@ release. See [Releases and docs](explanation/50-releases-and-docs.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP: 1Password is asked at most once per server (#117).** The server keeps
+  the resolved secrets once `op inject` succeeded, even when the Odoo login
+  fails afterwards; before, the next tool call asked again. An `auth` error
+  discards them, and the next call resolves once more (rotated key or
+  password).
+
+### Added
+
+- `odoo-work-cli mcp --secrets eager|lazy` (env `ODOO_WORK_CLI_MCP_SECRETS`,
+  default `lazy`): `eager` resolves the secrets at server start, so the prompt
+  comes when the client starts, except with the fake backend, which never
+  needs secrets (#117).
+- How-to "1Password prompts": when prompts come, and three setups (eager MCP,
+  `op run --env-file`, `ODOO_WORK_CLI_NO_OP`) (#117).
+
 ## [0.9.0] - 2026-11-10
 
 ### Added
