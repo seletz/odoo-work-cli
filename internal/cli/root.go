@@ -183,6 +183,7 @@ func newRootCmd(setup setupFunc) (*cobra.Command, *bool) {
 	rootCmd.AddCommand(entries.CMD(deps))
 	rootCmd.AddCommand(clock.CMD(deps))
 	rootCmd.AddCommand(llm.CMD())
+	rootCmd.AddCommand(mcpCMD(setup, &cfgFile, &backend))
 
 	return rootCmd, started
 }
@@ -193,6 +194,9 @@ func isNoneSetupCommand(cmd *cobra.Command) bool {
 		case "completion", "__complete", "__completeNoDesc":
 			return true
 		case "config", "llm":
+			return true
+		case "mcp":
+			// The server loads config per tool call (newMCPServer).
 			return true
 		}
 	}
