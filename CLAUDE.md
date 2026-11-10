@@ -53,6 +53,9 @@ internal/parsing/             # Date and hours parsing helpers
 internal/display/             # Output formatting
 internal/tui/                 # Bubbletea TUI: model, grid, rendering, keymap, styles, holidays
 internal/version/             # Version string injected at build time via ldflags
+internal/docsgen/             # Docs generator: demo state, TUI screenshots (SVG + goldens), CLI samples, cobra reference
+tools/docsgen/                # `go run ./tools/docsgen screenshots|reference`
+docs/                         # Zensical site (Diátaxis); docs/assets/{screenshots,cli} and docs/reference/commands are generated
 scripts/release.sh            # Interactive semver release script
 ```
 
@@ -119,7 +122,13 @@ mise run test         # run all tests
 mise run lint         # golangci-lint v2
 mise run fmt          # gofmt
 mise run release      # interactive semver release (scripts/release.sh)
+mise run docs:serve   # docs site preview; docs:build is strict
+mise run docs:generate  # regenerate screenshots, CLI samples, command reference
+mise run docs:check   # fail if generated docs are stale (CI)
 ```
+
+A TUI change, a changed command output or help text needs `mise run docs:generate`
+and the regenerated files in the same PR, or the Docs workflow fails.
 
 Releases are built with GoReleaser (`mise run goreleaser-check` / `goreleaser-snapshot`).
 
