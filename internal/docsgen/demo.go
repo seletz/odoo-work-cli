@@ -14,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	// Embedded zone data: renders must not depend on the host's tzdata.
+	_ "time/tzdata"
 
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/odoo/fake"
