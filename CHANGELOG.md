@@ -8,6 +8,8 @@ release. See [Releases and docs](explanation/50-releases-and-docs.md).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-10
+
 ### Fixed
 
 - **MCP: 1Password is asked at most once per server (#117).** The server keeps
