@@ -460,6 +460,15 @@ func spliceLine(bg, box string, col int) string {
 // RenderDetailOverlay composites a bordered detail box centered on top of bg.
 // boxStyle selects which border style to use for the overlay.
 func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int, boxStyle lipgloss.Style) string {
+	// Keep the box inside the terminal: cut over-long content lines by
+	// terminal cell, leaving one cell of margin on each side.
+	if maxInner := bgWidth - boxStyle.GetHorizontalFrameSize() - 2; bgWidth > 0 && maxInner > 0 {
+		lines := strings.Split(detail, "\n")
+		for i, l := range lines {
+			lines[i] = ansi.Truncate(l, maxInner, "…")
+		}
+		detail = strings.Join(lines, "\n")
+	}
 	box := boxStyle.Render(detail)
 
 	boxLines := strings.Split(box, "\n")
@@ -608,9 +617,8 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 
 	// padLine right-pads a line to the fixed inner width.
 	padLine := func(s string) string {
-		runes := []rune(s)
-		if len(runes) < innerWidth {
-			return s + strings.Repeat(" ", innerWidth-len(runes))
+		if w := ansi.StringWidth(s); w < innerWidth {
+			return s + strings.Repeat(" ", innerWidth-w)
 		}
 		return s
 	}
@@ -758,9 +766,8 @@ func renderHelpOverlay(km KeyMap, width, height int) string {
 	}
 
 	padLine := func(s string) string {
-		runes := []rune(s)
-		if len(runes) < innerWidth {
-			return s + strings.Repeat(" ", innerWidth-len(runes))
+		if w := ansi.StringWidth(s); w < innerWidth {
+			return s + strings.Repeat(" ", innerWidth-w)
 		}
 		return s
 	}

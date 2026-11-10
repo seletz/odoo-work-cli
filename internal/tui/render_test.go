@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/seletz/odoo-work-cli/internal/config"
@@ -365,5 +366,44 @@ func TestRenderDetailOverlay_CentersStyledBox(t *testing.T) {
 	row := ansi.Strip(strings.Split(result, "\n")[1])
 	if got := strings.Index(row, "0123456789"); got != 25 {
 		t.Errorf("box starts at cell %d, want 25: %q", got, row)
+	}
+}
+
+// Issue #105: an overlay must never make the frame wider than the terminal
+// (or, where the bare grid itself is wider than a narrow terminal, wider than
+// the grid), in any overlay state, with long project and task names.
+func TestView_LinesFitTerminalWidth(t *testing.T) {
+	long := strings.Repeat("Very long project name ", 8)
+	maxWidth := func(s string) int {
+		mx := 0
+		for _, line := range strings.Split(s, "\n") {
+			mx = max(mx, ansi.StringWidth(line))
+		}
+		return mx
+	}
+	build := func(width int, state uiState) Model {
+		m := newTestModel([]odoo.TimesheetEntry{
+			{Date: "2026-03-02", Project: long, ProjectID: 1, Task: long, TaskID: 2, Hours: 1, Name: long},
+		}, nil)
+		um, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+		m = um.(Model)
+		um, _ = m.Update(m.loadTimesheets()())
+		m = um.(Model)
+		m.state = state
+		m.searchSub = searchReady
+		m.searchUseFilter = true
+		m.searchFiltered = []searchItem{
+			{Kind: "project", ID: 1, Name: long, Extra: long, Company: "Corp"},
+			{Kind: "task", ID: 2, Name: long, Extra: long, Company: "Corp"},
+		}
+		return m
+	}
+	for _, width := range []int{80, 120} {
+		limit := max(width, maxWidth(build(width, stateGrid).View().Content))
+		for _, state := range []uiState{stateGrid, stateDetail, stateEdit, stateSearch, stateHelp} {
+			if w := maxWidth(build(width, state).View().Content); w > limit {
+				t.Errorf("state %d at width %d: frame is %d cells wide, limit %d", state, width, w, limit)
+			}
+		}
 	}
 }
