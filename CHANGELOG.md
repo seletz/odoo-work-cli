@@ -39,6 +39,9 @@ release. See [Releases and docs](explanation/50-releases-and-docs.md).
   commits, grouped by type (#112).
 - The TUI docs describe the 80-column layout and the 68-column minimum, and
   the troubleshooting page covers "terminal too narrow" (#112).
+- The TUI screenshots in the docs look like the TUI in a real terminal: set in
+  Fira Code with Ghostty's cell metrics and the Catppuccin Mocha palette
+  instead of Go Mono with raw ANSI colours (#115).
 
 ## [0.8.5] - 2026-11-10
 
