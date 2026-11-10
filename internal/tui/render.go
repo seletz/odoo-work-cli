@@ -132,6 +132,36 @@ func buildGridSeparatorBottom(labelWidth, colWidth int) string {
 	return gridSepStyle.Render(b.String())
 }
 
+// Grid layout limits. A day cell needs 5 cells for "10:30" (6 for "-1:30"
+// style attendance values, 5 when compact); each column adds one separator.
+const (
+	gridMinLabelWidth = 14
+	gridCompactCol    = 6 // day column incl. separator, compact
+	gridMinCol        = 7 // day column incl. separator, normal
+)
+
+// gridMinWidth is the smallest terminal width the grid can be laid out in.
+func gridMinWidth() int {
+	return gridMinLabelWidth + 2 + 8*gridCompactCol
+}
+
+// gridLayout returns the label column width and the day column width
+// (including its separator) for a grid of the given total width. The label
+// gets up to a third of the width (20..40); when that does not fit, the
+// label shrinks first, then the day columns go compact.
+func gridLayout(width int) (labelWidth, colWidth int) {
+	labelWidth = min(40, width/3)
+	labelWidth = max(labelWidth, 20)
+	colWidth = max((width-labelWidth-2)/8, gridMinCol)
+	if labelWidth+2+8*colWidth <= width {
+		return labelWidth, colWidth
+	}
+	if l := width - 2 - 8*gridMinCol; l >= gridMinLabelWidth {
+		return l, gridMinCol
+	}
+	return max(width-2-8*gridCompactCol, gridMinLabelWidth), gridCompactCol
+}
+
 // RenderGrid renders the weekly grid as a styled string.
 // holidays is a [7]string with holiday names per day (empty = no holiday).
 // companyColors maps company name to lipgloss color string for row label coloring.
@@ -140,30 +170,18 @@ func buildGridSeparatorBottom(labelWidth, colWidth int) string {
 // attendance and the attendance − booked difference are rendered below the
 // totals row.
 func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string, todayCol int, att WeekAttendance) string {
-	minColWidth := 7
-	minLabelWidth := 20
-	maxLabelWidth := 40
-
-	// Label gets up to maxLabelWidth; remaining space goes to day columns.
-	labelWidth := maxLabelWidth
-	if labelWidth > width/3 {
-		labelWidth = width / 3
-	}
-	if labelWidth < minLabelWidth {
-		labelWidth = minLabelWidth
-	}
-	remaining := width - labelWidth - 2 // 2 for gap
-	colWidth := remaining / 8           // 7 days + total
-	if colWidth < minColWidth {
-		colWidth = minColWidth
-	}
+	labelWidth, colWidth := gridLayout(width)
 
 	isHoliday := func(d int) bool { return holidays[d] != "" }
 
 	var b strings.Builder
 
 	// Header row.
-	header := fmt.Sprintf("%-*s  ", labelWidth, "Company Prefix / Project / Task")
+	title := "Company Prefix / Project / Task"
+	if runeLen(title) > labelWidth {
+		title = "Project / Task"
+	}
+	header := fmt.Sprintf("%-*s  ", labelWidth, title)
 	for i, name := range dayNames {
 		cell := fmt.Sprintf("%*s", colWidth-1, name)
 		switch {

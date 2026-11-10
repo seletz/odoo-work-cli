@@ -399,12 +399,33 @@ func TestView_LinesFitTerminalWidth(t *testing.T) {
 		}
 		return m
 	}
-	for _, width := range []int{80, 120} {
-		limit := max(width, maxWidth(build(width, stateGrid).View().Content))
+	// Issue #107: the grid itself fits the terminal, not only the overlays.
+	for _, width := range []int{80, 100, 120} {
 		for _, state := range []uiState{stateGrid, stateDetail, stateEdit, stateSearch, stateHelp} {
-			if w := maxWidth(build(width, state).View().Content); w > limit {
-				t.Errorf("state %d at width %d: frame is %d cells wide, limit %d", state, width, w, limit)
+			if w := maxWidth(build(width, state).View().Content); w > width {
+				t.Errorf("state %d at width %d: frame is %d cells wide", state, width, w)
 			}
+		}
+	}
+}
+
+// Issue #107: below the minimum layout the TUI shows a short notice instead
+// of a broken grid.
+func TestView_TooNarrowShowsNotice(t *testing.T) {
+	m := newTestModel([]odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: "P", ProjectID: 1, Task: "T", TaskID: 2, Hours: 1},
+	}, nil)
+	um, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 24})
+	m = um.(Model)
+	um, _ = m.Update(m.loadTimesheets()())
+	m = um.(Model)
+	out := ansi.Strip(m.View().Content)
+	if !strings.Contains(out, "terminal too narrow") {
+		t.Errorf("no notice at width 60: %q", out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if w := ansi.StringWidth(line); w > 60 {
+			t.Errorf("notice line is %d cells wide: %q", w, line)
 		}
 	}
 }
