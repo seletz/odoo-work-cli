@@ -12,48 +12,37 @@ import (
 	"sync"
 
 	uv "github.com/charmbracelet/ultraviolet"
-	"golang.org/x/image/font/gofont/gomono"
-	"golang.org/x/image/font/gofont/gomonobold"
-	"golang.org/x/image/font/gofont/gomonobolditalic"
-	"golang.org/x/image/font/gofont/gomonoitalic"
 )
 
-// Geometry of the screenshots in pixels. The font is drawn at twice a
-// typical terminal size, so the images stay sharp on high-resolution
-// displays.
+// Geometry of the window around the cells, in pixels (2× like the font).
+// The cell size comes from the font, see cell.
 const (
-	fontSize    = 26
-	cellW       = 16 // advance of Go Mono at fontSize, rounded
-	cellH       = 34
-	padX        = 36
-	padY        = 32
-	titleBar    = 60 // room above the first row, holds the window buttons
-	radius      = 22
-	stroke      = 3 // thickness of light box-drawing lines
-	heavyStroke = 6 // thickness of heavy box-drawing lines
-	doubleGap   = 3 // distance of the two strokes of a double line from the centre line
+	padX     = 36
+	padY     = 32
+	titleBar = 60 // room above the first row, holds the window buttons
+	radius   = 22
 )
 
-// Window colours: a dark terminal with the TUI's default text colour.
+// Window chrome: a Mocha surface0 frame and the usual three buttons.
 var (
-	background = color.RGBA{0x16, 0x1b, 0x22, 0xff}
-	foreground = color.RGBA{0xd0, 0xd0, 0xd0, 0xff}
-	border     = color.RGBA{0x30, 0x36, 0x3d, 0xff}
-	buttons    = []color.RGBA{{0xff, 0x5f, 0x57, 0xff}, {0xfe, 0xbc, 0x2e, 0xff}, {0x28, 0xc8, 0x40, 0xff}}
+	border  = color.RGBA{0x31, 0x32, 0x44, 0xff}
+	buttons = []color.RGBA{{0xff, 0x5f, 0x57, 0xff}, {0xfe, 0xbc, 0x2e, 0xff}, {0x28, 0xc8, 0x40, 0xff}}
 )
+
+// faintOpacity is how much of a faint cell's foreground shows over its
+// background: Ghostty's default faint-opacity.
+const faintOpacity = 0.5
 
 // Indexes into faces.
 const (
 	faceRegular = iota
 	faceBold
-	faceItalic
-	faceBoldItalic
 )
 
-// faces are the Go Mono faces, parsed once.
-var faces = sync.OnceValues(func() ([4]*glyphFace, error) {
-	var out [4]*glyphFace
-	for i, ttf := range [][]byte{gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF} {
+// faces are the Fira Code faces, parsed once.
+var faces = sync.OnceValues(func() ([2]*glyphFace, error) {
+	var out [2]*glyphFace
+	for i, ttf := range [][]byte{firaRegular, firaBold} {
 		f, err := newGlyphFace(ttf)
 		if err != nil {
 			return out, fmt.Errorf("png: font: %w", err)
@@ -66,7 +55,7 @@ var faces = sync.OnceValues(func() ([4]*glyphFace, error) {
 // imageSize returns the size in pixels of the image of a cols × rows
 // terminal.
 func imageSize(cols, rows int) (int, int) {
-	return cols*cellW + 2*padX, rows*cellH + titleBar + padY
+	return cols*cell.w + 2*padX, rows*cell.h + titleBar + padY
 }
 
 // PNG writes the image of a frame as PNG; see Image.
@@ -83,13 +72,15 @@ func PNG(w io.Writer, f Frame) error {
 }
 
 // Image draws a frame as a terminal window: a rounded dark panel with three
-// window buttons and one cell per terminal cell. Text is set in the
-// embedded Go Mono, so the image looks the same everywhere: bold and
-// italic cells use those faces, faint ones blend the foreground towards
-// the background, underlined ones get a line, reverse swaps the colours.
-// The box-drawing glyphs of the grid and the overlays are drawn as
-// shapes, so rules join without gaps. The output depends only on the
-// frame.
+// window buttons and one cell per terminal cell, made to look like the
+// reference terminal (Ghostty, Fira Code, Catppuccin Mocha). Text is set
+// in the embedded Fira Code with Ghostty's cell metrics (see cell), so the
+// image looks the same everywhere: bold cells use the bold face, faint
+// ones show the foreground at Ghostty's faint opacity, underlined ones
+// get the font's underline, reverse swaps the colours, the 16 ANSI
+// colours come from the theme (see themed). Box-drawing and block
+// glyphs are drawn as shapes, as Ghostty draws them, so rules join
+// without gaps. The output depends only on the frame.
 //
 // :param f: the frame
 // :returns: the image
@@ -110,17 +101,15 @@ func Image(f Frame) (*image.RGBA, error) {
 		fillCircle(img, padX+8+i*26, titleBar/2, 8, c)
 	}
 
-	metrics := fs[faceRegular].metrics
-	ascent := (cellH-(metrics.Ascent+metrics.Descent).Ceil())/2 + metrics.Ascent.Ceil()
 	for y := range rows {
 		for x := range cols {
-			cell := buf.CellAt(x, y)
-			if cell == nil || cell.Width == 0 || cell.Content == "" {
+			c := buf.CellAt(x, y)
+			if c == nil || c.Width == 0 || c.Content == "" {
 				continue
 			}
-			s := cell.Style
+			s := c.Style
 			fg, bg := colours(s)
-			r := image.Rect(padX+x*cellW, titleBar+y*cellH, padX+(x+cell.Width)*cellW, titleBar+(y+1)*cellH)
+			r := image.Rect(padX+x*cell.w, titleBar+y*cell.h, padX+(x+c.Width)*cell.w, titleBar+(y+1)*cell.h)
 			if bg != nil {
 				fill(img, r, bg)
 			}
@@ -128,24 +117,19 @@ func Image(f Frame) (*image.RGBA, error) {
 				fg = foreground
 			}
 			if s.Attrs&uv.AttrFaint != 0 {
-				fg = blend(fg, bgOr(bg), 0.55)
+				fg = blend(fg, bgOr(bg), faintOpacity)
 			}
-			if !boxShape(img, r, cell.Content, fg) && !shape(img, r, cell.Content, fg) {
+			if !boxShape(img, r, c.Content, fg) && !blockShape(img, r, c.Content, fg) && !shape(img, r, c.Content, fg) {
 				face := fs[faceRegular]
-				switch bold, italic := s.Attrs&uv.AttrBold != 0, s.Attrs&uv.AttrItalic != 0; {
-				case bold && italic:
-					face = fs[faceBoldItalic]
-				case bold:
+				if s.Attrs&uv.AttrBold != 0 {
 					face = fs[faceBold]
-				case italic:
-					face = fs[faceItalic]
 				}
-				if err := face.draw(img, r.Min.X, r.Min.Y+ascent, cell.Content, fg); err != nil {
-					return nil, fmt.Errorf("png: %q: %w", cell.Content, err)
+				if err := face.draw(img, r.Min.X, r.Min.Y+cell.baseline, c.Content, fg); err != nil {
+					return nil, fmt.Errorf("png: %q: %w", c.Content, err)
 				}
 			}
 			if s.Underline != uv.UnderlineNone {
-				fill(img, image.Rect(r.Min.X, r.Min.Y+ascent+4, r.Max.X, r.Min.Y+ascent+6), fg)
+				fill(img, image.Rect(r.Min.X, r.Min.Y+cell.ulPos, r.Max.X, r.Min.Y+cell.ulPos+cell.ulThick), fg)
 			}
 		}
 	}
@@ -155,7 +139,7 @@ func Image(f Frame) (*image.RGBA, error) {
 // colours resolves the foreground and background of a cell: nil means the
 // default; reverse swaps them.
 func colours(s uv.Style) (fg, bg color.Color) {
-	fg, bg = s.Fg, s.Bg
+	fg, bg = themed(s.Fg), themed(s.Bg)
 	if s.Attrs&uv.AttrReverse != 0 {
 		if fg == nil {
 			fg = foreground

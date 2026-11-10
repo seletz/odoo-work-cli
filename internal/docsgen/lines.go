@@ -38,111 +38,165 @@ var boxGlyphs = map[string]arms{
 	"╚": {r: double, u: double}, "╝": {l: double, u: double},
 }
 
-// boxShape draws the box-drawing glyph ch into the cell r as lines that
-// meet the neighbouring cells at their edge midpoints, and reports whether
-// ch was one. Light and heavy arms are strokes of their thickness, double
-// arms two light strokes either side of the centre line, rounded corners
-// a quarter circle.
+// boxShape draws the box-drawing glyph ch into the cell r and reports
+// whether ch was one. The geometry is Ghostty's (src/font/sprite/draw/
+// box.zig, linesChar and arc): light strokes are cell.box thick, heavy
+// ones twice that, centred in the cell; a double arm is two light
+// strokes with a light stroke's gap between them; arms meet in a square
+// so corners and tees close; rounded corners are a quarter circle of half
+// the cell width.
 func boxShape(img *image.RGBA, r image.Rectangle, ch string, fg color.Color) bool {
 	a, ok := boxGlyphs[ch]
 	if !ok {
 		return false
 	}
-	cx, cy := r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2
-	// hband and vband fill a horizontal or vertical stroke of width sw
-	// centred off pixels below/right of the centre line.
-	hband := func(x0, x1, off, sw int) {
-		fill(img, image.Rect(min(x0, x1), cy+off-sw/2, max(x0, x1), cy+off-sw/2+sw), fg)
+	w, h := r.Dx(), r.Dy()
+	lightPx, heavyPx := cell.box, 2*cell.box
+	hLightTop := (h - lightPx) / 2
+	hLightBottom := hLightTop + lightPx
+	hHeavyTop := (h - heavyPx) / 2
+	hHeavyBottom := hHeavyTop + heavyPx
+	hDoubleTop := hLightTop - lightPx
+	hDoubleBottom := hLightBottom + lightPx
+	vLightLeft := (w - lightPx) / 2
+	vLightRight := vLightLeft + lightPx
+	vHeavyLeft := (w - heavyPx) / 2
+	vHeavyRight := vHeavyLeft + heavyPx
+	vDoubleLeft := vLightLeft - lightPx
+	vDoubleRight := vLightRight + lightPx
+
+	box := func(x0, y0, x1, y1 int) {
+		fill(img, image.Rect(r.Min.X+x0, r.Min.Y+y0, r.Min.X+x1, r.Min.Y+y1), fg)
 	}
-	vband := func(y0, y1, off, sw int) {
-		fill(img, image.Rect(cx+off-sw/2, min(y0, y1), cx+off-sw/2+sw, max(y0, y1)), fg)
+	if a.round {
+		roundCorner(img, r, a, lightPx, fg)
+		return true
 	}
-	weight := max(a.l, a.r, a.u, a.d)
-	switch {
-	case a.round:
-		rad := min(r.Dx(), r.Dy()) / 2
-		h, hx := 1, r.Max.X
-		if a.l != none {
-			h, hx = -1, r.Min.X
-		}
-		v, vy := 1, r.Max.Y
-		if a.u != none {
-			v, vy = -1, r.Min.Y
-		}
-		ox, oy := cx+h*rad, cy+v*rad
-		arc(img, ox, oy, rad, -h, -v, fg)
-		hband(ox, hx, 0, stroke)
-		vband(oy, vy, 0, stroke)
-	case weight == double:
-		h, v := 0, 0 // direction of the horizontal and vertical arm, 0 for none
-		if a.r != none {
-			h = 1
-		} else if a.l != none {
-			h = -1
-		}
-		if a.d != none {
-			v = 1
-		} else if a.u != none {
-			v = -1
-		}
-		switch {
-		case v == 0:
-			hband(r.Min.X, r.Max.X, -doubleGap, stroke)
-			hband(r.Min.X, r.Max.X, doubleGap, stroke)
-		case h == 0:
-			vband(r.Min.Y, r.Max.Y, -doubleGap, stroke)
-			vband(r.Min.Y, r.Max.Y, doubleGap, stroke)
-		default:
-			// A corner: an outer and an inner L, joined at their bends.
-			hx, vy := r.Max.X, r.Max.Y
-			if h < 0 {
-				hx = r.Min.X
-			}
-			if v < 0 {
-				vy = r.Min.Y
-			}
-			for _, s := range []int{-1, 1} {
-				ex, ey := cx+s*doubleGap*h, cy+s*doubleGap*v
-				hband(ex-h*(stroke/2), hx, s*doubleGap*v, stroke)
-				vband(ey-v*(stroke/2), vy, s*doubleGap*h, stroke)
-			}
-		}
-	default:
-		sw := stroke
-		if weight == heavy {
-			sw = heavyStroke
-		}
-		// Each arm runs from the far side of the centre stroke to the edge,
-		// so arms join in a square.
-		if a.l != none {
-			hband(r.Min.X, cx-sw/2+sw, 0, sw)
-		}
-		if a.r != none {
-			hband(cx-sw/2, r.Max.X, 0, sw)
-		}
-		if a.u != none {
-			vband(r.Min.Y, cy-sw/2+sw, 0, sw)
-		}
-		if a.d != none {
-			vband(cy-sw/2, r.Max.Y, 0, sw)
-		}
+
+	// Where the vertical arms end and the horizontal arms start, so the
+	// arms join without a notch (linesChar's up_bottom, down_top,
+	// left_right, right_left).
+	upBottom := pick(a.l == heavy || a.r == heavy, hHeavyBottom,
+		pick(a.l != a.r || a.d == a.u, pick(a.l == double || a.r == double, hDoubleBottom, hLightBottom),
+			pick(a.l == none && a.r == none, hLightBottom, hLightTop)))
+	downTop := pick(a.l == heavy || a.r == heavy, hHeavyTop,
+		pick(a.l != a.r || a.u == a.d, pick(a.l == double || a.r == double, hDoubleTop, hLightTop),
+			pick(a.l == none && a.r == none, hLightTop, hLightBottom)))
+	leftRight := pick(a.u == heavy || a.d == heavy, vHeavyRight,
+		pick(a.u != a.d || a.l == a.r, pick(a.u == double || a.d == double, vDoubleRight, vLightRight),
+			pick(a.u == none && a.d == none, vLightRight, vLightLeft)))
+	rightLeft := pick(a.u == heavy || a.d == heavy, vHeavyLeft,
+		pick(a.u != a.d || a.r == a.l, pick(a.u == double || a.d == double, vDoubleLeft, vLightLeft),
+			pick(a.u == none && a.d == none, vLightLeft, vLightRight)))
+
+	switch a.u {
+	case light:
+		box(vLightLeft, 0, vLightRight, upBottom)
+	case heavy:
+		box(vHeavyLeft, 0, vHeavyRight, upBottom)
+	case double:
+		box(vDoubleLeft, 0, vLightLeft, pick(a.l == double, hLightTop, upBottom))
+		box(vLightRight, 0, vDoubleRight, pick(a.r == double, hLightTop, upBottom))
+	}
+	switch a.r {
+	case light:
+		box(rightLeft, hLightTop, w, hLightBottom)
+	case heavy:
+		box(rightLeft, hHeavyTop, w, hHeavyBottom)
+	case double:
+		box(pick(a.u == double, vLightRight, rightLeft), hDoubleTop, w, hLightTop)
+		box(pick(a.d == double, vLightRight, rightLeft), hLightBottom, w, hDoubleBottom)
+	}
+	switch a.d {
+	case light:
+		box(vLightLeft, downTop, vLightRight, h)
+	case heavy:
+		box(vHeavyLeft, downTop, vHeavyRight, h)
+	case double:
+		box(vDoubleLeft, pick(a.l == double, hLightBottom, downTop), vLightLeft, h)
+		box(vLightRight, pick(a.r == double, hLightBottom, downTop), vDoubleRight, h)
+	}
+	switch a.l {
+	case light:
+		box(0, hLightTop, leftRight, hLightBottom)
+	case heavy:
+		box(0, hHeavyTop, leftRight, hHeavyBottom)
+	case double:
+		box(0, hDoubleTop, pick(a.u == double, vLightLeft, leftRight), hLightTop)
+		box(0, hLightBottom, pick(a.d == double, vLightLeft, leftRight), hDoubleBottom)
 	}
 	return true
 }
 
-// arc draws the quarter of a circle of radius rad around (ox, oy) that
-// lies towards sx, sy (each -1 or +1), as a light stroke with soft edges.
-func arc(img *image.RGBA, ox, oy, rad, sx, sy int, c color.Color) {
-	for y := oy - rad - stroke; y <= oy+rad+stroke; y++ {
-		for x := ox - rad - stroke; x <= ox+rad+stroke; x++ {
-			dx, dy := float64(x)+0.5-float64(ox), float64(y)+0.5-float64(oy)
-			if dx*float64(sx) < 0 || dy*float64(sy) < 0 {
-				continue
+// pick is a conditional expression.
+func pick(cond bool, a, b int) int {
+	if cond {
+		return a
+	}
+	return b
+}
+
+// roundCorner draws a rounded corner (╭╮╰╯) with soft edges: the strokes
+// are centred as in Ghostty's arc; the quarter circle's radius is the
+// distance from the vertical stroke to the cell edge on the side of the
+// horizontal arm, so the arc ends exactly on that edge and joins the ─ of
+// the next cell; the vertical arm runs on straight to its edge.
+func roundCorner(img *image.RGBA, r image.Rectangle, a arms, thick int, fg color.Color) {
+	w, h := r.Dx(), r.Dy()
+	t := float64(thick)
+	// Centre of the strokes, as in Ghostty's arc.
+	cx := float64(r.Min.X) + float64((w-thick)/2) + t/2
+	cy := float64(r.Min.Y) + float64((h-thick)/2) + t/2
+	sx, sy := 1.0, 1.0 // direction of the horizontal and vertical arm
+	rad := float64(r.Max.X) - cx
+	if a.l != none {
+		sx = -1
+		rad = cx - float64(r.Min.X)
+	}
+	if a.u != none {
+		sy = -1
+	}
+	// Centre of the arc; the products are rounded on their own (no FMA).
+	ox, oy := cx+float64(sx*rad), cy+float64(sy*rad)
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			px, py := float64(x)+0.5, float64(y)+0.5
+			var d float64
+			switch {
+			case (py-oy)*sy >= 0: // past the arc: the vertical arm
+				d = math.Abs(px - cx)
+			case (px-ox)*sx >= 0: // the horizontal arm
+				d = math.Abs(py - cy)
+			default:
+				d = math.Abs(hypot(px-ox, py-oy) - rad)
 			}
-			d := math.Abs(hypot(dx, dy) - float64(rad))
-			if t := float64(stroke)/2 + 0.5 - d; t > 0 {
-				img.Set(x, y, blend(c, img.RGBAAt(x, y), math.Min(t, 1)))
+			if cov := t/2 + 0.5 - d; cov > 0 {
+				img.Set(x, y, blend(fg, img.RGBAAt(x, y), math.Min(cov, 1)))
 			}
 		}
 	}
+}
+
+// blockShape draws the block elements █ ▀ ▄ ▌ ▐ as filled parts of the
+// cell r, as Ghostty does (src/font/sprite/draw/block.zig), and reports
+// whether ch was one.
+func blockShape(img *image.RGBA, r image.Rectangle, ch string, fg color.Color) bool {
+	mx, my := r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2
+	var part image.Rectangle
+	switch ch {
+	case "█":
+		part = r
+	case "▀":
+		part = image.Rect(r.Min.X, r.Min.Y, r.Max.X, my)
+	case "▄":
+		part = image.Rect(r.Min.X, my, r.Max.X, r.Max.Y)
+	case "▌":
+		part = image.Rect(r.Min.X, r.Min.Y, mx, r.Max.Y)
+	case "▐":
+		part = image.Rect(mx, r.Min.Y, r.Max.X, r.Max.Y)
+	default:
+		return false
+	}
+	fill(img, part, fg)
+	return true
 }

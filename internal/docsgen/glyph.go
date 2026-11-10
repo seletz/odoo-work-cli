@@ -187,7 +187,7 @@ func steps(devsq float32) int {
 }
 
 // isShape reports whether r is drawn by shape: characters the TUI uses
-// that Go Mono has no glyph for.
+// that Fira Code has no glyph for.
 func isShape(r rune) bool { return r == '↵' }
 
 // shape draws the characters of isShape into the cell r and reports
@@ -202,8 +202,8 @@ func shape(img *image.RGBA, r image.Rectangle, ch string, fg color.Color) bool {
 	tip := r.Min.X + w/8
 	head := w / 4 // length and half height of the arrow head
 	// Stem down the right, shaft to the left at mid height.
-	fill(img, image.Rect(stem-stroke/2, r.Min.Y+h/4, stem-stroke/2+stroke, cy+stroke-stroke/2), fg)
-	fill(img, image.Rect(tip+head/2, cy-stroke/2, stem-stroke/2+stroke, cy-stroke/2+stroke), fg)
+	fill(img, image.Rect(stem-cell.box/2, r.Min.Y+h/4, stem-cell.box/2+cell.box, cy+cell.box-cell.box/2), fg)
+	fill(img, image.Rect(tip+head/2, cy-cell.box/2, stem-cell.box/2+cell.box, cy-cell.box/2+cell.box), fg)
 	// Arrow head: a triangle pointing left, its tip at tip.
 	for x := 0; x <= head; x++ {
 		fill(img, image.Rect(tip+x, cy-x/2-1, tip+x+1, cy+x/2+1), fg)
