@@ -43,7 +43,8 @@ There are now full **dev**, **test**, and **prod** environments of odoo-erp.
 ## Project Structure
 
 ```
-cmd/odoo-work-cli/main.go    # Cobra CLI entrypoint (all commands)
+cmd/odoo-work-cli/main.go    # entrypoint: calls internal/cli
+internal/cli/                 # Cobra root command, whoami, backend selection, error rendering
 internal/app/                 # Runtime dependency container (Deps: config + client)
 internal/config/              # Config loading: TOML discovery, env vars, op secrets, install
 internal/odoo/                # Odoo client interface + XML-RPC and JSON-RPC implementations
