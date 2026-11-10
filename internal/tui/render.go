@@ -28,7 +28,7 @@ const (
 
 // RenderHeaderBar renders a styled top header bar with app name, week number,
 // date range, clock status, attendance totals, and loading indicator.
-func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAttendance []odoo.AttendanceRecord, loading bool, spin spinner.Model, width int) string {
+func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAttendance []odoo.AttendanceRecord, loading bool, spin spinner.Model, width int, now time.Time) string {
 	sunday := monday.AddDate(0, 0, 6)
 	_, isoWeek := monday.ISOWeek()
 
@@ -44,8 +44,8 @@ func RenderHeaderBar(monday time.Time, attendance *odoo.AttendanceStatus, weekAt
 		loadingIndicator = " " + spin.View()
 	}
 
-	right := renderClockStatus(attendance)
-	if summary := renderAttendanceSummary(attendance, weekAttendance, time.Now()); summary != "" {
+	right := renderClockStatus(attendance, now)
+	if summary := renderAttendanceSummary(attendance, weekAttendance, now); summary != "" {
 		right += "  " + summary
 	}
 	right += loadingIndicator + " "
@@ -488,15 +488,16 @@ func RenderDetailOverlay(bg, detail string, bgWidth, bgHeight int, boxStyle lipg
 	return strings.Join(bgLines, "\n")
 }
 
-// renderClockStatus returns a styled clock-in/out status string.
-func renderClockStatus(attendance *odoo.AttendanceStatus) string {
+// renderClockStatus returns a styled clock-in/out status string; the
+// elapsed time of a running period counts up to now.
+func renderClockStatus(attendance *odoo.AttendanceStatus, now time.Time) string {
 	if attendance == nil {
 		return ""
 	}
 	if !attendance.ClockedIn || attendance.CheckIn == nil {
 		return clockedOutStyle.Render("● Out")
 	}
-	elapsed := time.Since(*attendance.CheckIn)
+	elapsed := now.Sub(*attendance.CheckIn)
 	h := int(elapsed.Hours())
 	m := int(elapsed.Minutes()) % 60
 	text := fmt.Sprintf("● In %s (%d:%02d)",

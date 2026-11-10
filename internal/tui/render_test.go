@@ -312,7 +312,7 @@ func TestRenderHeaderBar_ShowsAttendanceTotals(t *testing.T) {
 	}
 
 	s := spinner.New()
-	out := RenderHeaderBar(mon, attendance, week, false, s, 160)
+	out := RenderHeaderBar(mon, attendance, week, false, s, 160, time.Now())
 
 	if !strings.Contains(out, "Today 0:30") {
 		t.Errorf("header %q should contain today's attendance total", out)
