@@ -140,6 +140,13 @@ command also needs its man page added to `manpages:` in `.goreleaser.yml`.
 
 Releases are built with GoReleaser (`mise run goreleaser-check` / `goreleaser-snapshot`).
 
+CI: `ci.yml` (vet, test, golangci-lint with a pinned version) and `docs.yml`
+(docs check + strict build) run on PRs and pushes to `develop`; neither deploys.
+The docs site follows the releases: on a `v*` tag `release.yml` runs
+`verify` (tests, lint, docs check, strict build) → `goreleaser` → `docs`
+(deploys to GitHub Pages). `mise run release` runs `docs:check` before tagging.
+`docs.yml` via `workflow_dispatch` redeploys the site from the latest `v*` tag.
+
 ## Conventions
 
 - Conventional commits: `feat:`, `fix:`, `test:`, `refactor:`
