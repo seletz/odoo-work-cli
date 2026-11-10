@@ -23,12 +23,12 @@ func mustImage(t *testing.T, f Frame) *image.RGBA {
 
 // centre returns the colour at the centre of a cell.
 func centre(img *image.RGBA, col, row int) color.RGBA {
-	return img.RGBAAt(padX+col*cellW+cellW/2, titleBar+row*cellH+cellH/2)
+	return img.RGBAAt(padX+col*cell.w+cell.w/2, titleBar+row*cell.h+cell.h/2)
 }
 
 // at returns the colour at a point of a cell, given in eighths of its size.
 func pixelAt(img *image.RGBA, col, row, ex, ey int) color.RGBA {
-	return img.RGBAAt(padX+col*cellW+ex*cellW/8, titleBar+row*cellH+ey*cellH/8)
+	return img.RGBAAt(padX+col*cell.w+ex*cell.w/8, titleBar+row*cell.h+ey*cell.h/8)
 }
 
 func near(a, b color.RGBA) bool {
@@ -49,7 +49,7 @@ func TestImage_SizeFollowsTerminalCells(t *testing.T) {
 	if got := img.Bounds(); got.Dx() != w || got.Dy() != h {
 		t.Errorf("image is %dx%d, want %dx%d", got.Dx(), got.Dy(), w, h)
 	}
-	if w != 80*cellW+2*padX || h != 24*cellH+titleBar+padY {
+	if w != 80*cell.w+2*padX || h != 24*cell.h+titleBar+padY {
 		t.Errorf("imageSize(80, 24) = %dx%d does not follow the cell grid", w, h)
 	}
 	if c := img.RGBAAt(0, 0); c.A != 0 {
@@ -66,8 +66,8 @@ func TestImage_Colours(t *testing.T) {
 		t.Errorf("corner of the green cell = %v", c)
 	}
 	red := false
-	for y := titleBar; y < titleBar+cellH; y++ {
-		for x := padX; x < padX+cellW; x++ {
+	for y := titleBar; y < titleBar+cell.h; y++ {
+		for x := padX; x < padX+cell.w; x++ {
 			if near(img.RGBAAt(x, y), color.RGBA{255, 95, 95, 255}) {
 				red = true
 			}
@@ -85,7 +85,7 @@ func TestImage_Colours(t *testing.T) {
 }
 
 // TestImage_EveryGlyphIsCovered: every character of the shots is either
-// drawn as a shape or has a glyph in Go Mono; a missing glyph would show
+// drawn as a shape or has a glyph in Fira Code; a missing glyph would show
 // as an empty box.
 func TestImage_EveryGlyphIsCovered(t *testing.T) {
 	fs, err := faces()
@@ -118,8 +118,8 @@ func TestImage_TextIsDrawn(t *testing.T) {
 	img := mustImage(t, frameOf(string(glyphs), len(glyphs), 1))
 	for i, g := range glyphs {
 		ink := false
-		for y := titleBar; y < titleBar+cellH && !ink; y++ {
-			for x := padX + i*cellW; x < padX+(i+1)*cellW; x++ {
+		for y := titleBar; y < titleBar+cell.h && !ink; y++ {
+			for x := padX + i*cell.w; x < padX+(i+1)*cell.w; x++ {
 				if !near(img.RGBAAt(x, y), background) {
 					ink = true
 					break
@@ -141,9 +141,9 @@ func TestImage_LinesAreContinuous(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			img := mustImage(t, frameOf(tc.row, 7, 1))
 			rows := 0
-			for y := titleBar; y < titleBar+cellH; y++ {
+			for y := titleBar; y < titleBar+cell.h; y++ {
 				full := true
-				for x := padX; x < padX+7*cellW; x++ {
+				for x := padX; x < padX+7*cell.w; x++ {
 					if near(img.RGBAAt(x, y), background) {
 						full = false
 						break
@@ -153,7 +153,7 @@ func TestImage_LinesAreContinuous(t *testing.T) {
 					rows++
 				}
 			}
-			want := map[string]int{"light": stroke, "heavy": heavyStroke, "double": 2 * stroke}[tc.name]
+			want := map[string]int{"light": cell.box, "heavy": 2 * cell.box, "double": 2 * cell.box}[tc.name]
 			if rows != want {
 				t.Errorf("%d pixel rows run through all cells, want %d", rows, want)
 			}
@@ -161,9 +161,9 @@ func TestImage_LinesAreContinuous(t *testing.T) {
 	}
 	// A vertical rule over three rows meets without gaps.
 	img := mustImage(t, frameOf("│\n┃\n║", 1, 3))
-	for y := titleBar; y < titleBar+3*cellH; y++ {
+	for y := titleBar; y < titleBar+3*cell.h; y++ {
 		ink := false
-		for x := padX; x < padX+cellW; x++ {
+		for x := padX; x < padX+cell.w; x++ {
 			if !near(img.RGBAAt(x, y), background) {
 				ink = true
 			}
@@ -194,14 +194,14 @@ func TestImage_Corners(t *testing.T) {
 			for _, p := range c.drawn {
 				ink := false
 				// Double lines are two strokes beside the midpoint.
-				for d := -stroke * 2; d <= stroke*2; d++ {
-					x, y := padX+p[0]*cellW/8, titleBar+p[1]*cellH/8
+				for d := -cell.box * 4; d <= cell.box*4; d++ {
+					x, y := padX+p[0]*cell.w/8, titleBar+p[1]*cell.h/8
 					if p[0] == 4 {
 						x += d
 					} else {
 						y += d
 					}
-					if near(img.RGBAAt(x, y), foreground) {
+					if !near(img.RGBAAt(x, y), background) {
 						ink = true
 					}
 				}
