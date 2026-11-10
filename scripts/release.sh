@@ -7,6 +7,15 @@ if [ -z "$LATEST" ]; then
     LATEST="v0.0.0"
 fi
 
+# The release workflow refuses stale generated docs (screenshots, command
+# reference, man pages); catch that before the tag exists.
+if ! mise run docs:check; then
+    echo "" >&2
+    echo "Generated docs are stale; the release would fail. Run 'mise run docs:generate'," >&2
+    echo "commit the result, and run the release again." >&2
+    exit 1
+fi
+
 echo "Current version: $LATEST"
 echo ""
 echo "Select bump type:"
@@ -56,4 +65,5 @@ git push origin "$NEXT"
 
 echo ""
 echo "Done! Tag $NEXT pushed."
-echo "GoReleaser will build artifacts, create the GitHub release, and update the Homebrew tap."
+echo "The Release workflow now verifies (tests, lint, docs), runs GoReleaser (artifacts,"
+echo "GitHub release, Homebrew tap) and deploys the docs site."
