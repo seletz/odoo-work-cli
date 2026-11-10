@@ -601,6 +601,11 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 	if innerWidth < 40 {
 		innerWidth = 40
 	}
+	// Never lay out wider than the terminal leaves room for: width minus the
+	// box frame (border + padding) and one cell of margin on each side.
+	if avail := width - searchBoxStyle.GetHorizontalFrameSize() - 2; width > 0 && innerWidth > avail {
+		innerWidth = max(avail, 20)
+	}
 
 	// Fixed content area: use ~60% of terminal height for the overlay inner
 	// content (border + padding consume ~6 lines on top of this).
@@ -678,8 +683,11 @@ func renderSearchOverlay(input textinput.Model, items []searchItem, cursor int, 
 		for i, item := range items {
 			if shown >= maxVisible {
 				remaining := len(items) - i
-				b.WriteString(padLine(fmt.Sprintf("\n  ... and %d more", remaining)))
-				lines++
+				b.WriteString(padLine(""))
+				b.WriteString("\n")
+				b.WriteString(padLine(fmt.Sprintf("  ... and %d more", remaining)))
+				b.WriteString("\n")
+				lines += 2
 				break
 			}
 

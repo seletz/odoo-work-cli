@@ -3,22 +3,22 @@
 Company Prefix / Project / Task         │     Mon│     Tue│     Wed│     Thu│     Fri│     Sat│     Sun│   Total
                                         │Ostermo…│        │        │        │        │        │        │
 ────────────────────────────────────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────
-[┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-[┃                                                                                                                    ┃
-[┃    Search (filtered)    Ctrl+A: toggle filter                                                                      ┃
-[┃                                                                                                                    ┃
-[┃    > in                                                                                                            ┃
-[┃                                                                                                                    ┃
-[┃    Projects:                                                                                                       ┃
-[┃      [P] [EXA] Lighthouse Portal — Example Consulting                                                              ┃
-m┃      [P] [EXA] Orchard Mobile App — Example Consulting                                                             ┃
-─┃      [P] [EXA] Internal — Example Consulting                                                                       ┃
-T┃                                                                                                                    ┃
-─┃    Tasks:                                                                                                          ┃
-C┃      [T] [EXA] Backend API — Lighthouse Portal                                                                     ┃
-C┃                                                                                                                    ┃
-A┃    ... and 7 more                                                                                    tab: result…  ┃
-D┃                                                                                                                    ┃
- ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-  ↑/k up • ↓/j down • tab next day • ←/h prev week • →/l next week • ↵ detail • e edit • a add • d delete • / search …
+[EXA] In┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+[EXA] In┃                                                                                                      ┃
+[EXA] Li┃    Search (filtered)    Ctrl+A: toggle filter                                                        ┃
+[EXA] Li┃                                                                                                      ┃
+[EXA] Li┃    > in                                                                                              ┃
+[EXA] Or┃                                                                                                      ┃
+[EXA] Or┃    Projects:                                                                                         ┃
+[WIL] Ri┃      [P] [EXA] Lighthouse Portal — Example Consulting                                                ┃
+mapping ┃      [P] [EXA] Orchard Mobile App — Example Consulting                                               ┃
+────────┃      [P] [EXA] Internal — Example Consulting                                                         ┃
+Total   ┃                                                                                                      ┃
+────────┃    Tasks:                                                                                            ┃
+Check-in┃      [T] [EXA] Backend API — Lighthouse Portal                                                       ┃
+Check-ou┃                                                                                                      ┃
+Attendan┃    ... and 7 more                                                                                    ┃
+Diff    ┃    tab: results  ↑/↓: navigate  Enter: select  Esc: cancel                                           ┃
+        ┃                                                                                                      ┃
+  ↑/k up┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛arch …
  SEARCH                                                                                                     Week: 20:15
