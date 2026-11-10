@@ -75,7 +75,7 @@ printed configuration.
   The server instructions tell the agent to propose with a dry run first.
 - **Errors.** A failed call is a normal tool result with `isError: true` and
   the [error envelope](../reference/30-errors.md):
-  `{"error":{"kind":"not_found","message":"timesheet entry 424242 does not exist"}}`.
+  `{"error":{"kind":"not_found","message":"timesheet entry 424242 not found"}}`.
   Bad arguments are `validation` and name the argument, not a flag.
 - **Pages.** A result over 32 KiB comes in pages; the second content item
   says which page and gives the `cursor` for the next.
