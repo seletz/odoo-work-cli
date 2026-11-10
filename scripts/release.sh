@@ -74,7 +74,7 @@ git add CHANGELOG.md
 git commit -S -m "docs: changelog for $NEXT"
 
 echo "Tagging $NEXT..."
-git tag -a "$NEXT" -m "Release $NEXT"
+git tag -s "$NEXT" -m "Release $NEXT"
 
 echo "Pushing the changelog commit and the tag to origin..."
 git push origin HEAD
