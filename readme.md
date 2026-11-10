@@ -526,6 +526,11 @@ Why three credentials?
 - If the account has 2FA enabled, the web session login is followed by a
   TOTP challenge. With `totp_secret` configured the CLI completes it
   automatically — no interactive prompt.
+- Odoo ends web sessions server-side (inactivity cleanup, server restart,
+  logout). A long-running process such as the TUI notices this on the next
+  clock in/out, logs in again (TOTP included) and retries once. If that does
+  not help, the command fails with an `auth` error; the TUI shows it instead
+  of failing silently.
 
 Note the naming: `ODOO_PASSWORD` holds the **API key**, and
 `ODOO_WEB_PASSWORD` holds the actual password.
@@ -784,6 +789,11 @@ key in 1Password / `.env` is stale. Run `mise run odoo:prepare-db` (or
 **`clock in` fails with "authentication failed".**
 The web session needs your real login **password** (`password` /
 `ODOO_WEB_PASSWORD`) — Odoo's `/web/session/authenticate` rejects API keys.
+
+**Clock in/out fails with "logging in again did not restore the Odoo web session" or "Odoo web session expired and logging in again failed".**
+The web session had expired and the automatic re-login did not work. The
+message names the cause: wrong password or TOTP secret, or a server that no
+longer serves the attendance route (e.g. `hr_attendance` not installed).
 
 **`clock in` fails with "2FA is enabled but no TOTP secret configured".**
 Set `totp_secret` in `[op_secrets]` or `ODOO_TOTP_SECRET`. The value is the

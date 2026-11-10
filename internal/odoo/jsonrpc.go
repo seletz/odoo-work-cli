@@ -3,6 +3,7 @@ package odoo
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +34,7 @@ type jsonRPCSession struct {
 	authenticated bool
 	totpCompleted bool // a /web/login/totp challenge was served and passed
 	reqID         atomic.Int64
+	mu            sync.Mutex // serialises calls, which may re-login and swap the cookie jar
 }
 
 // newJSONRPCSession creates a new JSON-RPC session (not yet authenticated).
@@ -184,14 +187,69 @@ func parseTOTPSecret(s string) string {
 	return s
 }
 
-// call makes a JSON-RPC call to the given path, auto-authenticating if needed.
+// errSessionExpired marks a response showing that Odoo no longer knows the
+// web session: JSON-RPC error code 100 (odoo.http.SessionExpiredException),
+// a nodb 404 for a module route, or a redirect to the login page (#73).
+var errSessionExpired = errors.New("odoo web session expired")
+
+// jsonRPCSessionExpiredCode is the JSON-RPC error code Odoo uses for
+// odoo.http.SessionExpiredException.
+const jsonRPCSessionExpiredCode = 100
+
+// call makes a JSON-RPC call to the given path, authenticating first if
+// needed. A long-running process (the TUI) keeps one session for days, and
+// Odoo ends sessions server-side (inactivity GC, restart, logout). When a
+// response shows the session has expired, call logs in again with a fresh
+// cookie jar (TOTP included) and retries exactly once. If that does not
+// help, it returns an apperr.KindAuth error — never a silent failure.
+//
+// :param path: controller route, e.g. /hr_attendance/systray_check_in_out
+// :param params: JSON-RPC params
+// :returns: the JSON-RPC result object
 func (s *jsonRPCSession) call(path string, params map[string]interface{}) (map[string]interface{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if !s.authenticated {
 		if err := s.authenticate(); err != nil {
 			return nil, err
 		}
 	}
 
+	result, err := s.post(path, params)
+	if !errors.Is(err, errSessionExpired) {
+		return result, err
+	}
+
+	s.reset()
+	if err := s.authenticate(); err != nil {
+		kind := apperr.KindOf(err)
+		if kind == apperr.KindInternal {
+			kind = apperr.KindAuth
+		}
+		return nil, apperr.Wrapf(kind, err, "Odoo web session expired and logging in again failed")
+	}
+
+	result, err = s.post(path, params)
+	if errors.Is(err, errSessionExpired) {
+		return nil, apperr.Wrapf(apperr.KindAuth, err, "logging in again did not restore the Odoo web session")
+	}
+	return result, err
+}
+
+// reset drops the session cookies and the authenticated state so the next
+// authenticate starts from a fresh, anonymous session.
+func (s *jsonRPCSession) reset() {
+	jar, _ := cookiejar.New(nil)
+	s.httpClient.Jar = jar
+	s.authenticated = false
+	s.totpCompleted = false
+}
+
+// post sends one JSON-RPC request with the current session cookie. It
+// returns an error wrapping errSessionExpired when the response shows the
+// session is no longer valid.
+func (s *jsonRPCSession) post(path string, params map[string]interface{}) (map[string]interface{}, error) {
 	payload := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      s.reqID.Add(1),
@@ -210,20 +268,36 @@ func (s *jsonRPCSession) call(path string, params map[string]interface{}) (map[s
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// The client follows redirects; ending up on the login page means the
+	// request was bounced for lack of a valid session.
+	if strings.HasPrefix(resp.Request.URL.Path, "/web/login") {
+		return nil, fmt.Errorf("%w: %s redirected to %s", errSessionExpired, path, resp.Request.URL.Path)
+	}
+	// On a multi-db server without dbfilter, a session Odoo does not know
+	// is not bound to a database, so module routes are dispatched in nodb
+	// mode and do not exist (verified on dev).
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("%w: HTTP 404 from %s (session not bound to a database, or the route does not exist)", errSessionExpired, path)
+	}
+
 	var result struct {
 		Error *struct {
+			Code    int                    `json:"code"`
 			Message string                 `json:"message"`
 			Data    map[string]interface{} `json:"data"`
 		} `json:"error"`
 		Result map[string]interface{} `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decoding response from %s: %w", path, err)
+		return nil, fmt.Errorf("decoding response from %s (HTTP %d, %s): %w", path, resp.StatusCode, resp.Header.Get("Content-Type"), err)
 	}
 	if result.Error != nil {
 		msg := result.Error.Message
 		if data, ok := result.Error.Data["message"].(string); ok {
 			msg = data
+		}
+		if result.Error.Code == jsonRPCSessionExpiredCode || result.Error.Data["name"] == "odoo.http.SessionExpiredException" {
+			return nil, fmt.Errorf("%w: %s answered %q", errSessionExpired, path, msg)
 		}
 		return nil, fmt.Errorf("JSON-RPC error from %s: %s", path, msg)
 	}

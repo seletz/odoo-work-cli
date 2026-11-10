@@ -10,6 +10,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/seletz/odoo-work-cli/internal/apperr"
 	"github.com/seletz/odoo-work-cli/internal/config"
 	"github.com/seletz/odoo-work-cli/internal/odoo"
 	"github.com/seletz/odoo-work-cli/internal/parsing"
@@ -1899,19 +1900,44 @@ func TestModel_ClockToggleMsgUpdatesClockedOut(t *testing.T) {
 	}
 }
 
+// TestModel_ClockToggleMsgError is the TUI half of #73: a failed clock in
+// or out (e.g. an expired web session that could not be restored) used to
+// set m.err while staying in the grid, which never renders m.err — the
+// failure was silent. It must switch to the error view and say so.
 func TestModel_ClockToggleMsgError(t *testing.T) {
-	m := newTestModel(nil, nil)
-	m.state = stateGrid
-
-	msg := clockToggleMsg{err: errors.New("network error")}
-	updated, _ := m.Update(msg)
-	um := updated.(Model)
-
-	if um.err == nil {
-		t.Error("expected error to be set")
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{"network", errors.New("network error")},
+		{"session not restored", apperr.New(apperr.KindAuth, "logging in again did not restore the Odoo web session")},
+		{"conflict", apperr.New(apperr.KindConflict, "already clocked in")},
 	}
-	if um.loading {
-		t.Error("expected loading=false after error")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestModel(nil, nil)
+			m.state = stateGrid
+			m.loading = true
+			m.width = 120
+			m.height = 40
+
+			updated, _ := m.Update(clockToggleMsg{err: tt.err})
+			um := updated.(Model)
+
+			if !errors.Is(um.err, tt.err) {
+				t.Errorf("err = %v, want it to wrap %v", um.err, tt.err)
+			}
+			if um.loading {
+				t.Error("expected loading=false after error")
+			}
+			if um.state != stateError {
+				t.Fatalf("state = %v, want stateError so the error is shown", um.state)
+			}
+			view := um.View().Content
+			if !strings.Contains(view, "clock in/out failed") || !strings.Contains(view, tt.err.Error()) {
+				t.Errorf("view does not show the clock error:\n%s", view)
+			}
+		})
 	}
 }
 

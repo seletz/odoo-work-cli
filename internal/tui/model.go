@@ -325,7 +325,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clockToggleMsg:
 		m.loading = false
 		if msg.err != nil {
-			m.err = msg.err
+			// Show it: the grid never renders m.err, so staying there made
+			// clock failures silent (#73). 'r' reloads and returns to the grid.
+			m.state = stateError
+			m.err = fmt.Errorf("clock in/out failed: %w", msg.err)
 			return m, nil
 		}
 		m.attendance = msg.status
