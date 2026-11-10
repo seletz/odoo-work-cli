@@ -456,3 +456,36 @@ func TestRenderSearchOverlay_HintCompleteAtTerminalWidth(t *testing.T) {
 		}
 	}
 }
+
+// Issue #107: when the label column is squeezed (80 columns), every grid row
+// is exactly one line and long names are truncated with an ellipsis.
+func TestRenderGrid_SqueezedLabelsAreSingleLine(t *testing.T) {
+	long := "Very long project name that cannot possibly fit"
+	g := BuildWeekGrid([]odoo.TimesheetEntry{
+		{Date: "2026-03-02", Project: long, ProjectID: 1, Task: long, TaskID: 2, Company: "Digital", Hours: 1},
+		{Date: "2026-03-03", Project: "Short", ProjectID: 3, Task: "T", TaskID: 4, Hours: 2},
+	}, monday(2026, 3, 2))
+	out := ansi.Strip(RenderGrid(g, 0, 0, 76, config.DefaultHoursLimits(), [7]string{}, nil, -1, WeekAttendance{}))
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	// header, separator, 2 data rows, separator, totals: no continuation lines.
+	if len(lines) != 6 {
+		t.Fatalf("want 6 lines, got %d:\n%s", len(lines), out)
+	}
+	found := false
+	for _, l := range lines {
+		if strings.Contains(l, "Very long") {
+			found = true
+			if !strings.Contains(strings.Split(l, "│")[0], "…") {
+				t.Errorf("long name not truncated with ellipsis: %q", l)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("long row missing:\n%s", out)
+	}
+	for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if w := ansi.StringWidth(l); w > 76 {
+			t.Errorf("line is %d cells: %q", w, l)
+		}
+	}
+}

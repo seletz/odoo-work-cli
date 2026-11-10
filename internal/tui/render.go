@@ -145,13 +145,17 @@ func gridMinWidth() int {
 	return gridMinLabelWidth + 2 + 8*gridCompactCol
 }
 
+// gridNaturalLabelWidth is the label column width when nothing is squeezed.
+func gridNaturalLabelWidth(width int) int {
+	return max(min(40, width/3), 20)
+}
+
 // gridLayout returns the label column width and the day column width
 // (including its separator) for a grid of the given total width. The label
 // gets up to a third of the width (20..40); when that does not fit, the
 // label shrinks first, then the day columns go compact.
 func gridLayout(width int) (labelWidth, colWidth int) {
-	labelWidth = min(40, width/3)
-	labelWidth = max(labelWidth, 20)
+	labelWidth = gridNaturalLabelWidth(width)
 	colWidth = max((width-labelWidth-2)/8, gridMinCol)
 	if labelWidth+2+8*colWidth <= width {
 		return labelWidth, colWidth
@@ -171,6 +175,9 @@ func gridLayout(width int) (labelWidth, colWidth int) {
 // totals row.
 func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.HoursLimits, holidays [7]string, companyColors map[string]string, todayCol int, att WeekAttendance) string {
 	labelWidth, colWidth := gridLayout(width)
+	// A squeezed label column cannot wrap names into several lines without
+	// eating the screen: show one truncated line per row instead.
+	squeezed := labelWidth < gridNaturalLabelWidth(width)
 
 	isHoliday := func(d int) bool { return holidays[d] != "" }
 
@@ -232,6 +239,9 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 	for ri, row := range grid.Rows {
 		rowSelected := ri == cursorRow
 		labelLines := wrapLabel(row.Label, labelWidth)
+		if squeezed {
+			labelLines = []string{ansi.Truncate(row.Label, labelWidth, "…")}
+		}
 		var rowLines []string
 		var rowTotal float64
 		for d := 0; d < 7; d++ {
@@ -239,7 +249,7 @@ func RenderGrid(grid WeekGrid, cursorRow, cursorCol, width int, limits config.Ho
 		}
 
 		for li, label := range labelLines {
-			styledLabel := fmt.Sprintf("%-*s", labelWidth, label)
+			styledLabel := label + strings.Repeat(" ", max(labelWidth-ansi.StringWidth(label), 0))
 			if color, ok := companyColors[row.Company]; ok {
 				styledLabel = companyLabelStyle(color).Render(styledLabel)
 			}
