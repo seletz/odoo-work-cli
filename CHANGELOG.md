@@ -8,6 +8,8 @@ release. See [Releases and docs](explanation/50-releases-and-docs.md).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-10
+
 ### Added
 
 - **MCP server (#102).** `odoo-work-cli mcp` serves the CLI as MCP tools on
